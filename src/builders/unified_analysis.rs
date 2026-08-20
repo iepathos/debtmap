@@ -27,7 +27,6 @@ use crate::organization::GodObjectAnalysis;
 use crate::priority::{
     DebtType, UnifiedAnalysis, UnifiedAnalysisUtils, UnifiedDebtItem,
     call_graph::{CallGraph, FunctionId},
-    debt_aggregator::DebtAggregator,
 };
 use crate::risk;
 use anyhow::Result;
@@ -279,7 +278,7 @@ fn process_js_ts_call_graph(
 }
 
 fn collect_js_ts_files(results: &AnalysisResults) -> Vec<PathBuf> {
-    results
+    let mut files: Vec<_> = results
         .complexity
         .metrics
         .iter()
@@ -287,7 +286,9 @@ fn collect_js_ts_files(results: &AnalysisResults) -> Vec<PathBuf> {
         .map(|m| m.file.clone())
         .collect::<std::collections::HashSet<_>>()
         .into_iter()
-        .collect()
+        .collect();
+    files.sort();
+    files
 }
 
 fn is_js_ts_file(file: &Path) -> bool {
@@ -493,43 +494,6 @@ pub fn create_unified_analysis_with_exclusions(
     )
 }
 
-/// Create debt item from metric (compatibility wrapper for parallel_unified_analysis).
-///
-/// # Performance Note
-/// The `context_detector` and `recommendation_engine` parameters should be shared across
-/// all metric processing to avoid repeated regex compilation (spec 196 optimization).
-/// Create these once at the call site and pass references.
-#[allow(clippy::too_many_arguments)]
-pub(super) fn create_debt_item_from_metric_with_aggregator(
-    metric: &crate::core::FunctionMetrics,
-    call_graph: &CallGraph,
-    coverage_data: Option<&risk::lcov::LcovData>,
-    framework_exclusions: &HashSet<FunctionId>,
-    function_pointer_used_functions: Option<&HashSet<FunctionId>>,
-    debt_aggregator: &DebtAggregator,
-    data_flow: Option<&crate::data_flow::DataFlowGraph>,
-    risk_analyzer: Option<&risk::RiskAnalyzer>,
-    project_path: &Path,
-    file_line_counts: &core::phases::scoring::FileLineCountCache,
-    context_detector: &crate::analysis::ContextDetector,
-    recommendation_engine: &crate::priority::scoring::ContextRecommendationEngine,
-) -> Vec<UnifiedDebtItem> {
-    core::phases::scoring::create_debt_items_from_metric(
-        metric,
-        call_graph,
-        coverage_data,
-        framework_exclusions,
-        function_pointer_used_functions,
-        debt_aggregator,
-        data_flow,
-        risk_analyzer,
-        project_path,
-        file_line_counts,
-        context_detector,
-        recommendation_engine,
-    )
-}
-
 // --- Internal implementation ---
 
 #[allow(clippy::too_many_arguments)]
@@ -555,104 +519,27 @@ fn create_unified_analysis_with_exclusions_and_timing(
     >,
     reference_time: chrono::DateTime<chrono::Utc>,
 ) -> UnifiedAnalysis {
-    if parallel {
-        return create_parallel_analysis(
-            metrics,
-            call_graph,
-            coverage_data,
-            framework_exclusions,
-            function_pointer_used_functions,
-            debt_items,
-            no_god_object,
-            jobs,
-            call_graph_time,
-            coverage_time,
-            risk_analyzer,
-            project_path,
-            extracted_data,
-            reference_time,
-        );
-    }
-
-    // Sequential path using pure functions
-    let start = std::time::Instant::now();
-
-    let mut unified = UnifiedAnalysis::new(call_graph.clone());
-    let data_flow_start = std::time::Instant::now();
-    let data_flow = core::phases::preparation::build_data_flow_graph(
+    create_scheduled_analysis(
         metrics,
         call_graph,
-        extracted_data.as_ref(),
-    );
-    let data_flow_time = data_flow_start.elapsed();
-    unified.data_flow_graph = data_flow.clone();
-
-    let test_only_functions = core::phases::call_graph::find_test_only_functions(call_graph);
-    let debt_aggregator = core::phases::scoring::setup_debt_aggregator(metrics, debt_items);
-
-    // Build file line count cache (spec 195: I/O at boundary, once per unique file)
-    let file_line_counts = core::phases::scoring::build_file_line_count_cache(metrics);
-
-    // Process metrics to debt items (uses cached file line counts)
-    let items = core::phases::scoring::process_metrics_to_debt_items(
-        metrics,
-        call_graph,
-        &test_only_functions,
         coverage_data,
         framework_exclusions,
         function_pointer_used_functions,
-        &debt_aggregator,
-        Some(&data_flow),
-        risk_analyzer.as_ref(),
-        project_path,
-        &file_line_counts,
-    );
-
-    for item in items {
-        unified.add_item(item);
-    }
-
-    // File analysis
-    let file_context = FileAnalysisContext {
-        extracted_data: extracted_data.as_ref(),
-        file_line_counts: &file_line_counts,
-        coverage_data,
+        debt_items,
         no_god_object,
-        risk_analyzer: risk_analyzer.as_ref(),
+        parallel,
+        jobs,
+        call_graph_time,
+        coverage_time,
+        risk_analyzer,
         project_path,
-        call_graph,
-    };
-    process_file_analysis(&mut unified, metrics, &file_context);
-
-    // Finalize
-    unified.sort_by_priority();
-    unified.calculate_total_impact();
-    unified.has_coverage_data = coverage_data.is_some();
-
-    if let Some(lcov) = coverage_data {
-        unified.overall_coverage = Some(lcov.get_overall_coverage());
-    }
-
-    unified.timings = Some(parallel_unified_analysis::AnalysisPhaseTimings {
-        call_graph_building: call_graph_time,
-        trait_resolution: std::time::Duration::from_secs(0),
-        coverage_loading: coverage_time,
-        data_flow_creation: data_flow_time,
-        purity_analysis: std::time::Duration::from_secs(0),
-        test_detection: std::time::Duration::from_secs(0),
-        debt_aggregation: std::time::Duration::from_secs(0),
-        function_analysis: std::time::Duration::from_secs(0),
-        file_analysis: std::time::Duration::from_secs(0),
-        aggregation: std::time::Duration::from_secs(0),
-        sorting: std::time::Duration::from_secs(0),
-        total: start.elapsed(),
-    });
-
-    unified
+        extracted_data,
+        reference_time,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
-fn create_parallel_analysis(
+fn create_scheduled_analysis(
     metrics: &[crate::core::FunctionMetrics],
     call_graph: &CallGraph,
     coverage_data: Option<&risk::lcov::LcovData>,
@@ -660,6 +547,7 @@ fn create_parallel_analysis(
     function_pointer_used_functions: Option<&HashSet<FunctionId>>,
     debt_items: Option<&[crate::core::DebtItem]>,
     no_god_object: bool,
+    parallel: bool,
     jobs: usize,
     call_graph_time: std::time::Duration,
     coverage_time: std::time::Duration,
@@ -673,14 +561,14 @@ fn create_parallel_analysis(
     use parallel_unified_analysis::ParallelUnifiedAnalysisOptions;
 
     let options = ParallelUnifiedAnalysisOptions {
-        parallel: true,
+        parallel,
         jobs: if jobs > 0 { Some(jobs) } else { None },
         batch_size: 100,
         progress: std::env::var("DEBTMAP_QUIET").is_err(),
         reference_time,
     };
 
-    with_analysis_pool(jobs, || {
+    with_analysis_pool(if parallel { jobs } else { 0 }, || {
         execute_parallel_analysis(
             metrics,
             call_graph,
@@ -759,9 +647,6 @@ fn execute_parallel_analysis(
     let (data_flow_graph, purity, test_only_functions, debt_aggregator) =
         builder.execute_phase1_parallel(metrics, debt_items);
 
-    let file_line_counts = core::phases::scoring::build_file_line_count_cache(metrics);
-    builder = builder.with_line_count_index(file_line_counts);
-
     let items = builder.execute_phase2_parallel(
         metrics,
         &test_only_functions,
@@ -837,107 +722,8 @@ fn is_god_object_suppressed_unified(
     false
 }
 
-struct FileAnalysisContext<'a> {
-    extracted_data:
-        Option<&'a std::collections::HashMap<PathBuf, crate::extraction::ExtractedFileData>>,
-    file_line_counts: &'a core::phases::scoring::FileLineCountCache,
-    coverage_data: Option<&'a risk::lcov::LcovData>,
-    no_god_object: bool,
-    risk_analyzer: Option<&'a risk::RiskAnalyzer>,
-    project_path: &'a Path,
-    call_graph: &'a CallGraph,
-}
-
-fn process_file_analysis(
-    unified: &mut UnifiedAnalysis,
-    metrics: &[crate::core::FunctionMetrics],
-    context: &FileAnalysisContext<'_>,
-) {
-    let file_groups = core::phases::file_analysis::group_functions_by_file(metrics);
-
-    register_analyzed_files(
-        unified,
-        &file_groups,
-        context.extracted_data,
-        context.file_line_counts,
-    );
-
-    for (file_path, functions) in file_groups {
-        process_single_file(unified, file_path, functions, context);
-    }
-}
-
-fn register_analyzed_files(
-    unified: &mut UnifiedAnalysis,
-    file_groups: &std::collections::HashMap<PathBuf, Vec<crate::core::FunctionMetrics>>,
-    extracted_data: Option<
-        &std::collections::HashMap<PathBuf, crate::extraction::ExtractedFileData>,
-    >,
-    file_line_counts: &core::phases::scoring::FileLineCountCache,
-) {
-    for file_path in file_groups.keys() {
-        let extracted_count = extracted_data
-            .and_then(|data| data.get(file_path))
-            .map(|file| file.total_lines);
-        if let Some(line_count) =
-            extracted_count.or_else(|| file_line_counts.get(file_path).copied())
-        {
-            unified.register_analyzed_file(file_path.clone(), line_count);
-        }
-    }
-}
-
-fn process_single_file(
-    unified: &mut UnifiedAnalysis,
-    file_path: PathBuf,
-    functions: Vec<crate::core::FunctionMetrics>,
-    context: &FileAnalysisContext<'_>,
-) {
-    let extracted = context.extracted_data.and_then(|data| data.get(&file_path));
-    let file_content = std::fs::read_to_string(&file_path).ok();
-
-    let mut processed = core::phases::file_analysis::process_file_metrics_with_facts(
-        file_path.clone(),
-        functions,
-        core::phases::file_analysis::FileAnalysisFacts {
-            content: file_content.as_deref(),
-            extracted,
-            line_count: context.file_line_counts.get(&file_path).copied(),
-        },
-        context.coverage_data,
-        context.no_god_object,
-        context.project_path,
-    );
-
-    // Clear function_scores for consistency with parallel path
-    processed.file_metrics.function_scores = Vec::new();
-
-    let file_item = core::phases::file_analysis::create_file_debt_item(
-        processed.file_metrics.clone(),
-        Some(&processed.file_context),
-    );
-
-    let has_god_object = processed
-        .god_analysis
-        .as_ref()
-        .is_some_and(|a| a.is_god_object);
-
-    if file_item.score > 50.0 || has_god_object {
-        let finalized = finalize_file_item(
-            unified,
-            file_item,
-            &processed.raw_functions,
-            context.coverage_data,
-            context.risk_analyzer,
-            context.project_path,
-            context.call_graph,
-        );
-        unified.add_file_item(finalized);
-    }
-}
-
 #[allow(clippy::too_many_arguments)]
-pub(super) fn finalize_file_item(
+pub(super) fn finalize_file_item_with_content(
     unified: &mut UnifiedAnalysis,
     mut file_item: crate::priority::FileDebtItem,
     raw_functions: &[crate::core::FunctionMetrics],
@@ -945,6 +731,7 @@ pub(super) fn finalize_file_item(
     risk_analyzer: Option<&risk::RiskAnalyzer>,
     project_path: &Path,
     call_graph: &CallGraph,
+    file_content: Option<&str>,
 ) -> crate::priority::FileDebtItem {
     let god_analysis = file_item
         .metrics
@@ -962,6 +749,7 @@ pub(super) fn finalize_file_item(
             risk_analyzer,
             project_path,
             call_graph,
+            file_content,
         );
     }
 
@@ -978,8 +766,9 @@ fn add_god_object_item(
     risk_analyzer: Option<&risk::RiskAnalyzer>,
     project_path: &Path,
     call_graph: &CallGraph,
+    file_content: Option<&str>,
 ) {
-    if is_god_object_suppressed_for_file(file_item, god_analysis) {
+    if is_god_object_suppressed_for_file(file_item, god_analysis, file_content) {
         file_item.metrics.god_object_analysis = None;
         return;
     }
@@ -1054,12 +843,11 @@ fn build_god_object_item(
 fn is_god_object_suppressed_for_file(
     file_item: &crate::priority::FileDebtItem,
     god_analysis: &crate::organization::GodObjectAnalysis,
+    file_content: Option<&str>,
 ) -> bool {
-    std::fs::read_to_string(&file_item.metrics.path)
-        .ok()
-        .is_some_and(|content| {
-            is_god_object_suppressed_unified(god_analysis, &content, &file_item.metrics.path)
-        })
+    file_content.is_some_and(|content| {
+        is_god_object_suppressed_unified(god_analysis, content, &file_item.metrics.path)
+    })
 }
 
 fn member_contextual_risk(

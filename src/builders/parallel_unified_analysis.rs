@@ -1,7 +1,6 @@
 use crate::{
-    analysis::ContextDetector,
     builders::unified_analysis_phases::phases::scoring::{
-        SuppressionContextCache, build_suppression_context_cache,
+        PreparedScoringInput, ScoringExecution, SuppressionContextCache, score_metrics,
     },
     core::FunctionMetrics,
     data_flow::DataFlowGraph,
@@ -11,7 +10,6 @@ use crate::{
         call_graph::{CallGraph, FunctionId},
         debt_aggregator::DebtAggregator,
         file_metrics::FileDebtItem,
-        scoring::ContextRecommendationEngine,
     },
     progress::ProgressManager,
     risk::lcov::LcovData,
@@ -25,29 +23,6 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-
-/// Filter out unified debt items that are suppressed via debtmap:ignore annotations (spec 215).
-///
-/// This function checks each item against the suppression context cache and removes
-/// items whose functions have `debtmap:ignore[type] -- reason` annotations.
-fn filter_suppressed_items(
-    items: Vec<UnifiedDebtItem>,
-    suppression_cache: &SuppressionContextCache,
-) -> Vec<UnifiedDebtItem> {
-    items
-        .into_iter()
-        .filter(|item| {
-            // Look up suppression context for this file
-            if let Some(context) = suppression_cache.get(&item.location.file) {
-                // Filter out if the function is allowed (suppressed)
-                !context.is_function_allowed(item.location.line, &item.debt_type)
-            } else {
-                // No suppression context for this file, keep the item
-                true
-            }
-        })
-        .collect()
-}
 
 fn clone_function_metrics(functions: &[&FunctionMetrics]) -> Vec<FunctionMetrics> {
     functions.iter().map(|&function| function.clone()).collect()
@@ -97,8 +72,13 @@ pub struct AnalysisPhaseTimings {
     pub purity_analysis: Duration,
     pub test_detection: Duration,
     pub debt_aggregation: Duration,
+    pub prepare_scoring: Duration,
+    pub score_functions: Duration,
     pub function_analysis: Duration,
+    pub analyze_files: Duration,
     pub file_analysis: Duration,
+    pub finalize_files: Duration,
+    pub calculate_impact: Duration,
     pub aggregation: Duration,
     pub sorting: Duration,
     pub total: Duration,
@@ -114,29 +94,18 @@ impl Default for AnalysisPhaseTimings {
             purity_analysis: Duration::from_secs(0),
             test_detection: Duration::from_secs(0),
             debt_aggregation: Duration::from_secs(0),
+            prepare_scoring: Duration::from_secs(0),
+            score_functions: Duration::from_secs(0),
             function_analysis: Duration::from_secs(0),
+            analyze_files: Duration::from_secs(0),
             file_analysis: Duration::from_secs(0),
+            finalize_files: Duration::from_secs(0),
+            calculate_impact: Duration::from_secs(0),
             aggregation: Duration::from_secs(0),
             sorting: Duration::from_secs(0),
             total: Duration::from_secs(0),
         }
     }
-}
-
-/// Context for function analysis - groups all dependencies
-struct FunctionAnalysisContext<'a> {
-    call_graph: &'a CallGraph,
-    debt_aggregator: &'a DebtAggregator,
-    data_flow_graph: &'a DataFlowGraph,
-    coverage_data: Option<&'a LcovData>,
-    framework_exclusions: &'a HashSet<FunctionId>,
-    function_pointer_used_functions: Option<&'a HashSet<FunctionId>>,
-    risk_analyzer: Option<&'a crate::risk::RiskAnalyzer>,
-    project_path: &'a Path,
-    file_line_counts: &'a HashMap<PathBuf, usize>,
-    // Shared detectors to avoid per-metric regex compilation (spec 196 optimization)
-    context_detector: &'a ContextDetector,
-    recommendation_engine: &'a ContextRecommendationEngine,
 }
 
 /// Optimized test detector with lock-free caching
@@ -279,6 +248,9 @@ pub struct ParallelUnifiedAnalysisBuilder {
     /// Cached line counts from Phase 1 analysis, keyed by file path.
     /// Used to avoid redundant file I/O in Phase 3 (spec 195).
     line_count_index: HashMap<PathBuf, usize>,
+    /// Immutable source snapshot shared by suppression and file analysis.
+    file_content_index: HashMap<PathBuf, Option<String>>,
+    suppression_contexts: SuppressionContextCache,
     /// Pre-extracted file data from unified extraction phase (spec 213).
     /// When present, avoids re-parsing files during analysis.
     extracted_data: Option<Arc<HashMap<PathBuf, ExtractedFileData>>>,
@@ -293,6 +265,8 @@ impl ParallelUnifiedAnalysisBuilder {
             risk_analyzer: None,
             project_path: PathBuf::from("."),
             line_count_index: HashMap::new(),
+            file_content_index: HashMap::new(),
+            suppression_contexts: HashMap::new(),
             extracted_data: None,
         }
     }
@@ -323,6 +297,51 @@ impl ParallelUnifiedAnalysisBuilder {
             .filter(|fm| fm.total_lines > 0)
             .map(|fm| (fm.path.clone(), fm.total_lines))
             .collect()
+    }
+
+    fn prepare_file_facts(&mut self, metrics: &[FunctionMetrics]) {
+        let mut paths: Vec<_> = metrics
+            .iter()
+            .map(|metric| metric.file.clone())
+            .filter(|path| !self.file_content_index.contains_key(path))
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+        paths.sort();
+
+        let read = |path: &PathBuf| (path.clone(), std::fs::read_to_string(path).ok());
+        let facts: Vec<_> = if self.options.parallel {
+            paths.par_iter().map(read).collect()
+        } else {
+            paths.iter().map(read).collect()
+        };
+        for (path, content) in facts {
+            self.register_file_facts(path, content);
+        }
+    }
+
+    fn register_file_facts(&mut self, path: PathBuf, content: Option<String>) {
+        let extracted_lines = self
+            .extracted_data
+            .as_ref()
+            .and_then(|files| files.get(&path))
+            .map(|file| file.total_lines);
+        if let Some(lines) =
+            extracted_lines.or_else(|| content.as_ref().map(|text| text.lines().count()))
+        {
+            self.line_count_index.entry(path.clone()).or_insert(lines);
+        }
+        if let Some(text) = content.as_deref() {
+            let context = crate::debt::suppression::parse_suppression_comments(
+                text,
+                crate::core::Language::from_path(&path),
+                &path,
+            );
+            if !context.function_allows.is_empty() {
+                self.suppression_contexts.insert(path.clone(), context);
+            }
+        }
+        self.file_content_index.insert(path, content);
     }
 
     /// Set the risk analyzer for contextual risk analysis
@@ -394,6 +413,10 @@ impl ParallelUnifiedAnalysisBuilder {
         HashSet<FunctionId>,
         DebtAggregator,
     ) {
+        if !self.options.parallel {
+            return self.execute_phase1_sequential(metrics, debt_items);
+        }
+
         // Create shared references for parallel execution
         let call_graph = Arc::clone(&self.call_graph);
         let metrics_arc = Arc::new(metrics.to_vec());
@@ -486,6 +509,48 @@ impl ParallelUnifiedAnalysisBuilder {
         self.timings = t.clone();
 
         (data_flow, purity, test_funcs, debt_agg)
+    }
+
+    fn execute_phase1_sequential(
+        &mut self,
+        metrics: &[FunctionMetrics],
+        debt_items: Option<&[crate::core::DebtItem]>,
+    ) -> (
+        DataFlowGraph,
+        HashMap<String, bool>,
+        HashSet<FunctionId>,
+        DebtAggregator,
+    ) {
+        let started = Instant::now();
+        let data_flow =
+            crate::builders::unified_analysis_phases::phases::preparation::build_data_flow_graph(
+                metrics,
+                &self.call_graph,
+                self.extracted_data.as_deref(),
+            );
+        self.timings.data_flow_creation = started.elapsed();
+
+        let started = Instant::now();
+        let purity =
+            crate::builders::unified_analysis_phases::phases::scoring::metrics_to_purity_map(
+                metrics,
+            );
+        self.timings.purity_analysis = started.elapsed();
+
+        let started = Instant::now();
+        let tests =
+            crate::builders::unified_analysis_phases::phases::call_graph::find_test_only_functions(
+                &self.call_graph,
+            );
+        self.timings.test_detection = started.elapsed();
+
+        let started = Instant::now();
+        let aggregator =
+            crate::builders::unified_analysis_phases::phases::scoring::setup_debt_aggregator(
+                metrics, debt_items,
+            );
+        self.timings.debt_aggregation = started.elapsed();
+        (data_flow, purity, tests, aggregator)
     }
 
     fn spawn_data_flow_task<'a>(
@@ -609,8 +674,11 @@ impl ParallelUnifiedAnalysisBuilder {
         function_pointer_used_functions: Option<&HashSet<FunctionId>>,
     ) -> Vec<UnifiedDebtItem> {
         let start = Instant::now();
+        let prepare_start = Instant::now();
+        self.prepare_file_facts(metrics);
+        self.timings.prepare_scoring = prepare_start.elapsed();
 
-        // Subtask 1: Score functions (main computational loop with progress) - PARALLEL
+        // Subtask 1: score functions through the shared scheduling kernel.
         let total_metrics = metrics.len();
         if let Some(manager) = ProgressManager::global() {
             manager.tui_update_subtask(
@@ -621,41 +689,27 @@ impl ParallelUnifiedAnalysisBuilder {
             );
         }
 
-        // Suppress old progress bar - unified system already shows "4/4 Resolving dependencies"
-        let progress: Option<indicatif::ProgressBar> = None;
-
-        // Build suppression context cache for function-level debtmap:ignore annotations (spec 215)
-        // This enables filtering of unified debt items based on annotations like:
-        //   // debtmap:ignore[testing] -- I/O orchestration function
-        let suppression_cache = build_suppression_context_cache(metrics);
-
-        // Pre-create shared detectors once to avoid per-metric regex compilation (spec 196)
-        // These are Sync types that can be safely shared across threads
-        let context_detector = ContextDetector::new();
-        let recommendation_engine = ContextRecommendationEngine::new();
-
-        // Create analysis context for the pipeline
-        let context = FunctionAnalysisContext {
+        let input = PreparedScoringInput {
             call_graph: &self.call_graph,
+            test_only_functions,
             debt_aggregator,
-            data_flow_graph,
+            data_flow: Some(data_flow_graph),
             coverage_data,
             framework_exclusions,
             function_pointer_used_functions,
             risk_analyzer: self.risk_analyzer.as_ref(),
             project_path: &self.project_path,
             file_line_counts: &self.line_count_index,
-            context_detector: &context_detector,
-            recommendation_engine: &recommendation_engine,
+            suppression_contexts: &self.suppression_contexts,
         };
-
-        // Functional pipeline for processing metrics with progress tracking
-        let items: Vec<UnifiedDebtItem> = self.process_metrics_pipeline(
-            metrics,
-            test_only_functions,
-            &context,
-            progress.as_ref(),
-        );
+        let execution = if self.options.parallel {
+            ScoringExecution::Parallel
+        } else {
+            ScoringExecution::Sequential
+        };
+        let scoring_start = Instant::now();
+        let items = score_metrics(metrics, &input, execution);
+        self.timings.score_functions = scoring_start.elapsed();
 
         self.timings.function_analysis = start.elapsed();
 
@@ -669,105 +723,7 @@ impl ParallelUnifiedAnalysisBuilder {
             std::thread::sleep(std::time::Duration::from_millis(150));
         }
 
-        // Finish progress bar with completion message
-        if let Some(pb) = progress {
-            pb.finish_with_message(format!(
-                "Function analysis complete ({} items in {:?})",
-                items.len(),
-                self.timings.function_analysis
-            ));
-        }
-
-        // Filter out items that are suppressed via debtmap:ignore annotations (spec 215)
-        // This ensures annotations like `// debtmap:ignore[testing]` work in coverage mode
-        filter_suppressed_items(items, &suppression_cache)
-    }
-
-    /// Process metrics through a functional pipeline
-    fn process_metrics_pipeline(
-        &self,
-        metrics: &[FunctionMetrics],
-        test_only_functions: &HashSet<FunctionId>,
-        context: &FunctionAnalysisContext,
-        progress: Option<&indicatif::ProgressBar>,
-    ) -> Vec<UnifiedDebtItem> {
-        use std::sync::atomic::{AtomicUsize, Ordering};
-
-        let total_metrics = metrics.len();
-        let processed_count = AtomicUsize::new(0);
-        // Throttle TUI updates (~50-100 total updates)
-        let update_interval = (total_metrics / 100).max(1);
-
-        metrics
-            .par_iter()
-            .progress_with(
-                progress
-                    .cloned()
-                    .unwrap_or_else(indicatif::ProgressBar::hidden),
-            )
-            .flat_map(|metric| {
-                let result = self.process_single_metric(metric, test_only_functions, context);
-
-                // Update TUI progress (throttled)
-                let current = processed_count.fetch_add(1, Ordering::Relaxed) + 1;
-                if (current % update_interval == 0 || current == total_metrics)
-                    && let Some(manager) = crate::progress::ProgressManager::global()
-                {
-                    manager.tui_update_subtask(
-                        5,
-                        1,
-                        crate::tui::app::StageStatus::Active,
-                        Some((current, total_metrics)),
-                    );
-                }
-
-                result
-            })
-            .collect()
-    }
-
-    /// Process a single metric through the filtering and transformation pipeline (spec 228)
-    fn process_single_metric(
-        &self,
-        metric: &FunctionMetrics,
-        test_only_functions: &HashSet<FunctionId>,
-        context: &FunctionAnalysisContext,
-    ) -> Vec<UnifiedDebtItem> {
-        if !crate::builders::unified_analysis_phases::phases::call_graph::should_process_metric(
-            metric,
-            &self.call_graph,
-            test_only_functions,
-        ) {
-            return Vec::new();
-        }
-
-        // Transform metric to debt items (spec 228: returns Vec for multi-debt)
-        self.metric_to_debt_items(metric, context)
-    }
-
-    /// Transform a metric into debt items (spec 228: multi-debt support)
-    fn metric_to_debt_items(
-        &self,
-        metric: &FunctionMetrics,
-        context: &FunctionAnalysisContext,
-    ) -> Vec<UnifiedDebtItem> {
-        // Returns Vec<UnifiedDebtItem> - one per debt type found (spec 228)
-        // Uses shared detectors from context to avoid per-metric regex compilation (spec 196)
-        // Note: risk_analyzer is already a reference in context, no need to clone
-        crate::builders::unified_analysis::create_debt_item_from_metric_with_aggregator(
-            metric,
-            context.call_graph,
-            context.coverage_data,
-            context.framework_exclusions,
-            context.function_pointer_used_functions,
-            context.debt_aggregator,
-            Some(context.data_flow_graph),
-            context.risk_analyzer,
-            context.project_path,
-            context.file_line_counts,
-            context.context_detector,
-            context.recommendation_engine,
-        )
+        items
     }
 
     /// Execute phase 3: Parallel file analysis
@@ -778,6 +734,7 @@ impl ParallelUnifiedAnalysisBuilder {
         no_god_object: bool,
     ) -> Vec<(FileDebtItem, Vec<FunctionMetrics>)> {
         let start = Instant::now();
+        self.prepare_file_facts(metrics);
 
         // Group functions by file
         let mut files_map: HashMap<PathBuf, Vec<&FunctionMetrics>> = HashMap::new();
@@ -788,7 +745,9 @@ impl ParallelUnifiedAnalysisBuilder {
                 .push(metric);
         }
 
-        let total_files = files_map.len();
+        let mut files: Vec<_> = files_map.into_iter().collect();
+        files.sort_by(|a, b| a.0.cmp(&b.0));
+        let total_files = files.len();
 
         // Initialize TUI progress tracking (design consistency - DESIGN.md:179)
         // Subtask 2: File analysis (stage 5 = debt scoring)
@@ -808,47 +767,27 @@ impl ParallelUnifiedAnalysisBuilder {
         // Suppress old progress bar - unified system already shows subtask progress
         let progress = indicatif::ProgressBar::hidden();
 
-        // Analyze files in parallel with TUI progress updates
-        // Store both file items and raw functions for god object aggregation
-        let mut file_data: Vec<(FileDebtItem, Vec<FunctionMetrics>)> = files_map
-            .par_iter()
-            .progress_with(progress.clone())
-            .filter_map(|(file_path, functions)| {
-                let result =
-                    self.analyze_file_parallel(file_path, functions, coverage_data, no_god_object);
-
-                // Update progress (throttled to maintain 60 FPS - DESIGN.md:179)
-                let current =
-                    processed_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
-
-                if let Ok(mut last) = last_update.try_lock()
-                    && (current % 10 == 0 || last.elapsed() > std::time::Duration::from_millis(100))
-                {
-                    if let Some(manager) = crate::progress::ProgressManager::global() {
-                        manager.tui_update_subtask(
-                            5,
-                            2,
-                            crate::tui::app::StageStatus::Active,
-                            Some((current, total_files)),
-                        );
-                    }
-                    *last = Instant::now();
-                }
-
-                // Return both the file item and the raw functions
-                result.map(|item| {
-                    let raw_functions: Vec<FunctionMetrics> =
-                        functions.iter().map(|&f| f.clone()).collect();
-                    (item, raw_functions)
-                })
-            })
-            .collect();
+        let analyze = |(file_path, functions): &(PathBuf, Vec<&FunctionMetrics>)| {
+            let result = self.analyze_file(file_path, functions, coverage_data, no_god_object);
+            record_file_progress(&processed_count, &last_update, total_files);
+            result.map(|item| (item, clone_function_metrics(functions)))
+        };
+        let mut file_data: Vec<(FileDebtItem, Vec<FunctionMetrics>)> = if self.options.parallel {
+            files
+                .par_iter()
+                .progress_with(progress.clone())
+                .filter_map(analyze)
+                .collect()
+        } else {
+            files.iter().filter_map(analyze).collect()
+        };
 
         // Sort file_data by path to ensure deterministic order (Spec 214 fix)
         // This ensures god objects are added in a stable order for duplicate checks.
         file_data.sort_by(|a, b| a.0.metrics.path.cmp(&b.0.metrics.path));
 
         self.timings.file_analysis = start.elapsed();
+        self.timings.analyze_files = self.timings.file_analysis;
 
         progress.finish_and_clear();
 
@@ -865,7 +804,7 @@ impl ParallelUnifiedAnalysisBuilder {
         file_data
     }
 
-    fn analyze_file_parallel(
+    fn analyze_file(
         &self,
         file_path: &Path,
         functions: &[&FunctionMetrics],
@@ -877,13 +816,16 @@ impl ParallelUnifiedAnalysisBuilder {
             .extracted_data
             .as_ref()
             .and_then(|data| data.get(file_path));
-        let file_content = std::fs::read_to_string(file_path).ok();
+        let file_content = self
+            .file_content_index
+            .get(file_path)
+            .and_then(|content| content.as_deref());
         let mut processed =
             crate::builders::unified_analysis_phases::phases::file_analysis::process_file_metrics_with_facts(
                 file_path.to_path_buf(),
                 functions_owned,
                 crate::builders::unified_analysis_phases::phases::file_analysis::FileAnalysisFacts {
-                    content: file_content.as_deref(),
+                    content: file_content,
                     extracted,
                     line_count: self.line_count_index.get(file_path).copied(),
                 },
@@ -909,7 +851,7 @@ impl ParallelUnifiedAnalysisBuilder {
     pub fn build(
         mut self,
         data_flow_graph: DataFlowGraph,
-        purity_analysis: HashMap<String, bool>,
+        _purity_analysis: HashMap<String, bool>,
         items: Vec<UnifiedDebtItem>,
         file_data: Vec<(FileDebtItem, Vec<FunctionMetrics>)>,
         coverage_data: Option<&LcovData>,
@@ -920,12 +862,19 @@ impl ParallelUnifiedAnalysisBuilder {
         let agg_progress = create_final_aggregation_progress(total_file_items);
         let mut unified = self.initialize_unified_analysis(data_flow_graph, &file_data);
 
-        apply_purity_analysis(&mut unified, purity_analysis);
         add_unified_items(&mut unified, items);
+        let finalize_start = Instant::now();
         self.add_finalized_file_items(&mut unified, file_data, coverage_data);
+        self.timings.finalize_files = finalize_start.elapsed();
 
         agg_progress.set_message("Sorting by priority and calculating impact");
-        finalize_unified_analysis(&mut unified, coverage_data);
+        let sorting_start = Instant::now();
+        unified.sort_by_priority();
+        self.timings.sorting = sorting_start.elapsed();
+        let impact_start = Instant::now();
+        unified.calculate_total_impact();
+        self.timings.calculate_impact = impact_start.elapsed();
+        apply_coverage_summary(&mut unified, coverage_data);
         complete_finalization_subtask(total_file_items);
         finish_aggregation_progress(&agg_progress, &unified);
 
@@ -955,7 +904,11 @@ impl ParallelUnifiedAnalysisBuilder {
         let total_file_items = file_data.len();
 
         for (index, (file_item, raw_functions)) in file_data.into_iter().enumerate() {
-            let finalized = crate::builders::unified_analysis::finalize_file_item(
+            let content = self
+                .file_content_index
+                .get(&file_item.metrics.path)
+                .and_then(|content| content.as_deref());
+            let finalized = crate::builders::unified_analysis::finalize_file_item_with_content(
                 unified,
                 file_item,
                 &raw_functions,
@@ -963,6 +916,7 @@ impl ParallelUnifiedAnalysisBuilder {
                 self.risk_analyzer.as_ref(),
                 &self.project_path,
                 &self.call_graph,
+                content,
             );
             unified.add_file_item(finalized);
             update_finalization_subtask(index + 1, total_file_items);
@@ -970,7 +924,7 @@ impl ParallelUnifiedAnalysisBuilder {
     }
 
     fn record_final_timing(&mut self, elapsed: Duration) {
-        self.timings.sorting = elapsed;
+        self.timings.aggregation = elapsed;
         self.timings.total = total_analysis_duration(&self.timings);
     }
 
@@ -990,13 +944,40 @@ impl ParallelUnifiedAnalysisBuilder {
         log::debug!("  - Purity: {:?}", self.timings.purity_analysis);
         log::debug!("  - Test detection: {:?}", self.timings.test_detection);
         log::debug!("  - Debt aggregation: {:?}", self.timings.debt_aggregation);
+        log::debug!("  - Prepare scoring: {:?}", self.timings.prepare_scoring);
+        log::debug!("  - Score functions: {:?}", self.timings.score_functions);
         log::debug!(
             "  - Function analysis: {:?}",
             self.timings.function_analysis
         );
         log::debug!("  - File analysis: {:?}", self.timings.file_analysis);
+        log::debug!("  - Finalize files: {:?}", self.timings.finalize_files);
+        log::debug!("  - Calculate impact: {:?}", self.timings.calculate_impact);
         log::debug!("  - Sorting: {:?}", self.timings.sorting);
     }
+}
+
+fn record_file_progress(
+    processed: &std::sync::atomic::AtomicUsize,
+    last_update: &std::sync::Mutex<Instant>,
+    total_files: usize,
+) {
+    let current = processed.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+    let Ok(mut last) = last_update.try_lock() else {
+        return;
+    };
+    if current % 10 != 0 && last.elapsed() <= Duration::from_millis(100) {
+        return;
+    }
+    if let Some(manager) = ProgressManager::global() {
+        manager.tui_update_subtask(
+            5,
+            2,
+            crate::tui::app::StageStatus::Active,
+            Some((current, total_files)),
+        );
+    }
+    *last = Instant::now();
 }
 
 fn create_final_aggregation_progress(total_file_items: usize) -> indicatif::ProgressBar {
@@ -1027,27 +1008,13 @@ fn register_analyzed_files(
     }
 }
 
-fn apply_purity_analysis(unified: &mut UnifiedAnalysis, purity_analysis: HashMap<String, bool>) {
-    for (func_name, is_pure) in purity_analysis {
-        if let Some(item) = unified
-            .items
-            .iter_mut()
-            .find(|i| i.location.function == func_name)
-        {
-            item.is_pure = Some(is_pure);
-        }
-    }
-}
-
 fn add_unified_items(unified: &mut UnifiedAnalysis, items: Vec<UnifiedDebtItem>) {
     for item in items {
         unified.add_item(item);
     }
 }
 
-fn finalize_unified_analysis(unified: &mut UnifiedAnalysis, coverage_data: Option<&LcovData>) {
-    unified.sort_by_priority();
-    unified.calculate_total_impact();
+fn apply_coverage_summary(unified: &mut UnifiedAnalysis, coverage_data: Option<&LcovData>) {
     unified.has_coverage_data = coverage_data.is_some();
 
     if let Some(lcov) = coverage_data {
@@ -1085,7 +1052,6 @@ fn total_analysis_duration(timings: &AnalysisPhaseTimings) -> Duration {
         + timings.function_analysis
         + timings.file_analysis
         + timings.aggregation
-        + timings.sorting
 }
 
 fn update_finalization_subtask(current: usize, total: usize) {

@@ -121,7 +121,6 @@ fn canonicalize(value: &mut Value, root: &Path) {
             for value in values.iter_mut() {
                 canonicalize(value, root);
             }
-            values.sort_by_key(|value| serde_json::to_string(value).unwrap());
         }
         Value::Object(values) => {
             for value in values.values_mut() {
@@ -157,6 +156,24 @@ fn parallel_and_sequential_function_items_have_identical_scores() {
 
     assert!(parallel_items.iter().any(is_scored_production_hotspot));
     assert_eq!(parallel_items, sequential_items);
+    assert_eq!(
+        canonical_report(parallel, fixture.path()),
+        canonical_report(sequential, fixture.path())
+    );
+}
+
+fn canonical_report(mut report: Value, root: &Path) -> Value {
+    report["metadata"]["generated_at"] = Value::String("<time>".into());
+    report["receipt"]["reference_time"] = Value::String("<time>".into());
+    report["receipt"]
+        .as_object_mut()
+        .unwrap()
+        .remove("execution");
+    for item in report["items"].as_array_mut().unwrap() {
+        item.as_object_mut().unwrap().remove("context");
+    }
+    canonicalize(&mut report, root);
+    report
 }
 
 fn is_scored_production_hotspot(item: &Value) -> bool {
@@ -195,7 +212,6 @@ fn canonical_god_items(report: &Value, root: &Path) -> Vec<Value> {
         }
         canonicalize(item, root);
     }
-    items.sort_by_key(|item| serde_json::to_string(item).unwrap());
     items
 }
 

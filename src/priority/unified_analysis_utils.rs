@@ -20,6 +20,7 @@ fn compare_debt_items_by_score(a: &UnifiedDebtItem, b: &UnifiedDebtItem) -> Orde
         .then_with(|| a.location.file.cmp(&b.location.file))
         .then_with(|| a.location.line.cmp(&b.location.line))
         .then_with(|| a.location.function.cmp(&b.location.function))
+        .then_with(|| a.debt_type.to_string().cmp(&b.debt_type.to_string()))
 }
 
 /// Compare file items by score (pure function).

@@ -37,24 +37,9 @@ pub type FileLineCountCache = HashMap<PathBuf, usize>;
 
 /// Look up cached file line count (pure function, spec 195).
 ///
-/// This is a pure O(1) lookup from the pre-built cache.
-/// Falls back to reading file if not in cache (defensive coding).
+/// This is a pure O(1) lookup from the prepared source snapshot.
 fn get_file_line_count(file_path: &Path, cache: &FileLineCountCache) -> Option<usize> {
-    cache
-        .get(file_path)
-        .copied()
-        .or_else(|| calculate_file_line_count_from_disk(file_path))
-}
-
-/// Calculate file line count by reading from disk (fallback for cache miss).
-/// Returns None if file cannot be read.
-fn calculate_file_line_count_from_disk(file_path: &Path) -> Option<usize> {
-    use crate::metrics::LocCounter;
-    let loc_counter = LocCounter::default();
-    loc_counter
-        .count_file(file_path)
-        .ok()
-        .map(|count| count.physical_lines)
+    cache.get(file_path).copied()
 }
 
 /// Calculate context-aware multiplier for a file path (spec 191)
@@ -225,8 +210,8 @@ pub fn create_unified_debt_item_enhanced(
     // Calculate entropy analysis once for efficiency (Spec 218 - unified entropy type)
     let entropy_analysis = calculate_entropy_analysis(func);
 
-    // Calculate file line count (this function doesn't use the cache since it's a standalone API)
-    let file_line_count = calculate_file_line_count_from_disk(&func.file);
+    // Standalone construction has no prepared source snapshot.
+    let file_line_count = None;
 
     // Analyze responsibility category during construction (spec 254)
     let responsibility_category =

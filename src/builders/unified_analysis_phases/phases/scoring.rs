@@ -5,9 +5,8 @@
 //!
 //! # Parallelism (spec 196)
 //!
-//! The `process_metrics_to_debt_items` function uses rayon's `par_iter()` for
-//! parallel processing of function metrics. Shared detectors are created once
-//! and passed to all threads via immutable references.
+//! Sequential and parallel execution schedule the same immutable scoring input
+//! and pure per-metric transformation.
 
 use crate::analysis::ContextDetector;
 use crate::core::{DebtItem, FunctionMetrics, Language};
@@ -108,6 +107,28 @@ pub fn build_file_line_count_cache(metrics: &[FunctionMetrics]) -> FileLineCount
 /// Cache of suppression contexts for each file (spec 215 extension).
 /// Key: file path, Value: SuppressionContext for that file
 pub type SuppressionContextCache = HashMap<PathBuf, SuppressionContext>;
+
+/// Scheduling policy for the shared scoring kernel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScoringExecution {
+    Sequential,
+    Parallel,
+}
+
+/// Immutable dependencies prepared once for function scoring.
+pub struct PreparedScoringInput<'a> {
+    pub call_graph: &'a CallGraph,
+    pub test_only_functions: &'a HashSet<FunctionId>,
+    pub coverage_data: Option<&'a LcovData>,
+    pub framework_exclusions: &'a HashSet<FunctionId>,
+    pub function_pointer_used_functions: Option<&'a HashSet<FunctionId>>,
+    pub debt_aggregator: &'a DebtAggregator,
+    pub data_flow: Option<&'a DataFlowGraph>,
+    pub risk_analyzer: Option<&'a RiskAnalyzer>,
+    pub project_path: &'a Path,
+    pub file_line_counts: &'a FileLineCountCache,
+    pub suppression_contexts: &'a SuppressionContextCache,
+}
 
 /// Build cache of suppression contexts for all unique files in metrics.
 ///
@@ -295,45 +316,75 @@ pub fn process_metrics_to_debt_items(
     project_path: &Path,
     file_line_counts: &FileLineCountCache,
 ) -> Vec<UnifiedDebtItem> {
-    use super::call_graph::should_process_metric;
-
-    // Use global singletons to avoid repeated regex/HashMap creation
-    let context_detector = ContextDetector::global();
-    let recommendation_engine = ContextRecommendationEngine::global();
-
-    // Build suppression context cache for function-level debtmap:ignore annotations (spec 215)
-    // This enables filtering of unified debt items based on annotations like:
-    //   // debtmap:ignore[testing] -- I/O orchestration function
     let suppression_cache = build_suppression_context_cache(metrics);
+    let input = PreparedScoringInput {
+        call_graph,
+        test_only_functions,
+        coverage_data,
+        framework_exclusions,
+        function_pointer_used_functions,
+        debt_aggregator,
+        data_flow,
+        risk_analyzer,
+        project_path,
+        file_line_counts,
+        suppression_contexts: &suppression_cache,
+    };
+    score_metrics(metrics, &input, ScoringExecution::Parallel)
+}
 
-    // Parallel processing with shared references - spec 196
-    let items: Vec<UnifiedDebtItem> = metrics
-        .par_iter() // Parallel iteration with rayon
-        .filter(|metric| should_process_metric(metric, call_graph, test_only_functions))
-        .flat_map(|metric| {
-            create_debt_items_from_metric(
-                metric,
-                call_graph,
-                coverage_data,
-                framework_exclusions,
-                function_pointer_used_functions,
-                debt_aggregator,
-                data_flow,
-                risk_analyzer,
-                project_path,
-                file_line_counts,
-                context_detector,
-                recommendation_engine,
-            )
-        })
-        .collect();
+/// Score metrics through one deterministic kernel with configurable scheduling.
+pub fn score_metrics(
+    metrics: &[FunctionMetrics],
+    input: &PreparedScoringInput<'_>,
+    execution: ScoringExecution,
+) -> Vec<UnifiedDebtItem> {
+    let policy = crate::config::AnalysisPolicy::from_config(crate::config::get_config());
+    let items: Vec<UnifiedDebtItem> = match execution {
+        ScoringExecution::Sequential => metrics
+            .iter()
+            .flat_map(|metric| score_metric(metric, input, &policy))
+            .collect(),
+        ScoringExecution::Parallel => metrics
+            .par_iter()
+            .flat_map(|metric| score_metric(metric, input, &policy))
+            .collect(),
+    };
 
-    // Filter out items that are suppressed via debtmap:ignore annotations (spec 215)
-    // This ensures annotations like `// debtmap:ignore[testing]` work in coverage mode
     items
         .into_iter()
-        .filter(|item| !is_item_suppressed(item, &suppression_cache))
+        .filter(|item| !is_item_suppressed(item, input.suppression_contexts))
         .collect()
+}
+
+fn score_metric(
+    metric: &FunctionMetrics,
+    input: &PreparedScoringInput<'_>,
+    policy: &crate::config::AnalysisPolicy,
+) -> Vec<UnifiedDebtItem> {
+    use super::call_graph::should_process_metric;
+
+    if !should_process_metric(metric, input.call_graph, input.test_only_functions) {
+        return Vec::new();
+    }
+
+    create_debt_items_from_metric(
+        metric,
+        input.call_graph,
+        input.coverage_data,
+        input.framework_exclusions,
+        input.function_pointer_used_functions,
+        input.debt_aggregator,
+        input.data_flow,
+        input.risk_analyzer,
+        input.project_path,
+        input.file_line_counts,
+        ContextDetector::global(),
+        ContextRecommendationEngine::global(),
+    )
+    .into_iter()
+    .filter(|item| policy.allows_debt_type(Language::from_path(&metric.file), &item.debt_type))
+    .collect()
 }
 
 /// Calculate total complexity from metrics (pure).
