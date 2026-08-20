@@ -299,12 +299,13 @@ fn output_unified_priorities_with_summary_and_receipt(
         }
         Some(crate::cli::OutputFormat::Markdown) => {
             let include_scoring_details = verbosity >= 2;
-            llm_markdown::output_llm_markdown_with_format(
+            llm_markdown::output_llm_markdown_with_format_and_receipt(
                 &analysis,
                 top,
                 tail,
                 output_file,
                 include_scoring_details,
+                analysis_receipt.as_ref(),
             )
         }
         Some(crate::cli::OutputFormat::Dot) => {

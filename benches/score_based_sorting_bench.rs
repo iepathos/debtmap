@@ -186,6 +186,7 @@ fn bench_sorting_various_sizes(c: &mut Criterion) {
             timings: None,
             stats: FilterStatistics::default(),
             analyzed_files: std::collections::HashMap::new(),
+            suppression_audit: Default::default(),
         };
 
         group.bench_with_input(
@@ -251,6 +252,7 @@ fn bench_worst_case_sorting(c: &mut Criterion) {
         timings: None,
         stats: FilterStatistics::default(),
         analyzed_files: std::collections::HashMap::new(),
+        suppression_audit: Default::default(),
     };
 
     c.bench_function("worst_case_similar_scores_1000", |b| {
@@ -318,6 +320,7 @@ fn bench_mixed_debt_types(c: &mut Criterion) {
         timings: None,
         stats: FilterStatistics::default(),
         analyzed_files: std::collections::HashMap::new(),
+        suppression_audit: Default::default(),
     };
 
     c.bench_function("mixed_debt_types_1000", |b| {
@@ -374,6 +377,7 @@ fn bench_with_risk_boosts(c: &mut Criterion) {
         timings: None,
         stats: FilterStatistics::default(),
         analyzed_files: std::collections::HashMap::new(),
+        suppression_audit: Default::default(),
     };
 
     c.bench_function("with_risk_boosts_1000", |b| {

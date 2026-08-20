@@ -205,6 +205,7 @@ mod tests {
             timings: None,
             stats: crate::priority::FilterStatistics::new(),
             analyzed_files: std::collections::HashMap::new(),
+            suppression_audit: Default::default(),
         }
     }
 

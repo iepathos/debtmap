@@ -120,6 +120,24 @@ pub fn output_llm_markdown_with_format(
     output_file: Option<PathBuf>,
     include_scoring_details: bool,
 ) -> Result<()> {
+    output_llm_markdown_with_format_and_receipt(
+        analysis,
+        top,
+        tail,
+        output_file,
+        include_scoring_details,
+        None,
+    )
+}
+
+pub fn output_llm_markdown_with_format_and_receipt(
+    analysis: &UnifiedAnalysis,
+    top: Option<usize>,
+    tail: Option<usize>,
+    output_file: Option<PathBuf>,
+    include_scoring_details: bool,
+    receipt: Option<&crate::output::unified::AnalysisReceipt>,
+) -> Result<()> {
     // Convert to unified format (same as JSON for consistency)
     let unified_output = convert_to_unified_format(analysis, include_scoring_details);
 
@@ -131,11 +149,11 @@ pub fn output_llm_markdown_with_format(
             crate::io::ensure_dir(parent)?;
         }
         let mut file = fs::File::create(path)?;
-        write_grouped_markdown(&mut file, &groups, &filtered_output)?;
+        write_grouped_markdown(&mut file, &groups, &filtered_output, receipt)?;
     } else {
         let stdout = std::io::stdout();
         let mut handle = stdout.lock();
-        write_grouped_markdown(&mut handle, &groups, &filtered_output)?;
+        write_grouped_markdown(&mut handle, &groups, &filtered_output, receipt)?;
     }
     Ok(())
 }
@@ -192,6 +210,7 @@ fn write_grouped_markdown<W: Write>(
     writer: &mut W,
     groups: &[LocationGroup],
     output: &UnifiedOutput,
+    receipt: Option<&crate::output::unified::AnalysisReceipt>,
 ) -> Result<()> {
     // Header
     writeln!(writer, "# Debtmap Analysis Report")?;
@@ -244,6 +263,10 @@ fn write_grouped_markdown<W: Write>(
     writeln!(writer, "  - Low: {}", output.summary.score_distribution.low)?;
     writeln!(writer)?;
 
+    if let Some(receipt) = receipt {
+        write_suppression_audit(writer, &receipt.suppressions)?;
+    }
+
     // Debt Items (grouped by location)
     writeln!(writer, "## Debt Items")?;
     writeln!(writer)?;
@@ -252,6 +275,38 @@ fn write_grouped_markdown<W: Write>(
         write_location_group(writer, index + 1, group)?;
     }
 
+    Ok(())
+}
+
+fn write_suppression_audit<W: Write>(
+    writer: &mut W,
+    audit: &crate::output::unified::SuppressionAuditReceipt,
+) -> Result<()> {
+    if audit.is_empty() {
+        return Ok(());
+    }
+    writeln!(writer, "## Suppressions Applied")?;
+    writeln!(writer, "- Applied findings: {}", audit.applied_count)?;
+    for record in &audit.records {
+        let reason = record
+            .decision
+            .reason
+            .as_deref()
+            .map(|text| format!(" — {text}"))
+            .unwrap_or_default();
+        writeln!(
+            writer,
+            "- {}:{} `{}`: {} ({:?}, directive line {}){}",
+            record.file.display(),
+            record.line,
+            record.function.as_deref().unwrap_or("[file-scope]"),
+            record.debt_type,
+            record.decision.kind,
+            record.decision.directive_line,
+            reason
+        )?;
+    }
+    writeln!(writer)?;
     Ok(())
 }
 

@@ -263,6 +263,9 @@ fn create_analysis_receipt(
         selection: create_selection_receipt(config),
         execution: create_execution_receipt(config),
         scope: create_scope_receipt(analysis, file_outcomes),
+        suppressions: crate::output::unified::SuppressionAuditReceipt::from_audit(
+            &analysis.suppression_audit,
+        ),
         warnings: create_receipt_warnings(config, analysis, file_outcomes),
     })
 }

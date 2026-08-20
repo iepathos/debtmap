@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -15,7 +16,49 @@ pub struct AnalysisReceipt {
     pub selection: SelectionReceipt,
     pub execution: ExecutionReceipt,
     pub scope: ScopeReceipt,
+    #[serde(default, skip_serializing_if = "SuppressionAuditReceipt::is_empty")]
+    pub suppressions: SuppressionAuditReceipt,
     pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SuppressionAuditReceipt {
+    pub applied_count: usize,
+    pub by_language: BTreeMap<String, usize>,
+    pub by_debt_type: BTreeMap<String, usize>,
+    pub records: Vec<crate::debt::suppression_audit::AppliedSuppression>,
+}
+
+impl SuppressionAuditReceipt {
+    pub fn from_audit(audit: &crate::debt::suppression_audit::SuppressionAudit) -> Self {
+        Self {
+            applied_count: audit.applied.len(),
+            by_language: count_by(audit, |record| {
+                crate::core::Language::from_path(&record.file)
+                    .to_string()
+                    .to_lowercase()
+            }),
+            by_debt_type: count_by(audit, |record| record.debt_type.clone()),
+            records: audit.applied.clone(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+}
+
+fn count_by(
+    audit: &crate::debt::suppression_audit::SuppressionAudit,
+    key: impl Fn(&crate::debt::suppression_audit::AppliedSuppression) -> String,
+) -> BTreeMap<String, usize> {
+    audit
+        .applied
+        .iter()
+        .fold(BTreeMap::new(), |mut counts, record| {
+            *counts.entry(key(record)).or_default() += 1;
+            counts
+        })
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

@@ -24,6 +24,7 @@ fn test_unified_analysis_json_serialization() {
         timings: None,
         stats: FilterStatistics::new(),
         analyzed_files: std::collections::HashMap::new(),
+        suppression_audit: Default::default(),
     };
 
     // Attempt to serialize to JSON

@@ -22,6 +22,29 @@ fn secondary_entry(value: usize) -> usize {
     production_hotspot(value + 1)
 }
 
+// debtmap:ignore[complexity] -- parity fixture suppression
+fn suppressed_hotspot(value: usize) -> usize {
+    if value > 0 {
+        if value > 1 {
+            if value > 2 {
+                if value > 3 {
+                    if value > 4 {
+                        if value > 5 {
+                            if value > 6 {
+                                if value > 7 {
+                                    if value > 8 {
+                                        if value > 9 { value } else { 9 }
+                                    } else { 8 }
+                                } else { 7 }
+                            } else { 6 }
+                        } else { 5 }
+                    } else { 4 }
+                } else { 3 }
+            } else { 2 }
+        } else { 1 }
+    } else { 0 }
+}
+
 fn production_hotspot(value: usize) -> usize {
     if value > 0 {
         if value % 2 == 0 {
@@ -115,6 +138,29 @@ fn profile_analysis(root: &Path, profile_output: &Path) -> Value {
     serde_json::from_str(&fs::read_to_string(profile_output).unwrap()).unwrap()
 }
 
+fn markdown_analysis(root: &Path, output: &Path) -> String {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_debtmap"));
+    command
+        .current_dir(root)
+        .arg("analyze")
+        .arg(root)
+        .args([
+            "--format",
+            "markdown",
+            "--quiet",
+            "--no-tui",
+            "--no-context-aware",
+            "--min-score",
+            "0",
+            "--output",
+        ])
+        .arg(output);
+    clear_analysis_environment(&mut command);
+    let result = command.output().unwrap();
+    assert!(result.status.success());
+    fs::read_to_string(output).unwrap()
+}
+
 fn phase_named<'a>(phases: &'a [Value], name: &str) -> Option<&'a Value> {
     phases.iter().find_map(|phase| {
         let children = phase["children"]
@@ -198,6 +244,11 @@ fn parallel_and_sequential_function_items_have_identical_scores() {
     let sequential_items = canonical_function_items(&sequential, fixture.path());
 
     assert!(parallel_items.iter().any(is_scored_production_hotspot));
+    assert_eq!(parallel["receipt"]["suppressions"]["applied_count"], 1);
+    assert_eq!(
+        parallel["receipt"]["suppressions"]["records"][0]["decision"]["reason"],
+        "parity fixture suppression"
+    );
     let hotspot = parallel_items
         .iter()
         .find(|item| item["location"]["function"] == "production_hotspot")
@@ -246,6 +297,18 @@ fn profiling_report_exposes_debt_scoring_subphases() {
     ] {
         assert!(child_names.contains(&expected), "missing {expected}");
     }
+}
+
+#[test]
+fn markdown_reports_applied_suppressions() {
+    let fixture = TempDir::new().unwrap();
+    fs::write(fixture.path().join("analysis.rs"), FIXTURE).unwrap();
+
+    let markdown = markdown_analysis(fixture.path(), &fixture.path().join("report.md"));
+
+    assert!(markdown.contains("## Suppressions Applied"));
+    assert!(markdown.contains("parity fixture suppression"));
+    assert!(markdown.contains("directive line"));
 }
 
 fn canonical_report(mut report: Value, root: &Path) -> Value {

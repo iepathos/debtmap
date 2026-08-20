@@ -57,7 +57,7 @@ pub use priority::Priority;
 pub use receipt::{
     AnalysisPolicyReceipt, AnalysisReceipt, CodeBreakdownReceipt, EvidenceReceipt,
     ExecutionReceipt, LanguagePolicyReceipt, ScopeReceipt, ScopeStatus, SelectionReceipt,
-    SourceRevisionReceipt,
+    SourceRevisionReceipt, SuppressionAuditReceipt,
 };
 pub use types::{
     DebtSummary, OutputMetadata, ScoreDistribution, TypeBreakdown, UnifiedDebtItemOutput,

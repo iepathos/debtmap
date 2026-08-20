@@ -1,4 +1,5 @@
 use crate::core::{DebtType, Language};
+use crate::debt::suppression_audit::{SuppressionDecision, SuppressionKind};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::collections::HashMap;
@@ -77,6 +78,68 @@ impl SuppressionContext {
             }
         }
         false
+    }
+
+    /// Return the suppression decision applied to a finding, preserving provenance.
+    pub fn decision_for(&self, line: usize, debt_type: &DebtType) -> Option<SuppressionDecision> {
+        self.same_line_decision(line, debt_type)
+            .or_else(|| self.next_line_decision(line, debt_type))
+            .or_else(|| self.function_decision(line, debt_type))
+            .or_else(|| self.block_decision(line, debt_type))
+    }
+
+    pub fn has_directives(&self) -> bool {
+        !self.active_blocks.is_empty()
+            || !self.line_suppressions.is_empty()
+            || !self.function_allows.is_empty()
+    }
+
+    fn same_line_decision(&self, line: usize, debt_type: &DebtType) -> Option<SuppressionDecision> {
+        self.line_suppressions
+            .get(&line)
+            .filter(|rule| debt_type_matches(debt_type, &rule.debt_types))
+            .map(|rule| decision(SuppressionKind::SameLine, line, rule.reason.clone()))
+    }
+
+    fn next_line_decision(&self, line: usize, debt_type: &DebtType) -> Option<SuppressionDecision> {
+        let directive_line = line.checked_sub(1)?;
+        self.line_suppressions
+            .get(&directive_line)
+            .filter(|rule| rule.applies_to_next_line)
+            .filter(|rule| debt_type_matches(debt_type, &rule.debt_types))
+            .map(|rule| {
+                decision(
+                    SuppressionKind::NextLine,
+                    directive_line,
+                    rule.reason.clone(),
+                )
+            })
+    }
+
+    fn function_decision(&self, line: usize, debt_type: &DebtType) -> Option<SuppressionDecision> {
+        let (directive_line, allow) = nearest_function_allow(self, line)?;
+        debt_type_matches(debt_type, &allow.debt_types).then(|| {
+            decision(
+                SuppressionKind::Function,
+                directive_line,
+                Some(allow.reason.clone()),
+            )
+        })
+    }
+
+    fn block_decision(&self, line: usize, debt_type: &DebtType) -> Option<SuppressionDecision> {
+        self.active_blocks
+            .iter()
+            .filter(|block| line_within_block(line, block))
+            .filter(|block| debt_type_matches(debt_type, &block.debt_types))
+            .max_by_key(|block| block.start_line)
+            .map(|block| {
+                decision(
+                    SuppressionKind::Block,
+                    block.start_line,
+                    block.reason.clone(),
+                )
+            })
     }
 
     /// Get the reason for a function-level suppression, if any.
@@ -174,6 +237,31 @@ impl SuppressionContext {
                 *acc.entry(debt_type).or_insert(0) += 1;
                 acc
             })
+    }
+}
+
+fn nearest_function_allow(
+    context: &SuppressionContext,
+    function_line: usize,
+) -> Option<(usize, &FunctionAllow)> {
+    (1..=5).find_map(|offset| {
+        let line = function_line.checked_sub(offset)?;
+        context
+            .function_allows
+            .get(&line)
+            .map(|allow| (line, allow))
+    })
+}
+
+fn decision(
+    kind: SuppressionKind,
+    directive_line: usize,
+    reason: Option<String>,
+) -> SuppressionDecision {
+    SuppressionDecision {
+        kind,
+        directive_line,
+        reason,
     }
 }
 
@@ -1034,5 +1122,73 @@ fn function2() {}
             lines: 1000,
         };
         assert!(context.is_suppressed(1, &god_object));
+    }
+
+    fn complexity_debt() -> DebtType {
+        DebtType::ComplexityHotspot {
+            cyclomatic: 20,
+            cognitive: 30,
+        }
+    }
+
+    #[test]
+    fn decision_preserves_kind_line_and_reason_for_each_directive() {
+        let cases = [
+            (
+                "fn run() {} // debtmap:ignore[complexity] -- same line",
+                1,
+                SuppressionKind::SameLine,
+                1,
+                "same line",
+            ),
+            (
+                "// debtmap:ignore-next-line[complexity] -- next line\nfn run() {}",
+                2,
+                SuppressionKind::NextLine,
+                1,
+                "next line",
+            ),
+            (
+                "// debtmap:ignore[complexity] -- function reason\nfn run() {}",
+                2,
+                SuppressionKind::Function,
+                1,
+                "function reason",
+            ),
+            (
+                "// debtmap:ignore-start[complexity] -- block reason\nfn run() {}\n// debtmap:ignore-end",
+                2,
+                SuppressionKind::Block,
+                1,
+                "block reason",
+            ),
+        ];
+
+        for (source, line, kind, directive_line, reason) in cases {
+            let context = parse_suppression_comments(source, Language::Rust, Path::new("x.rs"));
+            let decision = context.decision_for(line, &complexity_debt()).unwrap();
+            assert_eq!(decision.kind, kind);
+            assert_eq!(decision.directive_line, directive_line);
+            assert_eq!(decision.reason.as_deref(), Some(reason));
+        }
+    }
+
+    #[test]
+    fn same_line_decision_precedes_enclosing_block() {
+        let source = "// debtmap:ignore-start[complexity] -- block\nfn run() {} // debtmap:ignore[complexity] -- line\n// debtmap:ignore-end";
+        let context = parse_suppression_comments(source, Language::Rust, Path::new("x.rs"));
+
+        let decision = context.decision_for(2, &complexity_debt()).unwrap();
+
+        assert_eq!(decision.kind, SuppressionKind::SameLine);
+        assert_eq!(decision.reason.as_deref(), Some("line"));
+    }
+
+    #[test]
+    fn nearest_nonmatching_function_directive_does_not_fall_through() {
+        let source = "// debtmap:ignore[complexity] -- older\n// debtmap:ignore[testing] -- nearest\nfn run() {}";
+        let context = parse_suppression_comments(source, Language::Rust, Path::new("x.rs"));
+
+        assert!(context.decision_for(3, &complexity_debt()).is_none());
     }
 }

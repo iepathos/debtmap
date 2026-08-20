@@ -1,6 +1,8 @@
+use crate::debt::suppression_audit::SuppressionAudit;
 use crate::{
     builders::unified_analysis_phases::phases::scoring::{
-        PreparedScoringInput, ScoringExecution, SuppressionContextCache, score_metrics_with_policy,
+        PreparedScoringInput, ScoringExecution, SuppressionContextCache,
+        score_metrics_with_policy_audited,
     },
     config::AnalysisPolicy,
     core::FunctionMetrics,
@@ -253,6 +255,7 @@ pub struct ParallelUnifiedAnalysisBuilder {
     /// Immutable source snapshot shared by suppression and file analysis.
     file_content_index: HashMap<PathBuf, Option<String>>,
     suppression_contexts: SuppressionContextCache,
+    suppression_audit: SuppressionAudit,
     analysis_policy: AnalysisPolicy,
     /// Pre-extracted file data from unified extraction phase (spec 213).
     /// When present, avoids re-parsing files during analysis.
@@ -270,6 +273,7 @@ impl ParallelUnifiedAnalysisBuilder {
             line_count_index: HashMap::new(),
             file_content_index: HashMap::new(),
             suppression_contexts: HashMap::new(),
+            suppression_audit: SuppressionAudit::default(),
             analysis_policy: AnalysisPolicy::from_config(crate::config::get_config()),
             extracted_data: None,
         }
@@ -347,7 +351,7 @@ impl ParallelUnifiedAnalysisBuilder {
                 crate::core::Language::from_path(&path),
                 &path,
             );
-            if !context.function_allows.is_empty() {
+            if context.has_directives() {
                 self.suppression_contexts.insert(path.clone(), context);
             }
         }
@@ -721,10 +725,11 @@ impl ParallelUnifiedAnalysisBuilder {
             ScoringExecution::Sequential
         };
         let scoring_start = Instant::now();
-        let items = {
+        let outcome = {
             time_span!("score_functions", parent: "debt_scoring");
-            score_metrics_with_policy(metrics, &input, execution, &self.analysis_policy)
+            score_metrics_with_policy_audited(metrics, &input, execution, &self.analysis_policy)
         };
+        self.suppression_audit = outcome.audit;
         self.timings.score_functions = scoring_start.elapsed();
 
         self.timings.function_analysis = start.elapsed();
@@ -739,7 +744,7 @@ impl ParallelUnifiedAnalysisBuilder {
             std::thread::sleep(std::time::Duration::from_millis(150));
         }
 
-        items
+        outcome.emitted
     }
 
     /// Execute phase 3: Parallel file analysis
@@ -878,6 +883,7 @@ impl ParallelUnifiedAnalysisBuilder {
 
         let agg_progress = create_final_aggregation_progress(total_file_items);
         let mut unified = self.initialize_unified_analysis(data_flow_graph, &file_data);
+        unified.suppression_audit = self.suppression_audit.clone();
 
         add_unified_items(&mut unified, items);
         let finalize_start = Instant::now();

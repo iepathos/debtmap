@@ -12,6 +12,7 @@ use crate::analysis::ContextDetector;
 use crate::core::{DebtItem, FunctionMetrics, Language};
 use crate::data_flow::DataFlowGraph;
 use crate::debt::suppression::{SuppressionContext, parse_suppression_comments};
+use crate::debt::suppression_audit::{AppliedSuppression, SuppressionAudit, SuppressionOutcome};
 use crate::priority::UnifiedDebtItem;
 use crate::priority::call_graph::{CallGraph, FunctionId};
 use crate::priority::debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId};
@@ -164,25 +165,15 @@ pub fn build_suppression_context_cache(metrics: &[FunctionMetrics]) -> Suppressi
             // Read file content
             let content = std::fs::read_to_string(path).ok()?;
 
-            // Determine language from extension
-            let language = path
-                .extension()
-                .and_then(|ext| ext.to_str())
-                .map(|ext| match ext {
-                    "rs" => Language::Rust,
-                    "py" | "pyw" => Language::Python,
-                    _ => Language::Rust, // Default to Rust
-                })
-                .unwrap_or(Language::Rust);
+            let language = Language::from_path(path);
 
             // Parse suppression comments
             let context = parse_suppression_comments(&content, language, path);
 
-            // Only include files that have function-level allows
-            if context.function_allows.is_empty() {
-                None
-            } else {
+            if context.has_directives() {
                 Some(((*path).clone(), context))
+            } else {
+                None
             }
         })
         .collect()
@@ -191,15 +182,40 @@ pub fn build_suppression_context_cache(metrics: &[FunctionMetrics]) -> Suppressi
 /// Check if a unified debt item should be suppressed based on annotations.
 ///
 /// Returns true if the item should be filtered out (suppressed).
-fn is_item_suppressed(item: &UnifiedDebtItem, suppression_cache: &SuppressionContextCache) -> bool {
-    // Look up suppression context for this file
-    if let Some(context) = suppression_cache.get(&item.location.file) {
-        // Convert priority::DebtType to core::DebtType for suppression check
-        // They are the same type (core re-exports priority), so this is a no-op
-        context.is_function_allowed(item.location.line, &item.debt_type)
-    } else {
-        false
+pub fn apply_suppressions(
+    items: Vec<UnifiedDebtItem>,
+    suppression_cache: &SuppressionContextCache,
+) -> SuppressionOutcome<UnifiedDebtItem> {
+    let (emitted, applied) = items.into_iter().fold(
+        (Vec::new(), Vec::new()),
+        |(mut emitted, mut applied), item| {
+            if let Some(record) = suppression_record(&item, suppression_cache) {
+                applied.push(record);
+            } else {
+                emitted.push(item);
+            }
+            (emitted, applied)
+        },
+    );
+    SuppressionOutcome {
+        emitted,
+        audit: SuppressionAudit { applied }.normalized(),
     }
+}
+
+fn suppression_record(
+    item: &UnifiedDebtItem,
+    suppression_cache: &SuppressionContextCache,
+) -> Option<AppliedSuppression> {
+    let context = suppression_cache.get(&item.location.file)?;
+    let decision = context.decision_for(item.location.line, &item.debt_type)?;
+    Some(AppliedSuppression {
+        file: item.location.file.clone(),
+        line: item.location.line,
+        function: Some(item.location.function.clone()),
+        debt_type: item.debt_type.display_name().to_string(),
+        decision,
+    })
 }
 
 /// Pure function to create function mappings from metrics.
@@ -350,6 +366,15 @@ pub fn score_metrics_with_policy(
     execution: ScoringExecution,
     policy: &crate::config::AnalysisPolicy,
 ) -> Vec<UnifiedDebtItem> {
+    score_metrics_with_policy_audited(metrics, input, execution, policy).emitted
+}
+
+pub fn score_metrics_with_policy_audited(
+    metrics: &[FunctionMetrics],
+    input: &PreparedScoringInput<'_>,
+    execution: ScoringExecution,
+    policy: &crate::config::AnalysisPolicy,
+) -> SuppressionOutcome<UnifiedDebtItem> {
     let items: Vec<UnifiedDebtItem> = match execution {
         ScoringExecution::Sequential => metrics
             .iter()
@@ -361,10 +386,7 @@ pub fn score_metrics_with_policy(
             .collect(),
     };
 
-    items
-        .into_iter()
-        .filter(|item| !is_item_suppressed(item, input.suppression_contexts))
-        .collect()
+    apply_suppressions(items, input.suppression_contexts)
 }
 
 fn score_metric(
@@ -546,10 +568,9 @@ fn run() {}"#;
         );
 
         // The item should be suppressed because it has allow[testing] annotation
-        assert!(
-            is_item_suppressed(&item, &cache),
-            "Item with debtmap:ignore[testing] should be suppressed"
-        );
+        let outcome = apply_suppressions(vec![item], &cache);
+        assert!(outcome.emitted.is_empty());
+        assert_eq!(outcome.audit.applied.len(), 1);
     }
 
     #[test]
@@ -572,10 +593,9 @@ fn run() {}"#;
         );
 
         // The item should NOT be suppressed because there's no annotation
-        assert!(
-            !is_item_suppressed(&item, &cache),
-            "Item without annotation should not be suppressed"
-        );
+        let outcome = apply_suppressions(vec![item], &cache);
+        assert_eq!(outcome.emitted.len(), 1);
+        assert!(outcome.audit.is_empty());
     }
 
     /// Helper function to create a minimal UnifiedDebtItem for testing

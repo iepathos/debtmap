@@ -86,7 +86,7 @@ fn cli_json_matches_v4_schema_with_receipt_and_details() {
     let directory = tempfile::tempdir().unwrap();
     fs::write(
         directory.path().join("sample.rs"),
-        "pub fn hotspot(x: i32) -> i32 { if x > 0 { if x > 1 { if x > 2 { if x > 3 { if x > 4 { if x > 5 { x } else { 0 } } else { 0 } } else { 0 } } else { 0 } } else { 0 } } else { 0 } }\n",
+        "// debtmap:ignore[complexity] -- generated dispatcher\npub fn suppressed_hotspot(x: i32) -> i32 { if x > 0 { if x > 1 { if x > 2 { if x > 3 { if x > 4 { if x > 5 { x } else { 0 } } else { 0 } } else { 0 } } else { 0 } } else { 0 } } else { 0 } }\n\n\n\n\n\npub fn hotspot(x: i32) -> i32 { if x > 0 { if x > 1 { if x > 2 { if x > 3 { if x > 4 { if x > 5 { x } else { 0 } } else { 0 } } else { 0 } } else { 0 } } else { 0 } } else { 0 } }\n",
     )
     .unwrap();
     let schema = load_json("schemas/debtmap-output-v4.schema.json");
@@ -141,6 +141,14 @@ fn cli_json_matches_v4_schema_with_receipt_and_details() {
         assert_eq!(report["receipt"]["scope"]["analyzed_files"], 1);
         assert_eq!(report["receipt"]["scope"]["failed_files"], 0);
         assert_eq!(report["receipt"]["scope"]["status"], "complete");
+        let suppressions = &report["receipt"]["suppressions"];
+        let records = suppressions["records"].as_array().unwrap();
+        assert_eq!(suppressions["applied_count"], records.len());
+        assert_eq!(records.len(), 1);
+        assert!(records.iter().all(|record| {
+            record["decision"]["reason"] == "generated dispatcher"
+                && record["decision"]["kind"] == "function"
+        }));
         let policy: AnalysisPolicyReceipt =
             serde_json::from_value(report["receipt"]["policy"].clone()).unwrap();
         assert_eq!(
@@ -151,12 +159,18 @@ fn cli_json_matches_v4_schema_with_receipt_and_details() {
             report["summary"]["total_items"],
             report["items"].as_array().unwrap().len()
         );
-        assert!(
-            report["items"][0]["finding_id"]
+        let items = report["items"].as_array().unwrap();
+        assert!(items.iter().any(|item| {
+            item["finding_id"]
                 .as_str()
                 .is_some_and(|id| id.starts_with("dm4_") && id.len() == 68)
+        }));
+        assert_eq!(
+            items
+                .iter()
+                .any(|item| item.get("scoring_details").is_some()),
+            verbose
         );
-        assert_eq!(report["items"][0].get("scoring_details").is_some(), verbose);
     }
 }
 

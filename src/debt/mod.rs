@@ -32,6 +32,7 @@ pub mod public_api_detector;
 pub mod rules;
 pub mod smells;
 pub mod suppression;
+pub mod suppression_audit;
 
 pub use crate::core::Priority;
 use crate::core::{DebtItem, DebtType};

@@ -115,6 +115,9 @@ pub struct UnifiedAnalysis {
     /// Used for accurate total LOC calculation including files without debt items
     #[serde(skip)]
     pub analyzed_files: std::collections::HashMap<PathBuf, usize>,
+    /// Unified finding suppressions applied after scoring.
+    #[serde(skip)]
+    pub suppression_audit: crate::debt::suppression_audit::SuppressionAudit,
 }
 
 // Single function analysis for evidence-based risk calculation
@@ -495,6 +498,7 @@ impl UnifiedAnalysis {
             timings: None,
             stats: FilterStatistics::new(),
             analyzed_files: std::collections::HashMap::new(),
+            suppression_audit: crate::debt::suppression_audit::SuppressionAudit::default(),
         }
     }
 
@@ -639,6 +643,7 @@ impl UnifiedAnalysis {
             timings: self.timings.clone(),
             stats: self.stats.clone(),
             analyzed_files: self.analyzed_files.clone(),
+            suppression_audit: self.suppression_audit.clone(),
         }
     }
 

@@ -476,6 +476,9 @@
         "scope": {
           "$ref": "#/$defs/scopeReceipt"
         },
+        "suppressions": {
+          "$ref": "#/$defs/suppressionAuditReceipt"
+        },
         "warnings": {
           "type": "array",
           "items": {
@@ -505,6 +508,61 @@
               }
             }
           ]
+        }
+      }
+    },
+    "suppressionAuditReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applied_count",
+        "by_language",
+        "by_debt_type",
+        "records"
+      ],
+      "properties": {
+        "applied_count": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "by_language": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/nonNegativeInteger"
+          }
+        },
+        "by_debt_type": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/nonNegativeInteger"
+          }
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["file", "line", "debt_type", "decision"],
+            "properties": {
+              "file": { "type": "string" },
+              "line": { "$ref": "#/$defs/nonNegativeInteger" },
+              "function": { "type": "string" },
+              "debt_type": { "type": "string" },
+              "decision": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "directive_line"],
+                "properties": {
+                  "kind": {
+                    "enum": ["same_line", "next_line", "function", "block"]
+                  },
+                  "directive_line": {
+                    "$ref": "#/$defs/nonNegativeInteger"
+                  },
+                  "reason": { "type": "string" }
+                }
+              }
+            }
+          }
         }
       }
     },
