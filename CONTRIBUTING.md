@@ -30,9 +30,8 @@ cargo build
 # Run tests to verify everything works
 just test
 
-# Try analyzing debtmap itself
-cargo build --bin debtmap
-./target/debug/debtmap analyze . --top 10
+# Try analyzing debtmap itself with the debug build
+just run analyze . --top 10
 ```
 
 ## Development Workflow
@@ -43,9 +42,11 @@ Debtmap uses [Just](https://github.com/casey/just) for common development tasks.
 
 ```bash
 # Development
-just dev            # Run in development mode
-just watch          # Run with hot reloading
-just build          # Build the project
+just run analyze .          # Run the CLI with the debug build
+just dev analyze .          # Equivalent development entry point
+just run-release analyze .  # Run an explicitly optimized build
+just watch                  # Run with hot reloading
+just build                  # Build the project
 
 # Testing
 just test              # Run the fast cross-platform smoke suite
@@ -353,26 +354,26 @@ Stuck? Don't hesitate to ask:
 ### Performance Profiling
 
 ```bash
-# Build with debug symbols
-cargo build --release --profile release-with-debug
+# Build the debug executable
+cargo build --bin debtmap
 
 # Profile with perf (Linux)
-perf record --call-graph=dwarf ./target/release/debtmap analyze .
+perf record --call-graph=dwarf ./target/debug/debtmap analyze .
 perf report
 
-# Use cargo-flamegraph
+# Use cargo-flamegraph with the debug profile
 cargo install flamegraph
-cargo flamegraph -- analyze .
+cargo flamegraph --dev -- analyze .
 ```
 
 ### Debugging
 
 ```bash
 # Run with debug logging
-RUST_LOG=debug cargo run -- analyze .
+RUST_LOG=debug just run analyze .
 
 # Run with backtrace
-RUST_BACKTRACE=1 cargo run -- analyze .
+RUST_BACKTRACE=1 just run analyze .
 
 # Use cargo-expand to debug macros
 cargo expand

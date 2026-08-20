@@ -15,17 +15,21 @@ alias l := lint
 
 # === DEVELOPMENT ===
 
-# Run the project in development mode
-dev:
-    cargo run
+# Run the project in development mode and forward CLI arguments
+dev *ARGS:
+    cargo run -- {{ARGS}}
 
 # Run the project with hot reloading
 watch:
     cargo watch -x run
 
-# Run the project in release mode
-run:
-    cargo run --release
+# Run the project with the debug build and forward CLI arguments
+run *ARGS:
+    cargo run -- {{ARGS}}
+
+# Run the project with the release build and forward CLI arguments
+run-release *ARGS:
+    cargo run --release -- {{ARGS}}
 
 # Run with all features enabled
 run-all:
