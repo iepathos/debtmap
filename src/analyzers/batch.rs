@@ -195,12 +195,36 @@ pub fn analyze_single_file_effect(path: PathBuf) -> AnalysisEffect<FileAnalysisR
         let content = env.file_system().read_to_string(&path).map_err(|e| {
             AnalysisError::io_with_path(format!("Failed to read file: {}", e.message()), &path)
         })?;
-
-        analyze_file_content(&path, &content, false).map_err(|e| {
-            AnalysisError::analysis(format!("Analysis failed for '{}': {}", path_display, e))
-        })
+        let config = env.config();
+        let generated_mode = go_generated_code_mode(config);
+        let solidity_config = solidity_config_from_debtmap(config);
+        if should_exclude_go_file(&path, &content, generated_mode)
+            || should_exclude_solidity_file(&path, &content, &solidity_config)
+        {
+            return Ok(excluded_file_result(&path, &content));
+        }
+        analyze_file_content_with_config(&path, &content, false, generated_mode, &solidity_config)
+            .map_err(|e| {
+                AnalysisError::analysis(format!("Analysis failed for '{}': {}", path_display, e))
+            })
     })
     .boxed()
+}
+
+fn excluded_file_result(path: &Path, content: &str) -> FileAnalysisResult {
+    let metrics = FileMetrics {
+        path: path.to_path_buf(),
+        language: Language::from_path(path),
+        complexity: Default::default(),
+        debt_items: Vec::new(),
+        dependencies: Vec::new(),
+        duplications: Vec::new(),
+        total_lines: content.lines().count(),
+        test_lines: 0,
+        module_scope: None,
+        classes: None,
+    };
+    FileAnalysisResult::new(path.to_path_buf(), metrics, Vec::new())
 }
 
 /// Analyze files with configuration-based settings.
