@@ -4,17 +4,26 @@
 
 use crate::analyzers::typescript::parser::node_text;
 use crate::core::ast::TypeScriptAst;
-use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
+use crate::priority::call_graph::{
+    CallEdgeProvenance, CallGraph, CallSite, CallType, FunctionId, ResolutionOutcome,
+};
 use std::path::PathBuf;
 use tree_sitter::Node;
 
 /// Function call information extracted from AST
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum CallShape {
+    Identifier(String),
+    Member { receiver: String, property: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExtractedCall {
-    /// Name of the function being called
-    pub callee_name: String,
+    pub shape: CallShape,
     /// Line number where the call occurs
     pub line: usize,
+    /// One-based column where the call occurs.
+    pub column: usize,
 }
 
 /// Function definition with its calls
@@ -52,70 +61,103 @@ pub fn extract_call_graph(ast: &TypeScriptAst) -> CallGraph {
     for func in &functions {
         let caller_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
 
-        // Extract class name if caller is a class method (e.g., "Calculator::add" -> "Calculator")
-        let caller_class = func
-            .name
-            .split("::")
-            .next()
-            .filter(|_| func.name.contains("::"));
+        let caller_owner = func.name.split_once("::").map(|(owner, _)| owner);
 
         // Sort calls by line and name for deterministic edge addition (Spec 214 fix)
         let mut sorted_calls = func.calls.clone();
-        sorted_calls.sort_by(|a, b| {
-            a.line
-                .cmp(&b.line)
-                .then_with(|| a.callee_name.cmp(&b.callee_name))
-        });
+        sorted_calls
+            .sort_by(|a, b| (a.line, a.column, &a.shape).cmp(&(b.line, b.column, &b.shape)));
 
         for call in sorted_calls {
-            // Try multiple matching strategies
-            let callee_func = find_callee_function(&functions, &call.callee_name, caller_class);
-
-            if let Some(callee_func) = callee_func {
-                let callee_id = FunctionId::new(
-                    callee_func.file.clone(),
-                    callee_func.name.clone(),
-                    callee_func.line,
-                );
-
-                call_graph.add_call(FunctionCall {
-                    caller: caller_id.clone(),
-                    callee: callee_id,
-                    call_type: CallType::Direct,
-                });
-            }
+            let outcome = resolve_call(&functions, &call, caller_owner, &ast.path);
+            call_graph.add_resolution(caller_id.clone(), CallType::Direct, outcome);
         }
     }
 
     call_graph
 }
 
-/// Find a callee function using multiple matching strategies
-fn find_callee_function<'a>(
-    functions: &'a [FunctionWithCalls],
-    callee_name: &str,
-    caller_class: Option<&str>,
-) -> Option<&'a FunctionWithCalls> {
-    // Strategy 1: Exact match
-    if let Some(func) = functions.iter().find(|f| f.name == callee_name) {
-        return Some(func);
-    }
+fn resolve_call(
+    functions: &[FunctionWithCalls],
+    call: &ExtractedCall,
+    caller_owner: Option<&str>,
+    file: &std::path::Path,
+) -> ResolutionOutcome {
+    let query = match resolution_query(&call.shape, caller_owner) {
+        QueryDecision::Resolve(query) => query,
+        QueryDecision::Reject(outcome) => return outcome,
+    };
+    let candidates = functions
+        .iter()
+        .filter(|function| function.name == query.name)
+        .map(function_id)
+        .collect();
+    resolution_from_candidates(candidates, query, call, file)
+}
 
-    // Strategy 2: If caller is in a class, try matching as a method of that class
-    // e.g., if caller is "Calculator::add" and callee is "validate", try "Calculator::validate"
-    if let Some(class_name) = caller_class {
-        let qualified_name = format!("{}::{}", class_name, callee_name);
-        if let Some(func) = functions.iter().find(|f| f.name == qualified_name) {
-            return Some(func);
+struct ResolutionQuery {
+    name: String,
+    provenance: CallEdgeProvenance,
+    confidence: u8,
+}
+
+enum QueryDecision {
+    Resolve(ResolutionQuery),
+    Reject(ResolutionOutcome),
+}
+
+fn resolution_query(shape: &CallShape, caller_owner: Option<&str>) -> QueryDecision {
+    match shape {
+        CallShape::Identifier(name) => QueryDecision::Resolve(ResolutionQuery {
+            name: name.clone(),
+            provenance: CallEdgeProvenance::AstDirect,
+            confidence: 100,
+        }),
+        CallShape::Member { receiver, property } if receiver == "this" => {
+            let Some(owner) = caller_owner else {
+                return QueryDecision::Reject(ResolutionOutcome::Unresolved {
+                    query: format!("this.{property}"),
+                });
+            };
+            QueryDecision::Resolve(ResolutionQuery {
+                name: format!("{owner}::{property}"),
+                provenance: CallEdgeProvenance::TypeResolution,
+                confidence: 95,
+            })
+        }
+        CallShape::Member { receiver, property } => {
+            QueryDecision::Reject(ResolutionOutcome::Ignored {
+                reason: format!("dynamic receiver {receiver}.{property}"),
+            })
         }
     }
+}
 
-    // Strategy 3: Match by simple name (for cross-class or module calls)
-    // If callee_name is a simple name like "helper", find any function ending with that name
-    functions.iter().find(|f| {
-        // Check if function name ends with ::callee_name or is exactly callee_name
-        f.name == callee_name || f.name.ends_with(&format!("::{}", callee_name))
-    })
+fn function_id(function: &FunctionWithCalls) -> FunctionId {
+    FunctionId::new(function.file.clone(), function.name.clone(), function.line)
+}
+
+fn resolution_from_candidates(
+    mut candidates: Vec<FunctionId>,
+    query: ResolutionQuery,
+    call: &ExtractedCall,
+    file: &std::path::Path,
+) -> ResolutionOutcome {
+    candidates.sort();
+    match candidates.as_slice() {
+        [target] => ResolutionOutcome::Resolved {
+            target: target.clone(),
+            provenance: query.provenance,
+            confidence: query.confidence,
+            call_site: Some(CallSite {
+                file: file.to_path_buf(),
+                line: call.line,
+                column: Some(call.column),
+            }),
+        },
+        [] => ResolutionOutcome::Unresolved { query: query.name },
+        _ => ResolutionOutcome::Ambiguous { candidates },
+    }
 }
 
 /// Extract all functions with their call information
@@ -323,53 +365,59 @@ fn extract_calls_from_body(body: &Node, ast: &TypeScriptAst) -> Vec<ExtractedCal
 /// Recursively extract function calls from AST nodes
 fn extract_calls_recursive(node: &Node, ast: &TypeScriptAst, calls: &mut Vec<ExtractedCall>) {
     if node.kind() == "call_expression"
-        && let Some(callee_name) = extract_callee_name(node, ast)
+        && let Some(shape) = extract_call_shape(node, ast)
     {
         calls.push(ExtractedCall {
-            callee_name,
+            shape,
             line: node.start_position().row + 1,
+            column: node.start_position().column + 1,
         });
     }
 
-    // Recurse into children
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
+        if is_nested_callable(&child) {
+            continue;
+        }
         extract_calls_recursive(&child, ast, calls);
     }
 }
 
-/// Extract the function name from a call expression
-fn extract_callee_name(call_expr: &Node, ast: &TypeScriptAst) -> Option<String> {
+fn is_nested_callable(node: &Node) -> bool {
+    matches!(
+        node.kind(),
+        "function_declaration"
+            | "generator_function_declaration"
+            | "function_expression"
+            | "function"
+            | "arrow_function"
+            | "method_definition"
+    )
+}
+
+fn extract_call_shape(call_expr: &Node, ast: &TypeScriptAst) -> Option<CallShape> {
     let function_node = call_expr.child_by_field_name("function")?;
 
     match function_node.kind() {
-        // Simple function call: foo()
-        "identifier" => Some(node_text(&function_node, &ast.source).to_string()),
-
-        // Method call: obj.method() - extract just the method name
-        "member_expression" => {
-            let property = function_node.child_by_field_name("property")?;
-            Some(node_text(&property, &ast.source).to_string())
-        }
-
-        // Optional chain: obj?.method()
-        "optional_chain_expression" => {
-            // Try to find the member access via property field first
-            if let Some(property) = function_node.child_by_field_name("property") {
-                return Some(node_text(&property, &ast.source).to_string());
-            }
-            // Fall back to finding identifier in children
-            let mut cursor = function_node.walk();
-            for child in function_node.children(&mut cursor) {
-                if child.kind() == "identifier" {
-                    return Some(node_text(&child, &ast.source).to_string());
-                }
-            }
-            None
-        }
-
+        "identifier" => Some(CallShape::Identifier(
+            node_text(&function_node, &ast.source).to_string(),
+        )),
+        "member_expression" => extract_member_shape(&function_node, ast),
+        "optional_chain_expression" => function_node
+            .named_children(&mut function_node.walk())
+            .find(|child| child.kind() == "member_expression")
+            .and_then(|member| extract_member_shape(&member, ast)),
         _ => None,
     }
+}
+
+fn extract_member_shape(node: &Node, ast: &TypeScriptAst) -> Option<CallShape> {
+    let receiver = node.child_by_field_name("object")?;
+    let property = node.child_by_field_name("property")?;
+    Some(CallShape::Member {
+        receiver: node_text(&receiver, &ast.source).to_string(),
+        property: node_text(&property, &ast.source).to_string(),
+    })
 }
 
 /// Check if a function name indicates it's a test
@@ -526,5 +574,93 @@ function format(d) { return d; }
         assert!(callees.iter().any(|c| c.name == "validate"));
         assert!(callees.iter().any(|c| c.name == "transform"));
         assert!(callees.iter().any(|c| c.name == "format"));
+    }
+
+    #[test]
+    fn this_call_resolves_only_within_caller_class_and_keeps_evidence() {
+        let source = "class A {\n  run() { return this.validate(); }\n  validate() { return true; }\n}\nclass B {\n  validate() { return false; }\n}";
+        let path = PathBuf::from("classes.ts");
+        let ast = parse_source(source, &path, JsLanguageVariant::TypeScript).unwrap();
+
+        let graph = extract_call_graph(&ast);
+        let run = graph
+            .get_all_functions()
+            .find(|function| function.name == "A::run")
+            .unwrap();
+        let callees = graph.get_callees(run);
+
+        assert_eq!(callees.len(), 1);
+        assert_eq!(callees[0].name, "A::validate");
+        let evidence = graph.edge_evidence().next().unwrap();
+        assert_eq!(evidence.provenance, CallEdgeProvenance::TypeResolution);
+        assert_eq!(evidence.confidence, 95);
+        assert_eq!(
+            evidence.call_site,
+            Some(CallSite {
+                file: path,
+                line: 2,
+                column: Some(18),
+            })
+        );
+    }
+
+    #[test]
+    fn arbitrary_receiver_and_bare_method_do_not_guess_local_edges() {
+        let source = r#"
+class Service {
+    run(other) {
+        other.validate();
+        validate();
+    }
+    validate() { return true; }
+}
+"#;
+        let path = PathBuf::from("service.js");
+        let ast = parse_source(source, &path, JsLanguageVariant::JavaScript).unwrap();
+
+        let graph = extract_call_graph(&ast);
+        let run = graph
+            .get_all_functions()
+            .find(|function| function.name == "Service::run")
+            .unwrap();
+
+        assert!(graph.get_callees(run).is_empty());
+        assert_eq!(graph.edge_evidence().count(), 0);
+    }
+
+    #[test]
+    fn duplicate_top_level_candidates_are_ambiguous() {
+        let source = "function run() { helper(); }\nfunction helper() {}\nfunction helper() {}";
+        let path = PathBuf::from("duplicate.js");
+        let ast = parse_source(source, &path, JsLanguageVariant::JavaScript).unwrap();
+
+        let graph = extract_call_graph(&ast);
+        let run = graph
+            .get_all_functions()
+            .find(|function| function.name == "run")
+            .unwrap();
+
+        assert!(graph.get_callees(run).is_empty());
+    }
+
+    #[test]
+    fn nested_callable_calls_are_not_attributed_to_outer_function() {
+        let source = r#"
+function outer() {
+    const nested = () => helper();
+    return 1;
+}
+function helper() { return 2; }
+"#;
+        let path = PathBuf::from("nested.js");
+        let ast = parse_source(source, &path, JsLanguageVariant::JavaScript).unwrap();
+
+        let graph = extract_call_graph(&ast);
+        let outer = graph
+            .get_all_functions()
+            .find(|function| function.name == "outer")
+            .unwrap();
+
+        assert!(graph.get_callees(outer).is_empty());
     }
 }

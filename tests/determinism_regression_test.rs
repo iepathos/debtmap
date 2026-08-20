@@ -187,11 +187,15 @@ const arrow = () => common();
 
         let func_data: Vec<_> = funcs.iter().map(|f| (f.name.clone(), f.line)).collect();
         let graph_nodes: Vec<_> = graph.get_all_functions().cloned().collect();
-        results.push((func_data, graph_nodes));
+        let graph_calls = graph.get_all_calls();
+        let edge_evidence: Vec<_> = graph.edge_evidence().cloned().collect();
+        results.push((func_data, graph_nodes, graph_calls, edge_evidence));
     }
 
-    let (first_funcs, first_nodes) = &results[0];
-    for (i, (other_funcs, other_nodes)) in results.iter().enumerate().skip(1) {
+    let (first_funcs, first_nodes, first_calls, first_evidence) = &results[0];
+    for (i, (other_funcs, other_nodes, other_calls, other_evidence)) in
+        results.iter().enumerate().skip(1)
+    {
         assert_eq!(
             first_funcs, other_funcs,
             "TS function extraction non-deterministic at iteration {}",
@@ -201,6 +205,11 @@ const arrow = () => common();
             first_nodes, other_nodes,
             "TS call graph nodes non-deterministic at iteration {}",
             i
+        );
+        assert_eq!(first_calls, other_calls, "TS calls differ at iteration {i}");
+        assert_eq!(
+            first_evidence, other_evidence,
+            "TS edge evidence differs at iteration {i}"
         );
     }
 }
