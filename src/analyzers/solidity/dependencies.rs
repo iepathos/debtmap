@@ -88,7 +88,9 @@ impl SolidityPathDisplay for Path {
 
 fn collect_import_paths(node: Node, ast: &SolidityAst, paths: &mut Vec<String>) {
     if node.kind() == "import_path" || node.kind() == "string" {
-        let text = node_text(&node, &ast.source).trim_matches('"').to_string();
+        let text = node_text(&node, &ast.source)
+            .trim_matches(['"', '\''])
+            .to_string();
         if !text.is_empty() {
             paths.push(text);
         }

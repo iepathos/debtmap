@@ -395,7 +395,7 @@ fn import_field_identifiers(
 
 fn import_source_contract(node: Node, ast: &crate::core::ast::SolidityAst) -> Option<String> {
     let source = node.child_by_field_name("source")?;
-    let path = node_text(&source, &ast.source).trim_matches('"');
+    let path = node_text(&source, &ast.source).trim_matches(['"', '\'']);
     Path::new(path)
         .file_stem()
         .and_then(|stem| stem.to_str())
