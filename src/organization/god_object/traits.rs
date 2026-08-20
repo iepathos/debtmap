@@ -33,7 +33,8 @@
 //! | Custom (unknown traits) | 0.4 | Moderate weight for unknown |
 //! | Self-chosen | 1.0 | Full weight, author's design choice |
 
-use serde::{Deserialize, Serialize};
+use serde::ser::SerializeMap;
+use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 
 // ============================================================================
@@ -753,6 +754,7 @@ pub struct TraitMethodSummary {
     /// Total trait-mandated methods
     pub mandated_count: usize,
     /// Breakdown by trait
+    #[serde(serialize_with = "serialize_trait_counts")]
     pub by_trait: HashMap<String, usize>,
     /// Weighted method count (after applying trait discounts)
     pub weighted_count: f64,
@@ -760,6 +762,22 @@ pub struct TraitMethodSummary {
     pub extractable_count: usize,
     /// Total methods (mandated + extractable)
     pub total_methods: usize,
+}
+
+fn serialize_trait_counts<S>(
+    counts: &HashMap<String, usize>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let mut entries: Vec<_> = counts.iter().collect();
+    entries.sort_by_key(|(name, _)| *name);
+    let mut map = serializer.serialize_map(Some(entries.len()))?;
+    for (name, count) in entries {
+        map.serialize_entry(name, count)?;
+    }
+    map.end()
 }
 
 impl TraitMethodSummary {
@@ -1097,5 +1115,19 @@ mod tests {
             summary.to_string(),
             "32 (14 trait-mandated, 18 extractable)"
         );
+    }
+
+    #[test]
+    fn trait_method_summary_serializes_trait_names_canonically() {
+        let summary = TraitMethodSummary {
+            by_trait: [("Zeta".into(), 2), ("Alpha".into(), 1)]
+                .into_iter()
+                .collect(),
+            ..Default::default()
+        };
+
+        let json = serde_json::to_string(&summary).unwrap();
+
+        assert!(json.contains(r#""by_trait":{"Alpha":1,"Zeta":2}"#));
     }
 }

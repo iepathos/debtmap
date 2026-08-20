@@ -10,8 +10,16 @@ const FIXTURE: &str = r#"fn shared_transform(value: usize) -> usize {
     value.saturating_mul(2).saturating_add(1)
 }
 
+fn alternate_transform(value: usize) -> usize {
+    value.saturating_sub(1)
+}
+
 fn production_entry(value: usize) -> usize {
     production_hotspot(value)
+}
+
+fn secondary_entry(value: usize) -> usize {
+    production_hotspot(value + 1)
 }
 
 fn production_hotspot(value: usize) -> usize {
@@ -22,7 +30,7 @@ fn production_hotspot(value: usize) -> usize {
                     if value > 100 {
                         shared_transform(value)
                     } else {
-                        shared_transform(value + 1)
+                        alternate_transform(value + 1)
                     }
                 } else {
                     shared_transform(value - 1)
@@ -155,6 +163,24 @@ fn parallel_and_sequential_function_items_have_identical_scores() {
     let sequential_items = canonical_function_items(&sequential, fixture.path());
 
     assert!(parallel_items.iter().any(is_scored_production_hotspot));
+    let hotspot = parallel_items
+        .iter()
+        .find(|item| item["location"]["function"] == "production_hotspot")
+        .unwrap();
+    assert_eq!(
+        hotspot["dependencies"]["upstream_callers"],
+        serde_json::json!([
+            "analysis.rs:production_entry",
+            "analysis.rs:secondary_entry"
+        ])
+    );
+    assert_eq!(
+        hotspot["dependencies"]["downstream_callees"],
+        serde_json::json!([
+            "analysis.rs:alternate_transform",
+            "analysis.rs:shared_transform"
+        ])
+    );
     assert_eq!(parallel_items, sequential_items);
     assert_eq!(
         canonical_report(parallel, fixture.path()),

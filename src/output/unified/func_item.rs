@@ -5,7 +5,7 @@
 use super::dependencies::{Dependencies, PurityAnalysis};
 #[cfg(debug_assertions)]
 use super::format::{assert_ratio_invariants, assert_score_invariants};
-use super::format::{round_ratio, round_score};
+use super::format::{canonical_strings, round_ratio, round_score};
 use super::location::UnifiedLocation;
 use super::patterns::{extract_complexity_pattern, extract_pattern_data};
 use super::priority::Priority;
@@ -230,15 +230,17 @@ impl FunctionDebtItemOutput {
                 Dependencies {
                     upstream_count: upstream,
                     downstream_count: downstream,
-                    upstream_callers: item.upstream_callers.clone(),
-                    downstream_callees: item.downstream_callees.clone(),
+                    upstream_callers: canonical_strings(&item.upstream_callers),
+                    downstream_callees: canonical_strings(&item.downstream_callees),
                     blast_radius,
                     critical_path,
                     coupling_classification,
                     instability,
                     // Spec 267: Production/test caller separation
-                    upstream_production_callers: item.upstream_production_callers.clone(),
-                    upstream_test_callers: item.upstream_test_callers.clone(),
+                    upstream_production_callers: canonical_strings(
+                        &item.upstream_production_callers,
+                    ),
+                    upstream_test_callers: canonical_strings(&item.upstream_test_callers),
                     production_upstream_count: production_count,
                     test_upstream_count: test_count,
                     production_blast_radius: item.production_blast_radius,

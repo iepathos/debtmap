@@ -7,7 +7,7 @@
 //! - Stable modules (low instability) with high callers are intentional architecture
 //! - Unstable modules (high instability) with high callers are potential debt
 
-use super::format::round_ratio;
+use super::format::{canonical_strings, round_ratio};
 use serde::{Deserialize, Serialize};
 
 /// File-level dependency metrics (spec 201)
@@ -319,8 +319,14 @@ pub fn build_file_dependencies(
         efferent_coupling: efferent,
         instability: round_ratio(metrics.instability),
         total_coupling: afferent + efferent,
-        top_dependents: metrics.dependents.iter().take(5).cloned().collect(),
-        top_dependencies: metrics.dependencies_list.iter().take(5).cloned().collect(),
+        top_dependents: canonical_strings(&metrics.dependents)
+            .into_iter()
+            .take(5)
+            .collect(),
+        top_dependencies: canonical_strings(&metrics.dependencies_list)
+            .into_iter()
+            .take(5)
+            .collect(),
         coupling_classification: classify_coupling(afferent, efferent),
     })
 }
@@ -447,6 +453,28 @@ mod tests {
         // Empty vectors should be skipped
         assert!(!json.contains("\"top_dependents\""));
         assert!(!json.contains("\"top_dependencies\""));
+    }
+
+    #[test]
+    fn file_dependency_limits_use_canonical_membership() {
+        let metrics = crate::priority::FileDebtMetrics {
+            afferent_coupling: 6,
+            efferent_coupling: 6,
+            dependents: vec!["f", "e", "d", "c", "b", "a"]
+                .into_iter()
+                .map(String::from)
+                .collect(),
+            dependencies_list: vec!["z", "v", "u", "x", "w", "y"]
+                .into_iter()
+                .map(String::from)
+                .collect(),
+            ..Default::default()
+        };
+
+        let dependencies = build_file_dependencies(&metrics).unwrap();
+
+        assert_eq!(dependencies.top_dependents, ["a", "b", "c", "d", "e"]);
+        assert_eq!(dependencies.top_dependencies, ["u", "v", "w", "x", "y"]);
     }
 
     // Spec 269: Architecture-aware classification tests

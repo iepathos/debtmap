@@ -23,6 +23,13 @@ pub fn round_ratio(ratio: f64) -> f64 {
     (ratio * 10000.0).round() / 10000.0
 }
 
+/// Return a canonical copy of a string collection for stable machine output.
+pub(super) fn canonical_strings(values: &[String]) -> Vec<String> {
+    let mut canonical = values.to_vec();
+    canonical.sort();
+    canonical
+}
+
 // ============================================================================
 // Invariant Assertions (spec 230)
 // ============================================================================
@@ -95,5 +102,15 @@ mod tests {
         assert_eq!(round_ratio(1.0), 1.0);
         assert_eq!(round_ratio(0.5), 0.5);
         assert_eq!(round_ratio(0.1234), 0.1234);
+    }
+
+    #[test]
+    fn canonical_strings_are_sorted_without_changing_membership() {
+        let values = vec!["zeta".to_string(), "alpha".to_string(), "alpha".to_string()];
+
+        assert_eq!(
+            canonical_strings(&values),
+            vec!["alpha".to_string(), "alpha".to_string(), "zeta".to_string()]
+        );
     }
 }

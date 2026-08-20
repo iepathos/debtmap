@@ -7,7 +7,7 @@ use super::cohesion::CohesionOutput;
 use super::coupling::{FileDependencies, build_file_dependencies};
 #[cfg(debug_assertions)]
 use super::format::{assert_ratio_invariants, assert_score_invariants};
-use super::format::{round_ratio, round_score};
+use super::format::{canonical_strings, round_ratio, round_score};
 use super::location::UnifiedLocation;
 use super::priority::Priority;
 #[cfg(debug_assertions)]
@@ -93,6 +93,12 @@ impl FileDebtItemOutput {
         // Derive debt type from file metrics
         let debt_type = derive_file_debt_type(item);
 
+        let god_object_indicators = item.metrics.god_object_analysis.clone().map(|analysis| {
+            let mut indicators: crate::priority::GodObjectIndicators = analysis.into();
+            indicators.responsibility_names = canonical_strings(&indicators.responsibility_names);
+            indicators
+        });
+
         FileDebtItemOutput {
             finding_id: None,
             score: rounded_score,
@@ -116,7 +122,7 @@ impl FileDebtItemOutput {
                 distribution: None, // Populated separately when distribution metrics are available
             },
             debt_type,
-            god_object_indicators: item.metrics.god_object_analysis.clone().map(|a| a.into()),
+            god_object_indicators,
             dependencies,
             anti_patterns,
             cohesion,
