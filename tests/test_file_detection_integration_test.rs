@@ -145,6 +145,7 @@ fn test_analysis_results_contains_file_contexts() {
             by_type: HashMap::new(),
             priorities: vec![],
             duplications: vec![],
+            suppression_audit: Default::default(),
         },
         dependencies: debtmap::core::DependencyReport {
             modules: vec![],

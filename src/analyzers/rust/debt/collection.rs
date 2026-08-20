@@ -51,21 +51,21 @@ pub fn collect_all_rust_debt_items(
     threshold: u32,
     functions: &[FunctionMetrics],
     source_content: &str,
-    suppression_context: &SuppressionContext,
+    _suppression_context: &SuppressionContext,
     enhanced_analysis: &[EnhancedFunctionAnalysis],
 ) -> Vec<DebtItem> {
     let items: Vec<DebtItem> = [
         extract_debt_items_with_enhanced(file, path, threshold, functions, enhanced_analysis),
-        find_todos_and_fixmes_with_suppression(source_content, path, Some(suppression_context)),
-        find_code_smells_with_suppression(source_content, path, Some(suppression_context)),
-        extract_rust_module_smell_items(path, source_content, suppression_context),
-        extract_rust_function_smell_items(functions, suppression_context),
-        detect_error_swallowing(file, path, Some(suppression_context)),
+        find_todos_and_fixmes_with_suppression(source_content, path, None),
+        find_code_smells_with_suppression(source_content, path, None),
+        extract_rust_module_smell_items(path, source_content),
+        extract_rust_function_smell_items(functions),
+        detect_error_swallowing(file, path, None),
         // New enhanced error handling detectors
-        detect_panic_patterns(file, path, Some(suppression_context)),
-        analyze_error_context(file, path, Some(suppression_context)),
-        detect_async_errors(file, path, Some(suppression_context)),
-        analyze_error_propagation(file, path, Some(suppression_context)),
+        detect_panic_patterns(file, path, None),
+        analyze_error_context(file, path, None),
+        detect_async_errors(file, path, None),
+        analyze_error_propagation(file, path, None),
         // Existing resource and organization analysis
         analyze_resource_patterns(file, path),
         analyze_organization_patterns(file, path),
@@ -76,11 +76,7 @@ pub fn collect_all_rust_debt_items(
     .flatten()
     .collect();
 
-    // Filter out items that are allowed by function-level debtmap:ignore annotations
     items
-        .into_iter()
-        .filter(|item| !suppression_context.is_function_allowed(item.line, &item.debt_type))
-        .collect()
 }
 
 /// Analyze Rust test quality
@@ -97,27 +93,18 @@ fn analyze_rust_test_quality(file: &syn::File, path: &Path) -> Vec<DebtItem> {
         .collect()
 }
 
-fn extract_rust_module_smell_items(
-    path: &std::path::Path,
-    source_content: &str,
-    suppression_context: &SuppressionContext,
-) -> Vec<DebtItem> {
+fn extract_rust_module_smell_items(path: &std::path::Path, source_content: &str) -> Vec<DebtItem> {
     analyze_module_smells(path, source_content.lines().count())
         .into_iter()
         .map(|smell| smell.to_debt_item())
-        .filter(|item| !suppression_context.is_suppressed(item.line, &item.debt_type))
         .collect()
 }
 
-fn extract_rust_function_smell_items(
-    functions: &[FunctionMetrics],
-    suppression_context: &SuppressionContext,
-) -> Vec<DebtItem> {
+fn extract_rust_function_smell_items(functions: &[FunctionMetrics]) -> Vec<DebtItem> {
     functions
         .iter()
         .flat_map(|func| analyze_function_smells(func, 0))
         .map(|smell| smell.to_debt_item())
-        .filter(|item| !suppression_context.is_suppressed(item.line, &item.debt_type))
         .collect()
 }
 

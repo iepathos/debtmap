@@ -321,6 +321,7 @@ mod tests {
                 by_type: HashMap::new(),
                 priorities: vec![Priority::Medium],
                 duplications: vec![],
+                suppression_audit: Default::default(),
             },
             dependencies: DependencyReport {
                 modules: vec![],

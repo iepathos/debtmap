@@ -78,6 +78,7 @@ end_of_record
             by_type: std::collections::HashMap::new(),
             priorities: vec![],
             duplications: vec![],
+            suppression_audit: Default::default(),
         },
         dependencies: DependencyReport {
             modules: vec![],
@@ -152,6 +153,7 @@ fn test_analyze_risk_with_coverage_invalid_lcov_path() {
             by_type: std::collections::HashMap::new(),
             priorities: vec![],
             duplications: vec![],
+            suppression_audit: Default::default(),
         },
         dependencies: DependencyReport {
             modules: vec![],
@@ -229,6 +231,7 @@ fn test_analyze_risk_without_coverage() {
             by_type: std::collections::HashMap::new(),
             priorities: vec![],
             duplications: vec![],
+            suppression_audit: Default::default(),
         },
         dependencies: DependencyReport {
             modules: vec![],
@@ -291,6 +294,7 @@ end_of_record
             by_type: std::collections::HashMap::new(),
             priorities: vec![],
             duplications: vec![],
+            suppression_audit: Default::default(),
         },
         dependencies: DependencyReport {
             modules: vec![],

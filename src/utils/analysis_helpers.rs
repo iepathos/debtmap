@@ -28,7 +28,12 @@ pub fn analyze_project(
     let file_contexts = analysis_utils::extract_file_contexts(&file_metrics);
 
     let complexity_report = build_complexity_report(&all_functions, complexity_threshold);
-    let technical_debt = build_technical_debt_report(all_debt_items, duplications.clone());
+    let suppression = analysis_utils::apply_debt_suppressions(all_debt_items);
+    let technical_debt = analysis_utils::build_technical_debt_report_with_audit(
+        suppression.emitted,
+        duplications.clone(),
+        suppression.audit,
+    );
     let dependencies = create_dependency_report(&file_metrics);
 
     Ok(AnalysisResults {

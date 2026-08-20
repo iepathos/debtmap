@@ -23,6 +23,7 @@ pub use super::unified_analysis_phases::phases::scoring::create_debt_items_from_
 use crate::analyzers::call_graph_integration;
 use crate::core::{AnalysisResults, Language};
 use crate::debt::suppression::parse_suppression_comments;
+use crate::debt::suppression_audit::{AppliedSuppression, SuppressionAudit};
 use crate::organization::GodObjectAnalysis;
 use crate::priority::{
     DebtType, UnifiedAnalysis, UnifiedAnalysisUtils, UnifiedDebtItem,
@@ -139,7 +140,7 @@ pub fn perform_unified_analysis_with_options(
         results: options.results,
         reference_time: options.reference_time,
     });
-    let result = run_debt_scoring_stage(DebtScoringOptions {
+    let mut result = run_debt_scoring_stage(DebtScoringOptions {
         enriched_metrics: &enriched_metrics,
         call_graph: &call_graph,
         coverage_data: coverage_data.as_ref(),
@@ -159,6 +160,9 @@ pub fn perform_unified_analysis_with_options(
         extracted_data: options.extracted_data,
         reference_time: options.reference_time,
     });
+    result.suppression_audit = result
+        .suppression_audit
+        .merged(options.results.technical_debt.suppression_audit.clone());
 
     info!(
         total_items = result.items.len(),
@@ -686,29 +690,16 @@ fn execute_parallel_analysis(
     unified
 }
 
-/// Check if a god object should be suppressed based on file annotations.
-/// Same logic as orchestration.rs - checks both file-level and struct-level suppressions.
-fn is_god_object_suppressed_unified(
+/// Build an auditable suppression record for a file- or struct-level god object.
+fn god_object_suppression_record(
     god_analysis: &GodObjectAnalysis,
     file_content: &str,
     file_path: &std::path::Path,
-) -> bool {
+) -> Option<AppliedSuppression> {
     use crate::organization::DetectionType;
 
-    // Determine language from file extension
-    let language = file_path
-        .extension()
-        .and_then(|ext| ext.to_str())
-        .map(|ext| match ext {
-            "rs" => Language::Rust,
-            "py" | "pyw" => Language::Python,
-            _ => Language::Rust,
-        })
-        .unwrap_or(Language::Rust);
-
-    let suppression_context = parse_suppression_comments(file_content, language, file_path);
-
-    // Create a representative GodObject debt type for suppression checking
+    let suppression_context =
+        parse_suppression_comments(file_content, Language::from_path(file_path), file_path);
     let god_object_debt_type = DebtType::GodObject {
         methods: god_analysis.method_count as u32,
         fields: Some(god_analysis.field_count as u32),
@@ -716,30 +707,20 @@ fn is_god_object_suppressed_unified(
         god_object_score: god_analysis.god_object_score,
         lines: god_analysis.lines_of_code as u32,
     };
-
-    // First, always check for file-level suppression at the top of the file
-    // A file-level annotation applies to all god objects in the file
-    for check_line in 1..=6 {
-        if suppression_context.is_suppressed(check_line, &god_object_debt_type) {
-            return true;
-        }
-        if suppression_context.is_function_allowed(check_line, &god_object_debt_type) {
-            return true;
-        }
-    }
-
-    // For GodClass, also check near the struct definition line
-    if let DetectionType::GodClass = god_analysis.detection_type {
-        let struct_line = god_analysis.struct_line.unwrap_or(1);
-        if suppression_context.is_suppressed(struct_line, &god_object_debt_type) {
-            return true;
-        }
-        if suppression_context.is_function_allowed(struct_line, &god_object_debt_type) {
-            return true;
-        }
-    }
-
-    false
+    let struct_line = matches!(god_analysis.detection_type, DetectionType::GodClass)
+        .then_some(god_analysis.struct_line.unwrap_or(1));
+    let (line, decision) = (1..=6).chain(struct_line).find_map(|line| {
+        suppression_context
+            .decision_for(line, &god_object_debt_type)
+            .map(|decision| (line, decision))
+    })?;
+    Some(AppliedSuppression {
+        file: file_path.to_path_buf(),
+        line,
+        function: None,
+        debt_type: god_object_debt_type.display_name().to_string(),
+        decision,
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -788,7 +769,11 @@ fn add_god_object_item(
     call_graph: &CallGraph,
     file_content: Option<&str>,
 ) {
-    if is_god_object_suppressed_for_file(file_item, god_analysis, file_content) {
+    if let Some(record) = god_object_suppression_for_file(file_item, god_analysis, file_content) {
+        unified.suppression_audit =
+            std::mem::take(&mut unified.suppression_audit).merged(SuppressionAudit {
+                applied: vec![record],
+            });
         file_item.metrics.god_object_analysis = None;
         return;
     }
@@ -860,13 +845,13 @@ fn build_god_object_item(
     (god_item, enriched)
 }
 
-fn is_god_object_suppressed_for_file(
+fn god_object_suppression_for_file(
     file_item: &crate::priority::FileDebtItem,
     god_analysis: &crate::organization::GodObjectAnalysis,
     file_content: Option<&str>,
-) -> bool {
-    file_content.is_some_and(|content| {
-        is_god_object_suppressed_unified(god_analysis, content, &file_item.metrics.path)
+) -> Option<AppliedSuppression> {
+    file_content.and_then(|content| {
+        god_object_suppression_record(god_analysis, content, &file_item.metrics.path)
     })
 }
 

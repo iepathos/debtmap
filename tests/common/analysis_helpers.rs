@@ -97,6 +97,7 @@ pub fn analyze_file_directly(file_path: &Path) -> Result<AnalysisResults> {
             by_type,
             priorities,
             duplications: vec![],
+            suppression_audit: Default::default(),
         },
         dependencies: DependencyReport {
             modules: vec![],

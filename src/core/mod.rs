@@ -315,6 +315,11 @@ pub struct TechnicalDebtReport {
     pub by_type: HashMap<DebtType, Vec<DebtItem>>,
     pub priorities: Vec<Priority>,
     pub duplications: Vec<DuplicationBlock>,
+    #[serde(
+        default,
+        skip_serializing_if = "crate::debt::suppression_audit::SuppressionAudit::is_empty"
+    )]
+    pub suppression_audit: crate::debt::suppression_audit::SuppressionAudit,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]

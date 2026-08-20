@@ -13,7 +13,6 @@ use crate::core::ast::SolidityAst;
 use crate::core::{DebtItem, DebtType, FunctionMetrics, Priority};
 use crate::debt::patterns::find_todos_and_fixmes_with_suppression;
 use crate::debt::smells::analyze_function_smells;
-use crate::debt::suppression::{SuppressionContext, parse_suppression_comments};
 
 pub fn detect_debt(
     path: &Path,
@@ -48,8 +47,6 @@ pub fn detect_debt_with_extraction(
         return Vec::new();
     }
 
-    let suppression =
-        parse_suppression_comments(&ast.source, crate::core::Language::Solidity, path);
     let mut items = if config.features.detect_complexity {
         detect_complexity_debt(path, threshold, functions)
     } else {
@@ -58,7 +55,7 @@ pub fn detect_debt_with_extraction(
     items.extend(find_todos_and_fixmes_with_suppression(
         &ast.source,
         path,
-        Some(&suppression),
+        None,
     ));
     items.extend(function_smell_debt(functions));
     items.extend(detect_natspec_debt_with_signatures(
@@ -73,7 +70,7 @@ pub fn detect_debt_with_extraction(
         &extraction.contracts,
         config,
     ));
-    filter_suppressed_items(items, &suppression)
+    items
 }
 
 pub fn detect_complexity_debt(
@@ -272,21 +269,6 @@ fn advisory_debt(path: &Path, function: &FunctionMetrics, pattern: &str) -> Opti
         ),
         context: Some(definition.context.to_string()),
     })
-}
-
-fn filter_suppressed_items(
-    items: Vec<DebtItem>,
-    suppression: &SuppressionContext,
-) -> Vec<DebtItem> {
-    items
-        .into_iter()
-        .filter(|item| !is_suppressed_item(item, suppression))
-        .collect()
-}
-
-fn is_suppressed_item(item: &DebtItem, suppression: &SuppressionContext) -> bool {
-    suppression.is_suppressed(item.line, &item.debt_type)
-        || suppression.is_function_allowed(item.line, &item.debt_type)
 }
 
 struct AdvisoryDefinition {

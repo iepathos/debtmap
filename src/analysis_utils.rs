@@ -163,6 +163,14 @@ pub fn build_technical_debt_report(
     all_debt_items: Vec<DebtItem>,
     duplications: Vec<DuplicationBlock>,
 ) -> TechnicalDebtReport {
+    build_technical_debt_report_with_audit(all_debt_items, duplications, Default::default())
+}
+
+pub fn build_technical_debt_report_with_audit(
+    all_debt_items: Vec<DebtItem>,
+    duplications: Vec<DuplicationBlock>,
+    suppression_audit: crate::debt::suppression_audit::SuppressionAudit,
+) -> TechnicalDebtReport {
     let debt_by_type = debt::categorize_debt(&all_debt_items);
     let priorities = debt::prioritize_debt(&all_debt_items)
         .into_iter()
@@ -174,7 +182,68 @@ pub fn build_technical_debt_report(
         by_type: debt_by_type,
         priorities,
         duplications,
+        suppression_audit,
     }
+}
+
+pub fn apply_debt_suppressions(
+    items: Vec<DebtItem>,
+) -> crate::debt::suppression_audit::SuppressionOutcome<DebtItem> {
+    let contexts = suppression_contexts_for_items(&items);
+    apply_debt_suppressions_with_contexts(items, &contexts)
+}
+
+pub fn apply_debt_suppressions_with_contexts(
+    items: Vec<DebtItem>,
+    contexts: &std::collections::HashMap<PathBuf, crate::debt::suppression::SuppressionContext>,
+) -> crate::debt::suppression_audit::SuppressionOutcome<DebtItem> {
+    let (emitted, applied) = items.into_iter().fold(
+        (Vec::new(), Vec::new()),
+        |(mut emitted, mut applied), item| {
+            let decision = contexts
+                .get(&item.file)
+                .and_then(|context| context.decision_for(item.line, &item.debt_type));
+            if let Some(decision) = decision {
+                applied.push(crate::debt::suppression_audit::AppliedSuppression {
+                    file: item.file.clone(),
+                    line: item.line,
+                    function: None,
+                    debt_type: item.debt_type.display_name().to_string(),
+                    decision,
+                });
+            } else {
+                emitted.push(item);
+            }
+            (emitted, applied)
+        },
+    );
+    crate::debt::suppression_audit::SuppressionOutcome {
+        emitted,
+        audit: crate::debt::suppression_audit::SuppressionAudit { applied }.normalized(),
+    }
+}
+
+fn suppression_contexts_for_items(
+    items: &[DebtItem],
+) -> std::collections::HashMap<PathBuf, crate::debt::suppression::SuppressionContext> {
+    let mut files = items
+        .iter()
+        .map(|item| item.file.clone())
+        .collect::<Vec<_>>();
+    files.sort();
+    files.dedup();
+    files
+        .into_iter()
+        .filter_map(|file| {
+            let source = std::fs::read_to_string(&file).ok()?;
+            let context = crate::debt::suppression::parse_suppression_comments(
+                &source,
+                Language::from_path(&file),
+                &file,
+            );
+            context.has_directives().then_some((file, context))
+        })
+        .collect()
 }
 
 pub fn create_dependency_report(file_metrics: &[FileMetrics]) -> DependencyReport {
@@ -319,8 +388,84 @@ fn analyze_single_file_direct(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::{ComplexityMetrics, Dependency, DependencyKind};
+    use crate::core::{ComplexityMetrics, DebtType, Dependency, DependencyKind, Priority};
+    use crate::debt::suppression_audit::SuppressionKind;
     use std::env;
+
+    fn debt_item(path: &Path, line: usize, debt_type: DebtType) -> DebtItem {
+        DebtItem {
+            id: format!("{}:{line}", path.display()),
+            debt_type,
+            priority: Priority::Medium,
+            file: path.to_path_buf(),
+            line,
+            column: None,
+            message: "test finding".to_string(),
+            context: None,
+        }
+    }
+
+    #[test]
+    fn raw_suppression_partitions_findings_and_preserves_reason() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let path = directory.path().join("sample.rs");
+        std::fs::write(
+            &path,
+            "// debtmap:ignore-next-line[complexity] -- generated parser\nfn hotspot() {}\n",
+        )
+        .expect("write fixture");
+        let complexity = DebtType::Complexity {
+            cyclomatic: 20,
+            cognitive: 20,
+        };
+        let todo = DebtType::Todo { reason: None };
+
+        let outcome = apply_debt_suppressions(vec![
+            debt_item(&path, 2, complexity),
+            debt_item(&path, 2, todo),
+        ]);
+
+        assert_eq!(outcome.emitted.len(), 1);
+        assert!(matches!(
+            outcome.emitted[0].debt_type,
+            DebtType::Todo { .. }
+        ));
+        assert_eq!(outcome.audit.applied.len(), 1);
+        assert_eq!(
+            outcome.audit.applied[0].decision.kind,
+            SuppressionKind::NextLine
+        );
+        assert_eq!(outcome.audit.applied[0].decision.directive_line, 1);
+        assert_eq!(
+            outcome.audit.applied[0].decision.reason.as_deref(),
+            Some("generated parser")
+        );
+    }
+
+    #[test]
+    fn raw_suppression_uses_language_from_file_path() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let path = directory.path().join("sample.py");
+        std::fs::write(
+            &path,
+            "# debtmap:ignore-start[todo] -- generated fixture\n# TODO: later\n# debtmap:ignore-end\n",
+        )
+        .expect("write fixture");
+
+        let outcome =
+            apply_debt_suppressions(vec![debt_item(&path, 2, DebtType::Todo { reason: None })]);
+
+        assert!(outcome.emitted.is_empty());
+        assert_eq!(outcome.audit.applied.len(), 1);
+        assert_eq!(
+            outcome.audit.applied[0].decision.kind,
+            SuppressionKind::Block
+        );
+        assert_eq!(
+            outcome.audit.applied[0].decision.reason.as_deref(),
+            Some("generated fixture")
+        );
+    }
 
     #[test]
     fn test_build_complexity_report_empty() {

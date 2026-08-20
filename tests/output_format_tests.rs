@@ -63,6 +63,7 @@ fn test_output_json_format() {
             },
             priorities: vec![Priority::Medium],
             duplications: vec![],
+            suppression_audit: Default::default(),
         },
         dependencies: DependencyReport {
             modules: vec![],
@@ -96,6 +97,7 @@ fn test_output_markdown_format() {
             by_type: HashMap::new(),
             priorities: vec![],
             duplications: vec![],
+            suppression_audit: Default::default(),
         },
         dependencies: DependencyReport {
             modules: vec![],

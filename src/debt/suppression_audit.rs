@@ -45,6 +45,13 @@ impl SuppressionAudit {
     pub fn is_empty(&self) -> bool {
         self.applied.is_empty()
     }
+
+    pub fn merged(self, other: Self) -> Self {
+        Self {
+            applied: self.applied.into_iter().chain(other.applied).collect(),
+        }
+        .normalized()
+    }
 }
 
 fn suppression_key(

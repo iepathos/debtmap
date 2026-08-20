@@ -458,8 +458,12 @@ fn build_analysis_results(
 ) -> AnalysisResults {
     let complexity_report =
         analysis_helpers::build_complexity_report(&all_functions, complexity_threshold);
-    let technical_debt =
-        analysis_helpers::build_technical_debt_report(all_debt_items, duplications.clone());
+    let suppression = analysis_utils::apply_debt_suppressions(all_debt_items);
+    let technical_debt = analysis_utils::build_technical_debt_report_with_audit(
+        suppression.emitted,
+        duplications.clone(),
+        suppression.audit,
+    );
     let dependencies = analysis_helpers::create_dependency_report(file_metrics);
 
     AnalysisResults {

@@ -286,6 +286,7 @@ mod tests {
                 by_type: HashMap::new(),
                 priorities: vec![],
                 duplications: vec![],
+                suppression_audit: Default::default(),
             },
             dependencies: DependencyReport {
                 modules: vec![],
