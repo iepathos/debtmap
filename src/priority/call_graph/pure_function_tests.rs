@@ -30,6 +30,7 @@ mod tests {
         nodes.insert(
             func1.clone(),
             FunctionNode {
+                roles: Default::default(),
                 id: func1.clone(),
                 is_entry_point: false,
                 is_test: false,
@@ -41,6 +42,7 @@ mod tests {
         nodes.insert(
             func2.clone(),
             FunctionNode {
+                roles: Default::default(),
                 id: func2.clone(),
                 is_entry_point: false,
                 is_test: false,
@@ -113,6 +115,7 @@ mod tests {
         nodes.insert(
             func1.clone(),
             FunctionNode {
+                roles: Default::default(),
                 id: func1.clone(),
                 is_entry_point: false,
                 is_test: false,
@@ -123,6 +126,7 @@ mod tests {
         nodes.insert(
             func2.clone(),
             FunctionNode {
+                roles: Default::default(),
                 id: func2.clone(),
                 is_entry_point: false,
                 is_test: false,
@@ -133,6 +137,7 @@ mod tests {
         nodes.insert(
             func3.clone(),
             FunctionNode {
+                roles: Default::default(),
                 id: func3.clone(),
                 is_entry_point: false,
                 is_test: false,
@@ -172,6 +177,7 @@ mod tests {
     #[test]
     fn test_is_production_entry_point() {
         let node_entry = FunctionNode {
+            roles: Default::default(),
             id: FunctionId::new(PathBuf::from("test.rs"), "entry".to_string(), 10),
             is_entry_point: true,
             is_test: false,
@@ -180,6 +186,7 @@ mod tests {
         };
 
         let node_test = FunctionNode {
+            roles: Default::default(),
             id: FunctionId::new(PathBuf::from("test.rs"), "test".to_string(), 20),
             is_entry_point: false,
             is_test: true,
@@ -188,6 +195,7 @@ mod tests {
         };
 
         let node_regular = FunctionNode {
+            roles: Default::default(),
             id: FunctionId::new(PathBuf::from("test.rs"), "regular".to_string(), 30),
             is_entry_point: false,
             is_test: false,

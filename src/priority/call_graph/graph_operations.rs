@@ -35,10 +35,26 @@ impl CallGraph {
         complexity: u32,
         lines: usize,
     ) {
+        let roles = crate::analysis::role_policy::CodeRoles {
+            is_test,
+            is_entry_point,
+            ..crate::analysis::role_policy::CodeRoles::default()
+        };
+        self.add_function_with_roles(id, roles, complexity, lines);
+    }
+
+    pub fn add_function_with_roles(
+        &mut self,
+        id: FunctionId,
+        roles: crate::analysis::role_policy::CodeRoles,
+        complexity: u32,
+        lines: usize,
+    ) {
         let node = FunctionNode {
             id: id.clone(),
-            is_entry_point,
-            is_test,
+            roles,
+            is_entry_point: roles.is_entry_point,
+            is_test: roles.is_test,
             complexity,
             _lines: lines,
         };
@@ -561,11 +577,15 @@ impl CallGraph {
         let mut visited = HashSet::new();
         let mut result = Vector::new();
 
-        // Sort initial nodes for deterministic traversal start (Spec 214 fix)
-        let mut nodes: Vec<_> = self.nodes.keys().collect();
+        // Include edge endpoints so callers using `add_call` directly still get
+        // a complete dependency ordering.
+        let mut nodes: HashSet<FunctionId> = self.nodes.keys().cloned().collect();
+        nodes.extend(self.edges.iter().map(|call| call.caller.clone()));
+        nodes.extend(self.edges.iter().map(|call| call.callee.clone()));
+        let mut nodes: Vec<_> = nodes.into_iter().collect();
         nodes.sort();
 
-        for func_id in nodes {
+        for func_id in &nodes {
             if !visited.contains(func_id) {
                 self.topo_sort_dfs_iterative(func_id, &mut visited, &mut result);
             }

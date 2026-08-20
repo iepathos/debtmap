@@ -35,10 +35,13 @@ impl PathResolver {
 
     /// Build function index from call graph (call once after construction)
     pub fn with_function_index(mut self, call_graph: &CallGraph) -> Self {
-        let mut index: HashMap<String, Vec<FunctionId>> = HashMap::new();
+        let all_funcs = call_graph.get_all_functions().cloned().collect();
+        self.index_functions(all_funcs);
+        self
+    }
 
-        // Use deterministic iteration order (Spec 214 fix)
-        let mut all_funcs: Vec<FunctionId> = call_graph.get_all_functions().cloned().collect();
+    fn index_functions(&mut self, mut all_funcs: Vec<FunctionId>) {
+        let mut index: HashMap<String, Vec<FunctionId>> = HashMap::new();
         all_funcs.sort();
 
         for func in all_funcs {
@@ -81,7 +84,6 @@ impl PathResolver {
         }
 
         self.function_index = index;
-        self
     }
 
     /// Resolve a function call to a FunctionId using multiple strategies
@@ -387,6 +389,7 @@ impl PathResolver {
 pub struct PathResolverBuilder {
     import_map: ImportMap,
     module_tree: ModuleTree,
+    functions: Vec<FunctionId>,
 }
 
 impl PathResolverBuilder {
@@ -395,6 +398,7 @@ impl PathResolverBuilder {
         Self {
             import_map: ImportMap::new(),
             module_tree: ModuleTree::new(),
+            functions: Vec::new(),
         }
     }
 
@@ -410,6 +414,17 @@ impl PathResolverBuilder {
         // Register with import map
         self.import_map
             .register_file(file_path.clone(), module_path);
+        self.functions.extend(ast.items.iter().filter_map(|item| {
+            let syn::Item::Fn(function) = item else {
+                return None;
+            };
+            Some(FunctionId::with_module_path(
+                file_path.clone(),
+                function.sig.ident.to_string(),
+                0,
+                ModuleTree::infer_module_from_file(&file_path),
+            ))
+        }));
 
         // Analyze imports
         self.import_map.analyze_imports(&file_path, ast);
@@ -477,7 +492,9 @@ impl PathResolverBuilder {
 
     /// Build the path resolver
     pub fn build(self) -> PathResolver {
-        PathResolver::new(self.import_map, self.module_tree)
+        let mut resolver = PathResolver::new(self.import_map, self.module_tree);
+        resolver.index_functions(self.functions);
+        resolver
     }
 }
 
@@ -496,7 +513,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "known-broken: CallGraphExtractor import integration is incomplete"]
     fn test_simple_import_resolution() {
         let file1 = PathBuf::from("src/main.rs");
         let file2 = PathBuf::from("src/helper.rs");

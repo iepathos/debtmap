@@ -167,6 +167,8 @@ impl PurityPropagator {
         let deps = self.call_graph.get_dependencies(func_id);
         let result = if self.call_graph.is_in_cycle(func_id) {
             propagate_recursive_result(result)
+        } else if deps.is_empty() {
+            result
         } else {
             let callee_evidence = self.callee_evidence(&deps);
             let summary = self.dependency_summary(&deps, &callee_evidence);
@@ -287,7 +289,7 @@ fn propagated_pure_result(
     result.level = PurityLevel::StrictlyPure;
     result.reason = PurityReason::PropagatedFromDeps { depth };
     result.confidence =
-        (result.confidence * depth_confidence * summary.aggregated_confidence).clamp(0.5, 1.0);
+        (result.confidence.min(summary.aggregated_confidence) * depth_confidence).clamp(0.5, 1.0);
     result
 }
 

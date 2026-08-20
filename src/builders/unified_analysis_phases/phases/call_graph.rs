@@ -93,7 +93,7 @@ pub fn find_test_only_functions(call_graph: &CallGraph) -> HashSet<FunctionId> {
 
 /// Pure predicate: should skip test functions.
 pub fn is_test_function(metric: &FunctionMetrics) -> bool {
-    metric.is_test || metric.in_test_module
+    crate::analysis::role_policy::roles_for_metric(metric).is_test
 }
 
 /// Pure predicate: is closure function.

@@ -52,14 +52,7 @@ pub(crate) fn matches_accessor_name(
 }
 
 pub(crate) fn is_entry_point_by_name(name: &str) -> bool {
-    let entry_patterns = [
-        "main", "run", "start", "init", "handle", "process", "execute", "serve", "listen",
-    ];
-
-    let name_lower = name.to_lowercase();
-    entry_patterns
-        .iter()
-        .any(|pattern| name_lower.starts_with(pattern) || name_lower.ends_with(pattern))
+    crate::analysis::role_policy::is_entry_name(name, crate::core::Language::Unknown)
 }
 
 pub(crate) fn is_orchestrator_by_name(name: &str) -> bool {

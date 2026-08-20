@@ -168,6 +168,8 @@ pub struct CallGraph {
 #[cfg_attr(test, derive(PartialEq))]
 pub struct FunctionNode {
     pub id: FunctionId,
+    #[serde(default)]
+    pub roles: crate::analysis::role_policy::CodeRoles,
     pub is_entry_point: bool,
     pub is_test: bool,
     pub complexity: u32,

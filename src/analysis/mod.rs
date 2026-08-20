@@ -118,6 +118,8 @@ pub mod purity_analysis;
 /// Propagates purity information through the call graph, accounting
 /// for transitive dependencies and caching results.
 pub mod purity_propagation;
+/// Shared evidence-based classification for test, entry-point, framework, and API roles.
+pub mod role_policy;
 /// Rust-specific pattern detection.
 ///
 /// Recognizes Rust idioms and patterns like `impl` blocks, trait

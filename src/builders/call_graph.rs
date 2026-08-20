@@ -25,37 +25,17 @@ pub fn build_initial_call_graph(metrics: &[FunctionMetrics]) -> priority::CallGr
     let mut call_graph = priority::CallGraph::new();
 
     for metric in metrics {
+        let roles = crate::analysis::role_policy::roles_for_metric(metric);
         let func_id = priority::call_graph::FunctionId::new(
             metric.file.clone(),
             metric.name.clone(),
             metric.line,
         );
 
-        call_graph.add_function(
-            func_id,
-            is_entry_point(&metric.name),
-            is_test_function(&metric.name, &metric.file, metric.is_test),
-            metric.cyclomatic,
-            metric.length,
-        );
+        call_graph.add_function_with_roles(func_id, roles, metric.cyclomatic, metric.length);
     }
 
     call_graph
-}
-
-fn is_entry_point(function_name: &str) -> bool {
-    match function_name {
-        "main" => true,
-        name if name.starts_with("handle_") => true,
-        name if name.starts_with("run_") => true,
-        _ => false,
-    }
-}
-
-fn is_test_function(function_name: &str, file_path: &Path, is_test_attr: bool) -> bool {
-    is_test_attr
-        || function_name.starts_with("test_")
-        || file_path.to_string_lossy().contains("test")
 }
 
 pub fn process_rust_files_for_call_graph<F>(
