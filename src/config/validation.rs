@@ -176,10 +176,10 @@ fn validate_thresholds_config(thresholds: Option<&ThresholdsConfig>) -> Analysis
     }
 
     if let Some(similarity) = thresholds.duplication_similarity
-        && !(0.0..=1.0).contains(&similarity)
+        && !(0.0 < similarity && similarity <= 1.0)
     {
         errors.push(AnalysisError::config(format!(
-            "Duplication similarity must be 0.0-1.0: {similarity}"
+            "Duplication similarity must be greater than 0.0 and at most 1.0: {similarity}"
         )));
     }
 
@@ -749,6 +749,16 @@ mod tests {
             }
             Validation::Success(_) => panic!("Expected validation failure"),
         }
+    }
+
+    #[test]
+    fn duplication_similarity_must_be_positive() {
+        let thresholds = ThresholdsConfig {
+            duplication_similarity: Some(0.0),
+            ..ThresholdsConfig::default()
+        };
+
+        assert!(validate_thresholds_config(Some(&thresholds)).is_failure());
     }
 
     #[test]

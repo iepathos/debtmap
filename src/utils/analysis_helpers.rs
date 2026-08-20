@@ -11,8 +11,6 @@ use chrono::Utc;
 use rayon::prelude::*;
 use std::path::{Path, PathBuf};
 
-const DEFAULT_SIMILARITY_THRESHOLD: f64 = 0.8;
-
 pub fn analyze_project(
     path: PathBuf,
     languages: Vec<Language>,
@@ -50,6 +48,20 @@ pub fn analyze_project(
 pub fn detect_duplications_with_progress<F>(
     files: &[PathBuf],
     threshold: usize,
+    progress_callback: F,
+) -> Vec<DuplicationBlock>
+where
+    F: FnMut(usize, usize),
+{
+    let policy = config::AnalysisPolicy::from_config(config::get_config());
+    detect_duplications_with_policy_and_progress(files, threshold, &policy, progress_callback)
+}
+
+/// Detect duplications using one explicit immutable language and similarity policy.
+pub fn detect_duplications_with_policy_and_progress<F>(
+    files: &[PathBuf],
+    threshold: usize,
+    policy: &config::AnalysisPolicy,
     mut progress_callback: F,
 ) -> Vec<DuplicationBlock>
 where
@@ -60,6 +72,12 @@ where
     // Parallel file reading - significant speedup for I/O bound operations
     let files_with_content: Vec<(PathBuf, String)> = files
         .par_iter()
+        .filter(|path| {
+            policy.allows(
+                Language::from_path(path),
+                config::AnalysisFeature::Duplication,
+            )
+        })
         .filter_map(|path| match io::read_file(path) {
             Ok(content) => Some((path.clone(), content)),
             Err(e) => {
@@ -79,7 +97,7 @@ where
     debt::duplication::detect_duplication(
         files_with_content,
         threshold,
-        DEFAULT_SIMILARITY_THRESHOLD,
+        policy.duplication.similarity_threshold,
     )
 }
 
@@ -169,6 +187,50 @@ pub fn is_in_current_project(path: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn duplication_policy(similarity_threshold: f64) -> config::AnalysisPolicy {
+        config::AnalysisPolicy::from_config(&config::DebtmapConfig {
+            thresholds: Some(config::ThresholdsConfig {
+                duplication_similarity: Some(similarity_threshold),
+                ..config::ThresholdsConfig::default()
+            }),
+            ..config::DebtmapConfig::default()
+        })
+    }
+
+    #[test]
+    fn explicit_duplication_policy_controls_executed_threshold() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let first = temp_dir.path().join("first.rs");
+        let second = temp_dir.path().join("second.rs");
+        std::fs::write(
+            &first,
+            "alpha bravo charlie\ndelta echo foxtrot\ngolf hotel india",
+        )
+        .unwrap();
+        std::fs::write(
+            &second,
+            "alpha bravo charlie\ndelta echo foxtrot\ngolf hotel juliet",
+        )
+        .unwrap();
+        let files = vec![first, second];
+
+        let fuzzy = detect_duplications_with_policy_and_progress(
+            &files,
+            3,
+            &duplication_policy(0.8),
+            |_, _| {},
+        );
+        let exact = detect_duplications_with_policy_and_progress(
+            &files,
+            3,
+            &duplication_policy(1.0),
+            |_, _| {},
+        );
+
+        assert_eq!(fuzzy.len(), 1);
+        assert!(exact.is_empty());
+    }
 
     #[test]
     fn test_is_in_current_project_relative_path() {

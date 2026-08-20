@@ -84,7 +84,7 @@ fn default_max_complexity() -> u32 {
 pub struct ThresholdsConfig {
     pub complexity: Option<u32>,
     pub duplication: Option<u32>,
-    /// Minimum normalized similarity for duplicate windows (0.0-1.0).
+    /// Minimum normalized similarity for duplicate windows (greater than 0.0, at most 1.0).
     #[serde(default)]
     pub duplication_similarity: Option<f64>,
     pub max_file_length: Option<usize>,

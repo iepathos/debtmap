@@ -1,47 +1,60 @@
 use crate::core::{DuplicationBlock, DuplicationLocation};
-use dashmap::DashMap;
 use rayon::prelude::*;
 use std::path::PathBuf;
-use xxhash_rust::xxh64::xxh64;
+
+mod similarity;
+#[cfg(test)]
+mod threshold_tests;
+
+use similarity::{SimilarityChunk, group_similar_chunks};
 
 /// Detects code duplication across multiple files using parallel processing.
 ///
-/// Uses rayon for parallel file processing and DashMap for concurrent hash aggregation.
-/// This provides 2-4x speedup on multi-core systems compared to sequential processing.
+/// Uses rayon for parallel chunk extraction and deterministic similarity grouping.
+/// A threshold of `1.0` requires normalized text equality. Lower thresholds use
+/// exact set-Jaccard token similarity and emit only directly verified pairs.
 pub fn detect_duplication(
     files: Vec<(PathBuf, String)>,
     min_lines: usize,
-    _similarity_threshold: f64,
+    similarity_threshold: f64,
 ) -> Vec<DuplicationBlock> {
-    // Thread-safe concurrent map for parallel aggregation
-    let chunk_locations: DashMap<u64, Vec<DuplicationLocation>> = DashMap::new();
+    if min_lines == 0
+        || !similarity_threshold.is_finite()
+        || !(0.0 < similarity_threshold && similarity_threshold <= 1.0)
+    {
+        return Vec::new();
+    }
 
-    // Parallel processing of files - extract chunks and compute hashes concurrently
-    files.par_iter().for_each(|(path, content)| {
-        for (start_line, chunk) in extract_chunks(content, min_lines) {
-            let hash = calculate_hash(&chunk);
-            let location = DuplicationLocation {
-                file: path.clone(),
-                start_line,
-                end_line: start_line + min_lines - 1,
-            };
+    let chunks = extract_project_chunks(&files, min_lines);
+    group_similar_chunks(chunks, min_lines, similarity_threshold)
+}
 
-            // Thread-safe insertion into DashMap
-            chunk_locations.entry(hash).or_default().push(location);
-        }
-    });
-
-    // Convert to result - sequential but small compared to hashing
-    chunk_locations
-        .into_iter()
-        .filter_map(|(hash, locations)| {
-            (locations.len() > 1).then_some(DuplicationBlock {
-                hash,
-                lines: min_lines,
-                locations,
-            })
+fn extract_project_chunks(files: &[(PathBuf, String)], chunk_size: usize) -> Vec<SimilarityChunk> {
+    let mut chunks: Vec<_> = files
+        .par_iter()
+        .flat_map_iter(|(path, content)| {
+            extract_chunks(content, chunk_size)
+                .into_iter()
+                .map(|(start_line, normalized)| {
+                    SimilarityChunk::new(
+                        normalized,
+                        DuplicationLocation {
+                            file: path.clone(),
+                            start_line,
+                            end_line: start_line + chunk_size - 1,
+                        },
+                    )
+                })
         })
-        .collect()
+        .collect();
+    chunks.sort_by(|left, right| {
+        left.location
+            .file
+            .cmp(&right.location.file)
+            .then(left.location.start_line.cmp(&right.location.start_line))
+            .then(left.location.end_line.cmp(&right.location.end_line))
+    });
+    chunks
 }
 
 fn extract_chunks(content: &str, chunk_size: usize) -> Vec<(usize, String)> {
@@ -68,34 +81,8 @@ fn normalize_chunk(chunk: &str) -> String {
         .join("\n")
 }
 
-/// Calculates a fast non-cryptographic hash using xxHash64.
-///
-/// Returns a u64 hash value suitable for duplication detection.
-/// xxHash64 provides excellent distribution and is 10-20x faster than SHA256.
-fn calculate_hash(content: &str) -> u64 {
-    xxh64(content.as_bytes(), 0)
-}
-
 pub fn calculate_similarity(chunk1: &str, chunk2: &str) -> f64 {
-    let tokens1 = tokenize(chunk1);
-    let tokens2 = tokenize(chunk2);
-    let tokens2_set: std::collections::HashSet<_> = tokens2.iter().collect();
-
-    let intersection_count = tokens1.iter().filter(|t| tokens2_set.contains(t)).count();
-    let union_count = tokens1.len() + tokens2.len() - intersection_count;
-
-    match union_count {
-        0 => 0.0,
-        n => intersection_count as f64 / n as f64,
-    }
-}
-
-fn tokenize(content: &str) -> Vec<String> {
-    content
-        .split_whitespace()
-        .map(str::to_lowercase)
-        .filter(|s| s.len() > 2)
-        .collect()
+    similarity::calculate_similarity(chunk1, chunk2)
 }
 
 pub fn merge_adjacent_duplications(mut blocks: Vec<DuplicationBlock>) -> Vec<DuplicationBlock> {

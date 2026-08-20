@@ -378,14 +378,14 @@ pub struct CircularDependency {
     pub cycle: Vec<String>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DuplicationBlock {
     pub hash: u64,
     pub lines: usize,
     pub locations: Vec<DuplicationLocation>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DuplicationLocation {
     pub file: PathBuf,
     pub start_line: usize,

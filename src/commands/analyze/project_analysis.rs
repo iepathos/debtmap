@@ -409,12 +409,17 @@ fn detect_duplications(files: &[PathBuf], threshold: usize) -> Vec<DuplicationBl
     time_span!("duplication_detection", parent: "analyze_project");
 
     let file_count = files.len();
-    let duplications =
-        analysis_helpers::detect_duplications_with_progress(files, threshold, |current, total| {
+    let policy = crate::config::AnalysisPolicy::from_config(crate::config::get_config());
+    let duplications = analysis_helpers::detect_duplications_with_policy_and_progress(
+        files,
+        threshold,
+        &policy,
+        |current, total| {
             if let Some(manager) = ProgressManager::global() {
                 manager.tui_update_subtask(0, 3, StageStatus::Active, Some((current, total)));
             }
-        });
+        },
+    );
 
     if let Some(manager) = ProgressManager::global() {
         manager.tui_update_subtask(0, 3, StageStatus::Completed, Some((file_count, file_count)));

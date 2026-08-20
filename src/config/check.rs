@@ -357,6 +357,19 @@ detail_level = "everything"
     }
 
     #[test]
+    fn rejects_zero_duplication_similarity() {
+        let diagnostics =
+            check_config_contents("[thresholds]\nduplication_similarity = 0.0").unwrap_err();
+
+        assert_eq!(diagnostics.len(), 1);
+        assert!(
+            diagnostics[0]
+                .message
+                .contains("Duplication similarity must be greater than 0.0")
+        );
+    }
+
+    #[test]
     fn rejects_out_of_range_validation_and_entropy_values() {
         let contents = r#"
 [thresholds.validation]
