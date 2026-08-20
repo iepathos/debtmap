@@ -8,6 +8,13 @@ use std::path::{Path, PathBuf};
 
 type PackageSymbol = (PathBuf, String);
 
+#[derive(Debug, Default)]
+struct SymbolIndex {
+    by_package: HashMap<PackageSymbol, Vec<FunctionId>>,
+    by_import_path: HashMap<(String, String), Vec<FunctionId>>,
+    imports_by_file: HashMap<PathBuf, HashMap<String, String>>,
+}
+
 pub(super) fn add_resolved_calls(graph: &mut CallGraph, metrics: &[FunctionMetrics]) {
     let index = symbol_index(metrics);
     let mut callers: Vec<_> = metrics
@@ -21,26 +28,48 @@ pub(super) fn add_resolved_calls(graph: &mut CallGraph, metrics: &[FunctionMetri
     }
 }
 
-fn symbol_index(metrics: &[FunctionMetrics]) -> HashMap<PackageSymbol, Vec<FunctionId>> {
+fn symbol_index(metrics: &[FunctionMetrics]) -> SymbolIndex {
     metrics
         .iter()
         .filter(|metric| is_production_go(metric))
-        .fold(HashMap::new(), |mut index, metric| {
+        .fold(SymbolIndex::default(), |mut index, metric| {
+            index
+                .imports_by_file
+                .entry(metric.file.clone())
+                .or_insert_with(|| {
+                    crate::analyzers::go::imports::import_aliases_for_file(&metric.file)
+                });
             let candidates = index
+                .by_package
                 .entry(symbol_key(&metric.file, &metric.name))
                 .or_default();
             candidates.push(function_id(metric));
             candidates.sort();
             candidates.dedup();
+            if !metric.name.contains('.') {
+                index_importable_symbol(&mut index, metric);
+            }
             index
         })
 }
 
-fn add_caller_edges(
-    graph: &mut CallGraph,
-    caller: &FunctionMetrics,
-    index: &HashMap<PackageSymbol, Vec<FunctionId>>,
-) {
+fn index_importable_symbol(index: &mut SymbolIndex, metric: &FunctionMetrics) {
+    let Some(directory) = metric.file.parent() else {
+        return;
+    };
+    let Some(import_path) = crate::analyzers::go::imports::package_import_path(directory) else {
+        return;
+    };
+    let candidates = index
+        .by_import_path
+        .entry((import_path, metric.name.clone()))
+        .or_default();
+    candidates.push(function_id(metric));
+    candidates.sort();
+    candidates.dedup();
+}
+
+fn add_caller_edges(graph: &mut CallGraph, caller: &FunctionMetrics, index: &SymbolIndex) {
     let mut calls = caller.call_dependencies.clone().unwrap_or_default();
     calls.sort();
     calls.dedup();
@@ -50,21 +79,40 @@ fn add_caller_edges(
     }
 }
 
-fn resolve_call(
+fn resolve_call(caller: &FunctionMetrics, call: &str, index: &SymbolIndex) -> ResolutionOutcome {
+    let (candidates, provenance, confidence) = imported_candidates(caller, call, index)
+        .unwrap_or_else(|| {
+            (
+                index
+                    .by_package
+                    .get(&symbol_key(&caller.file, call))
+                    .cloned()
+                    .unwrap_or_default(),
+                if call.contains('.') {
+                    CallEdgeProvenance::TypeResolution
+                } else {
+                    CallEdgeProvenance::AstDirect
+                },
+                if call.contains('.') { 95 } else { 100 },
+            )
+        });
+    outcome(candidates, call, provenance, confidence)
+}
+
+fn imported_candidates(
     caller: &FunctionMetrics,
     call: &str,
-    index: &HashMap<PackageSymbol, Vec<FunctionId>>,
-) -> ResolutionOutcome {
+    index: &SymbolIndex,
+) -> Option<(Vec<FunctionId>, CallEdgeProvenance, u8)> {
+    let (alias, function) = call.split_once('.')?;
+    let imports = index.imports_by_file.get(&caller.file)?;
+    let import_path = imports.get(alias)?;
     let candidates = index
-        .get(&symbol_key(&caller.file, call))
+        .by_import_path
+        .get(&(import_path.clone(), function.to_string()))
         .cloned()
         .unwrap_or_default();
-    let (provenance, confidence) = if call.contains('.') {
-        (CallEdgeProvenance::TypeResolution, 95)
-    } else {
-        (CallEdgeProvenance::AstDirect, 100)
-    };
-    outcome(candidates, call, provenance, confidence)
+    Some((candidates, CallEdgeProvenance::ImportResolution, 100))
 }
 
 fn outcome(
@@ -107,6 +155,8 @@ fn is_production_go(metric: &FunctionMetrics) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use tempfile::tempdir;
 
     #[test]
     fn resolves_unique_same_package_calls_with_evidence() {
@@ -142,6 +192,33 @@ mod tests {
 
         assert!(graph.get_callees_exact(&function_id(&caller)).is_empty());
         assert_eq!(graph.edge_evidence().count(), 0);
+    }
+
+    #[test]
+    fn resolves_explicit_import_alias_without_name_guessing() {
+        let project = tempdir().unwrap();
+        fs::write(project.path().join("go.mod"), "module example.com/app\n").unwrap();
+        let app = project.path().join("cmd/app.go");
+        let library = project.path().join("lib/helpers.go");
+        fs::create_dir_all(app.parent().unwrap()).unwrap();
+        fs::create_dir_all(library.parent().unwrap()).unwrap();
+        fs::write(&app, "package main\nimport util \"example.com/app/lib\"\n").unwrap();
+        fs::write(&library, "package lib\n").unwrap();
+        let mut caller = metric(app.to_str().unwrap(), "run", 1);
+        caller.call_dependencies = Some(vec!["util.Helper".into(), "other.Helper".into()]);
+        let callee = metric(library.to_str().unwrap(), "Helper", 1);
+        let metrics = vec![caller.clone(), callee.clone()];
+        let mut graph = crate::builders::call_graph::build_initial_call_graph(&metrics);
+
+        add_resolved_calls(&mut graph, &metrics);
+
+        assert_eq!(
+            graph.get_callees_exact(&function_id(&caller)),
+            vec![function_id(&callee)]
+        );
+        let evidence = graph.edge_evidence().next().unwrap();
+        assert_eq!(evidence.provenance, CallEdgeProvenance::ImportResolution);
+        assert_eq!(evidence.confidence, 100);
     }
 
     fn metric(file: &str, name: &str, line: usize) -> FunctionMetrics {

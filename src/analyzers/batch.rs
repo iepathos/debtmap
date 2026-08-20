@@ -1041,9 +1041,7 @@ fn go_import_maps(results: &[FileAnalysisResult]) -> HashMap<PathBuf, HashMap<St
         .iter()
         .filter(|result| is_go_result(result))
         .fold(HashMap::new(), |mut maps, result| {
-            let imports = std::fs::read_to_string(&result.path)
-                .map(|source| go_import_aliases(&source))
-                .unwrap_or_default();
+            let imports = crate::analyzers::go::imports::import_aliases_for_file(&result.path);
             maps.insert(result.path.clone(), imports);
             maps
         })
@@ -1068,7 +1066,7 @@ fn go_package_key(result: &FileAnalysisResult) -> GoPackageKey {
         .to_path_buf();
 
     GoPackageKey {
-        import_path: go_package_import_path(&directory),
+        import_path: crate::analyzers::go::imports::package_import_path(&directory),
         directory,
         package_name: result.package_name.clone(),
     }
@@ -1084,124 +1082,6 @@ impl GoFunctionKey {
     fn new(package: GoPackageKey, name: String) -> Self {
         Self { package, name }
     }
-}
-
-fn go_package_import_path(directory: &Path) -> Option<String> {
-    let module = nearest_go_module(directory)?;
-    let relative = directory.strip_prefix(&module.root).ok()?;
-    Some(join_go_import_path(&module.path, relative))
-}
-
-#[derive(Debug, Clone)]
-struct GoModule {
-    root: PathBuf,
-    path: String,
-}
-
-fn nearest_go_module(directory: &Path) -> Option<GoModule> {
-    directory.ancestors().filter_map(go_module_at).next()
-}
-
-fn go_module_at(directory: &Path) -> Option<GoModule> {
-    let go_mod = directory.join("go.mod");
-    let source = std::fs::read_to_string(go_mod).ok()?;
-    parse_go_module_path(&source).map(|path| GoModule {
-        root: directory.to_path_buf(),
-        path,
-    })
-}
-
-fn parse_go_module_path(source: &str) -> Option<String> {
-    source.lines().find_map(|line| {
-        let line = line.split("//").next().unwrap_or("").trim();
-        line.strip_prefix("module ")
-            .map(str::trim)
-            .filter(|path| !path.is_empty())
-            .map(str::to_string)
-    })
-}
-
-fn join_go_import_path(module_path: &str, relative: &Path) -> String {
-    let relative_path = relative
-        .components()
-        .filter_map(|component| component.as_os_str().to_str())
-        .collect::<Vec<_>>()
-        .join("/");
-
-    if relative_path.is_empty() {
-        module_path.to_string()
-    } else {
-        format!("{module_path}/{relative_path}")
-    }
-}
-
-fn go_import_aliases(source: &str) -> HashMap<String, String> {
-    go_import_specs(source)
-        .into_iter()
-        .filter_map(|spec| {
-            let alias = go_import_alias(&spec)?;
-            let path = go_import_path(&spec)?;
-            Some((alias, path))
-        })
-        .filter(|(alias, _)| alias != "." && alias != "_")
-        .collect()
-}
-
-fn go_import_specs(source: &str) -> Vec<String> {
-    source
-        .lines()
-        .fold(ImportScan::default(), |scan, line| scan.next(line))
-        .specs
-}
-
-#[derive(Debug, Clone, Default)]
-struct ImportScan {
-    in_block: bool,
-    specs: Vec<String>,
-}
-
-impl ImportScan {
-    fn next(mut self, line: &str) -> Self {
-        let trimmed = line.trim();
-        if self.in_block {
-            if trimmed.starts_with(')') {
-                self.in_block = false;
-            } else {
-                self.specs.push(trimmed.to_string());
-            }
-            return self;
-        }
-
-        if let Some(rest) = trimmed.strip_prefix("import ") {
-            if rest.trim_start().starts_with('(') {
-                self.in_block = true;
-            } else {
-                self.specs.push(rest.trim().to_string());
-            }
-        }
-
-        self
-    }
-}
-
-fn go_import_alias(spec: &str) -> Option<String> {
-    let quote_index = spec.find('"').or_else(|| spec.find('`'))?;
-    let prefix = spec[..quote_index].trim();
-    prefix
-        .split_whitespace()
-        .last()
-        .map(str::to_string)
-        .or_else(|| {
-            go_import_path(spec).and_then(|path| path.rsplit('/').next().map(str::to_string))
-        })
-}
-
-fn go_import_path(spec: &str) -> Option<String> {
-    let start = spec.find('"').or_else(|| spec.find('`'))?;
-    let quote = spec.as_bytes()[start] as char;
-    let rest = &spec[start + 1..];
-    let end = rest.find(quote)?;
-    Some(rest[..end].to_string())
 }
 
 /// Combine validations while preserving successful values.
@@ -1536,7 +1416,7 @@ mod tests {
         let source = "// comment\nmodule example.com/app\n\ngo 1.22\n";
 
         assert_eq!(
-            super::parse_go_module_path(source),
+            crate::analyzers::go::imports::parse_module_path(source),
             Some("example.com/app".to_string())
         );
     }
@@ -1544,11 +1424,14 @@ mod tests {
     #[test]
     fn test_join_go_import_path() {
         assert_eq!(
-            super::join_go_import_path("example.com/app", Path::new("internal/mathx")),
+            crate::analyzers::go::imports::join_import_path(
+                "example.com/app",
+                Path::new("internal/mathx")
+            ),
             "example.com/app/internal/mathx"
         );
         assert_eq!(
-            super::join_go_import_path("example.com/app", Path::new("")),
+            crate::analyzers::go::imports::join_import_path("example.com/app", Path::new("")),
             "example.com/app"
         );
     }
@@ -1575,7 +1458,7 @@ import (
     . "example.com/app/internal/dot"
 )
 "#;
-        let aliases = super::go_import_aliases(source);
+        let aliases = crate::analyzers::go::imports::import_aliases(source);
 
         assert_eq!(aliases.get("fmt"), Some(&"fmt".to_string()));
         assert_eq!(
