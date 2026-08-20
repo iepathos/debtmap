@@ -28,6 +28,15 @@ pub struct CodeRoles {
     pub is_public_api: bool,
 }
 
+pub struct RoleFacts<'a> {
+    pub path: &'a Path,
+    pub language: Language,
+    pub name: &'a str,
+    pub is_test: bool,
+    pub in_test_module: bool,
+    pub visibility: Option<&'a str>,
+}
+
 impl CodeRoles {
     pub fn is_production(self) -> bool {
         !self.is_test
@@ -36,17 +45,28 @@ impl CodeRoles {
 
 pub fn evidence_for_metric(metric: &FunctionMetrics) -> RoleEvidence {
     let language = Language::from_path(&metric.file);
+    evidence_for_facts(RoleFacts {
+        path: &metric.file,
+        language,
+        name: &metric.name,
+        is_test: metric.is_test,
+        in_test_module: metric.in_test_module,
+        visibility: metric.visibility.as_deref(),
+    })
+}
+
+pub fn evidence_for_facts(facts: RoleFacts<'_>) -> RoleEvidence {
     let mut signals = Vec::new();
-    if metric.is_test || metric.in_test_module {
+    if facts.is_test || facts.in_test_module {
         signals.push(RoleSignal::TestSyntax);
     }
-    if is_test_path(&metric.file, language) {
+    if is_test_path(facts.path, facts.language) {
         signals.push(RoleSignal::TestPath);
     }
-    if is_entry_name(&metric.name, language) {
+    if is_entry_name(facts.name, facts.language) {
         signals.push(RoleSignal::EntryConvention);
     }
-    if is_public_visibility(metric.visibility.as_deref()) {
+    if is_public_visibility(facts.visibility) {
         signals.push(RoleSignal::PublicExport);
     }
     RoleEvidence { signals }
@@ -172,6 +192,28 @@ mod tests {
                 is_test: false,
                 is_entry_point: true,
                 is_framework_managed: true,
+                is_public_api: true,
+            }
+        );
+    }
+
+    #[test]
+    fn extracted_facts_preserve_overlapping_roles() {
+        let evidence = evidence_for_facts(RoleFacts {
+            path: Path::new("tests/runner.py"),
+            language: Language::Python,
+            name: "main",
+            is_test: false,
+            in_test_module: false,
+            visibility: Some("public"),
+        });
+
+        assert_eq!(
+            classify_roles(&evidence),
+            CodeRoles {
+                is_test: true,
+                is_entry_point: true,
+                is_framework_managed: false,
                 is_public_api: true,
             }
         );

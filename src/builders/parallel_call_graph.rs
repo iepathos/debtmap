@@ -475,59 +475,41 @@ pub fn build_call_graph_from_extracted(
 ) -> (CallGraph, HashSet<FunctionId>, HashSet<FunctionId>) {
     use crate::priority::call_graph::CallType as GraphCallType;
 
-    let parallel_graph =
-        Arc::new(crate::priority::parallel_call_graph::ParallelCallGraph::new(extracted.len()));
-
-    // Initialize with base graph
-    parallel_graph.merge_concurrent(base_graph);
-
-    // Process each file's extracted data in deterministic order (Spec 214 fix)
-    let mut sorted_extracted: Vec<_> = extracted.iter().collect();
-    sorted_extracted.sort_by(|a, b| a.0.cmp(b.0));
+    let sorted_extracted = extracted_files_sorted(extracted);
     let callee_index = CalleeResolutionIndex::from_sorted_extracted(&sorted_extracted);
+    let mut final_graph = base_graph;
 
-    for (path, file_data) in sorted_extracted {
-        // Add functions to call graph
+    for (path, file_data) in &sorted_extracted {
         for func in &file_data.functions {
-            let func_id = FunctionId::new(path.clone(), func.qualified_name.clone(), func.line);
-
-            // Add the function as a node with basic properties
-            // is_entry_point: false (will be determined by call graph analysis)
-            // is_test: use extracted value
-            // complexity: use extracted cyclomatic complexity
-            // lines: use extracted length
-            parallel_graph.add_function(
-                func_id.clone(),
-                false, // is_entry_point
-                func.is_test,
-                func.cyclomatic,
-                func.length,
-            );
-
-            // Add call edges from the extracted call sites
-            for call_site in &func.calls {
-                // Try to resolve callee to a FunctionId
-                // Direct calls: function name matches a function in the same or imported file
-                // Method calls: callee_name is just the method name, harder to resolve
-                let callee_id = resolve_callee_from_extracted(
-                    &call_site.callee_name,
-                    &call_site.call_type,
-                    path,
-                    &callee_index,
-                );
-
-                if let Some(callee) = callee_id {
-                    parallel_graph.add_call(func_id.clone(), callee, GraphCallType::Direct);
-                }
+            let function_id = extracted_function_id(path, func);
+            if final_graph.get_function_info(&function_id).is_some() {
+                continue;
             }
+            let roles = crate::analysis::role_policy::classify_roles(
+                &crate::analysis::role_policy::evidence_for_facts(
+                    crate::analysis::role_policy::RoleFacts {
+                        path,
+                        language: crate::core::Language::from_path(path),
+                        name: &func.qualified_name,
+                        is_test: func.is_test,
+                        in_test_module: func.in_test_module,
+                        visibility: func.visibility.as_deref(),
+                    },
+                ),
+            );
+            final_graph.add_function_with_roles(function_id, roles, func.cyclomatic, func.length);
         }
-
-        parallel_graph.stats().increment_files();
     }
 
-    // Convert to regular CallGraph
-    let mut final_graph = parallel_graph.to_call_graph();
-    final_graph.resolve_cross_file_calls();
+    for (path, file_data) in sorted_extracted {
+        for func in &file_data.functions {
+            let caller = extracted_function_id(path, func);
+            for call in &func.calls {
+                let outcome = resolve_callee_from_extracted(call, path, &callee_index);
+                final_graph.add_resolution(caller.clone(), GraphCallType::Direct, outcome);
+            }
+        }
+    }
 
     // For now, no framework exclusions or function pointer detection from extracted data
     // These require deeper AST analysis that isn't captured in extraction
@@ -536,10 +518,7 @@ pub fn build_call_graph_from_extracted(
 
     log::info!(
         "Call graph from extracted data: {} nodes in {} files",
-        parallel_graph
-            .stats()
-            .total_nodes
-            .load(std::sync::atomic::Ordering::Relaxed),
+        final_graph.node_count(),
         extracted.len()
     );
 
@@ -547,9 +526,17 @@ pub fn build_call_graph_from_extracted(
 }
 
 struct CalleeResolutionIndex {
-    same_file_functions: HashMap<PathBuf, HashMap<String, FunctionId>>,
-    qualified_functions: HashMap<String, FunctionId>,
+    same_file_functions: HashMap<PathBuf, HashMap<String, Vec<FunctionId>>>,
+    qualified_functions: HashMap<String, Vec<FunctionId>>,
     method_functions: HashMap<String, Vec<FunctionId>>,
+}
+
+fn extracted_files_sorted(
+    extracted: &HashMap<PathBuf, ExtractedFileData>,
+) -> Vec<(&PathBuf, &ExtractedFileData)> {
+    let mut files: Vec<_> = extracted.iter().collect();
+    files.sort_by(|left, right| left.0.cmp(right.0));
+    files
 }
 
 impl CalleeResolutionIndex {
@@ -578,15 +565,12 @@ impl CalleeResolutionIndex {
         for func in functions {
             let function_id = extracted_function_id(path, func);
             add_same_file_function(file_functions, func, &function_id);
-            add_first_match(
+            add_candidate(
                 &mut self.qualified_functions,
                 &func.qualified_name,
                 &function_id,
             );
-            self.method_functions
-                .entry(func.name.clone())
-                .or_default()
-                .push(function_id);
+            add_candidate(&mut self.method_functions, &func.name, &function_id);
         }
     }
 }
@@ -596,65 +580,125 @@ fn extracted_function_id(path: &Path, func: &ExtractedFunctionData) -> FunctionI
 }
 
 fn add_same_file_function(
-    file_functions: &mut HashMap<String, FunctionId>,
+    file_functions: &mut HashMap<String, Vec<FunctionId>>,
     func: &ExtractedFunctionData,
     function_id: &FunctionId,
 ) {
-    add_first_match(file_functions, &func.qualified_name, function_id);
-    add_first_match(file_functions, &func.name, function_id);
+    add_candidate(file_functions, &func.qualified_name, function_id);
+    add_candidate(file_functions, &func.name, function_id);
 }
 
-fn add_first_match(
-    functions: &mut HashMap<String, FunctionId>,
+fn add_candidate(
+    functions: &mut HashMap<String, Vec<FunctionId>>,
     key: &str,
     function_id: &FunctionId,
 ) {
-    functions
-        .entry(key.to_string())
-        .or_insert_with(|| function_id.clone());
+    let candidates = functions.entry(key.to_string()).or_default();
+    if !candidates.contains(function_id) {
+        candidates.push(function_id.clone());
+        candidates.sort();
+    }
 }
 
 /// Resolve a callee name to a FunctionId using extracted data.
 fn resolve_callee_from_extracted(
-    callee_name: &str,
-    call_type: &crate::extraction::CallType,
+    call: &crate::extraction::CallSite,
     caller_file: &Path,
     index: &CalleeResolutionIndex,
-) -> Option<FunctionId> {
+) -> crate::priority::call_graph::ResolutionOutcome {
     use crate::extraction::CallType;
+    use crate::priority::call_graph::ResolutionOutcome;
 
-    match call_type {
+    match call.call_type {
         CallType::Direct | CallType::StaticMethod | CallType::TraitMethod => {
-            resolve_direct_callee(callee_name, caller_file, index)
+            resolve_direct_callee(call, caller_file, index)
         }
         CallType::Method => {
-            if crate::analyzers::call_graph::CallResolver::is_common_library_method(callee_name) {
-                return None;
+            if crate::analyzers::call_graph::CallResolver::is_common_library_method(
+                &call.callee_name,
+            ) {
+                return ResolutionOutcome::Ignored {
+                    reason: format!("common library method {}", call.callee_name),
+                };
             }
-
-            // Method calls lack type information, so preserve the previous first match.
-            index
+            let candidates = index
                 .method_functions
-                .get(callee_name)
-                .and_then(|matches| matches.first().cloned())
+                .get(&call.callee_name)
+                .cloned()
+                .unwrap_or_default();
+            outcome_for_candidates(
+                candidates,
+                call,
+                caller_file,
+                crate::priority::call_graph::CallEdgeProvenance::NameHeuristic,
+                60,
+            )
         }
-        CallType::Closure | CallType::FunctionPointer => {
-            // Cannot resolve closures or function pointers statically
-            None
-        }
+        CallType::Closure | CallType::FunctionPointer => ResolutionOutcome::Ignored {
+            reason: "dynamic callable".to_string(),
+        },
     }
 }
 
 fn resolve_direct_callee(
-    callee_name: &str,
+    call: &crate::extraction::CallSite,
     caller_file: &Path,
     index: &CalleeResolutionIndex,
-) -> Option<FunctionId> {
-    index
+) -> crate::priority::call_graph::ResolutionOutcome {
+    let local = index
         .same_file_functions
         .get(caller_file)
-        .and_then(|functions| functions.get(callee_name).cloned())
-        .or_else(|| index.qualified_functions.get(callee_name).cloned())
+        .and_then(|functions| functions.get(&call.callee_name))
+        .cloned()
+        .unwrap_or_default();
+    if !local.is_empty() {
+        return outcome_for_candidates(
+            local,
+            call,
+            caller_file,
+            crate::priority::call_graph::CallEdgeProvenance::AstDirect,
+            100,
+        );
+    }
+    let global = index
+        .qualified_functions
+        .get(&call.callee_name)
+        .cloned()
+        .unwrap_or_default();
+    outcome_for_candidates(
+        global,
+        call,
+        caller_file,
+        crate::priority::call_graph::CallEdgeProvenance::ImportResolution,
+        85,
+    )
+}
+
+fn outcome_for_candidates(
+    mut candidates: Vec<FunctionId>,
+    call: &crate::extraction::CallSite,
+    caller_file: &Path,
+    provenance: crate::priority::call_graph::CallEdgeProvenance,
+    confidence: u8,
+) -> crate::priority::call_graph::ResolutionOutcome {
+    use crate::priority::call_graph::{CallSite, ResolutionOutcome};
+    candidates.sort();
+    match candidates.as_slice() {
+        [target] => ResolutionOutcome::Resolved {
+            target: target.clone(),
+            provenance,
+            confidence,
+            call_site: Some(CallSite {
+                file: caller_file.to_path_buf(),
+                line: call.line,
+                column: None,
+            }),
+        },
+        [] => ResolutionOutcome::Unresolved {
+            query: call.callee_name.clone(),
+        },
+        _ => ResolutionOutcome::Ambiguous { candidates },
+    }
 }
 
 #[cfg(test)]
@@ -675,8 +719,14 @@ mod extracted_call_resolution_tests {
         ]);
         let index = CalleeResolutionIndex::from_sorted_extracted(&sorted(&extracted));
 
-        let resolved =
-            resolve_callee_from_extracted("helper", &CallType::Direct, &caller, &index).unwrap();
+        let outcome =
+            resolve_callee_from_extracted(&call("helper", CallType::Direct, 6), &caller, &index);
+        let crate::priority::call_graph::ResolutionOutcome::Resolved {
+            target: resolved, ..
+        } = outcome
+        else {
+            panic!("expected resolved call, got {outcome:?}");
+        };
 
         assert_eq!(resolved.file, caller);
         assert_eq!(resolved.name, "local::helper");
@@ -684,20 +734,31 @@ mod extracted_call_resolution_tests {
     }
 
     #[test]
-    fn method_calls_use_first_deterministic_name_match() {
+    fn ambiguous_method_names_produce_no_resolved_target() {
         let first = PathBuf::from("src/a.rs");
         let second = PathBuf::from("src/b.rs");
+        let mut entry = function("entry", "entry", 1);
+        entry.calls = vec![call("run", CallType::Method, 2)];
         let extracted = extracted_files(vec![
             (second, vec![function("run", "Second::run", 20)]),
-            (first.clone(), vec![function("run", "First::run", 10)]),
+            (
+                first.clone(),
+                vec![entry, function("run", "First::run", 10)],
+            ),
         ]);
         let index = CalleeResolutionIndex::from_sorted_extracted(&sorted(&extracted));
 
-        let resolved =
-            resolve_callee_from_extracted("run", &CallType::Method, &first, &index).unwrap();
+        let outcome =
+            resolve_callee_from_extracted(&call("run", CallType::Method, 6), &first, &index);
 
-        assert_eq!(resolved.file, first);
-        assert_eq!(resolved.name, "First::run");
+        assert!(matches!(
+            outcome,
+            crate::priority::call_graph::ResolutionOutcome::Ambiguous { .. }
+        ));
+        let (graph, _, _) = build_call_graph_from_extracted(CallGraph::new(), &extracted);
+        let entry_id = FunctionId::new(first, "entry".to_string(), 1);
+        assert!(graph.get_callees_exact(&entry_id).is_empty());
+        assert_eq!(graph.edge_evidence().count(), 0);
     }
 
     #[test]
@@ -719,12 +780,15 @@ mod extracted_call_resolution_tests {
         let index = CalleeResolutionIndex::from_sorted_extracted(&sorted(&extracted));
 
         for method in ["filter", "map", "take", "get"] {
-            let resolved =
-                resolve_callee_from_extracted(method, &CallType::Method, &caller, &index);
+            let outcome =
+                resolve_callee_from_extracted(&call(method, CallType::Method, 6), &caller, &index);
 
             assert!(
-                resolved.is_none(),
-                "common library method {method} should not resolve to unrelated project method {resolved:?}"
+                matches!(
+                    outcome,
+                    crate::priority::call_graph::ResolutionOutcome::Ignored { .. }
+                ),
+                "common library method {method} should be ignored, got {outcome:?}"
             );
         }
     }
@@ -775,6 +839,29 @@ mod extracted_call_resolution_tests {
         assert!(callee_names.contains(&"local_helper"));
         assert!(callee_names.contains(&"Helper::remote"));
         assert!(callee_names.contains(&"Helper::run"));
+        let evidence: Vec<_> = graph.edge_evidence().collect();
+        assert_eq!(evidence.len(), 3);
+        assert!(evidence.iter().all(|edge| edge.confidence > 0));
+        assert!(evidence.iter().all(|edge| edge.call_site.is_some()));
+    }
+
+    #[test]
+    fn extracted_nodes_do_not_overwrite_base_roles() {
+        let path = PathBuf::from("src/entry.py");
+        let function_id = FunctionId::new(path.clone(), "main".to_string(), 1);
+        let roles = crate::analysis::role_policy::CodeRoles {
+            is_test: false,
+            is_entry_point: true,
+            is_framework_managed: true,
+            is_public_api: true,
+        };
+        let mut base_graph = CallGraph::new();
+        base_graph.add_function_with_roles(function_id.clone(), roles, 1, 2);
+        let extracted = extracted_files(vec![(path, vec![function("main", "main", 1)])]);
+
+        let (graph, _, _) = build_call_graph_from_extracted(base_graph, &extracted);
+
+        assert_eq!(graph.nodes[&function_id].roles, roles);
     }
 
     fn extracted_files(
@@ -794,6 +881,14 @@ mod extracted_call_resolution_tests {
         let mut function = ExtractedFunctionData::minimal(name, line);
         function.qualified_name = qualified_name.to_string();
         function
+    }
+
+    fn call(name: &str, call_type: CallType, line: usize) -> crate::extraction::CallSite {
+        crate::extraction::CallSite {
+            callee_name: name.to_string(),
+            call_type,
+            line,
+        }
     }
 
     fn sorted(

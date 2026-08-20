@@ -209,11 +209,11 @@ type HybridMetricsResult = (
     FileOutcomeSummary,
 );
 
-/// Parse files using hybrid approach: extract Rust files, parse others (Spec 214).
+/// Parse files using hybrid approach: extract supported files, parse others (Spec 214).
 ///
 /// This function:
-/// 1. Splits files into Rust and non-Rust
-/// 2. Extracts Rust files using UnifiedFileExtractor (single parse)
+/// 1. Splits files into unified-extractor and legacy-parser inputs
+/// 2. Extracts Rust and Python files using UnifiedFileExtractor (single parse)
 /// 3. Converts extracted data to FileMetrics via adapter
 /// 4. Parses non-Rust files using traditional analyzer
 /// 5. Returns combined metrics and extracted data for downstream reuse
@@ -229,15 +229,17 @@ fn parse_and_extract_metrics_hybrid(
     update_file_count(files.len());
     configure_project_size(files, parallel_enabled, formatting_config)?;
 
-    // Split files by type
-    let (rust_files, non_rust_files): (Vec<PathBuf>, Vec<PathBuf>) = files
-        .iter()
-        .cloned()
-        .partition(|p| p.extension().map(|e| e == "rs").unwrap_or(false));
+    let (extractable_files, legacy_files): (Vec<PathBuf>, Vec<PathBuf>) =
+        files.iter().cloned().partition(|path| {
+            matches!(
+                crate::core::Language::from_path(path),
+                crate::core::Language::Rust | crate::core::Language::Python
+            )
+        });
 
-    // Extract Rust files and convert to metrics via adapter
-    let (rust_metrics, extracted_data, rust_failures) = if !rust_files.is_empty() {
-        let extracted = extract_all_files_with_outcomes(&rust_files);
+    let (extracted_metrics, extracted_data, extraction_failures) = if !extractable_files.is_empty()
+    {
+        let extracted = extract_all_files_with_outcomes(&extractable_files);
         let metrics =
             crate::extraction::adapters::metrics::all_file_metrics_from_extracted(&extracted.data);
         (metrics, Some(extracted.data), extracted.failed)
@@ -246,17 +248,17 @@ fn parse_and_extract_metrics_hybrid(
     };
 
     // Parse non-Rust files using traditional path
-    let non_rust_outcomes = if !non_rust_files.is_empty() {
-        analysis_utils::collect_file_metrics_with_errors(&non_rust_files)
+    let legacy_outcomes = if !legacy_files.is_empty() {
+        analysis_utils::collect_file_metrics_with_errors(&legacy_files)
     } else {
         crate::errors::AnalysisResults::new(vec![], vec![])
     };
 
     // Combine metrics
-    let non_rust_failures = non_rust_outcomes.failure_count();
-    let mut all_metrics = rust_metrics;
-    all_metrics.extend(non_rust_outcomes.successes);
-    let failed = rust_failures + non_rust_failures;
+    let legacy_failures = legacy_outcomes.failure_count();
+    let mut all_metrics = extracted_metrics;
+    all_metrics.extend(legacy_outcomes.successes);
+    let failed = extraction_failures + legacy_failures;
 
     // Sort metrics by path to ensure deterministic analysis results (spec 214 fix)
     // Non-deterministic order from HashMap iteration was causing unstable scores
@@ -472,11 +474,16 @@ fn build_analysis_results(
 /// 200 files * ~50KB avg = ~10MB per batch, well under the 4GB limit.
 const EXTRACTION_BATCH_SIZE: usize = 200;
 
-/// Filter paths to include only Rust source files.
-fn filter_rust_files(files: &[PathBuf]) -> Vec<PathBuf> {
+/// Filter paths supported by the unified extractor.
+fn filter_extractable_files(files: &[PathBuf]) -> Vec<PathBuf> {
     files
         .iter()
-        .filter(|p| p.extension().is_some_and(|e| e == "rs"))
+        .filter(|path| {
+            matches!(
+                crate::core::Language::from_path(path),
+                crate::core::Language::Rust | crate::core::Language::Python
+            )
+        })
         .cloned()
         .collect()
 }
@@ -525,20 +532,20 @@ struct ExtractionOutcome {
 }
 
 fn extract_all_files_with_outcomes(files: &[PathBuf]) -> ExtractionOutcome {
-    let rust_files = filter_rust_files(files);
-    if rust_files.is_empty() {
+    let extractable_files = filter_extractable_files(files);
+    if extractable_files.is_empty() {
         return ExtractionOutcome {
             data: HashMap::new(),
             failed: 0,
         };
     }
 
-    let contents = read_file_contents(&rust_files);
+    let contents = read_file_contents(&extractable_files);
     let results = UnifiedFileExtractor::extract_batch(&contents, EXTRACTION_BATCH_SIZE);
     let extraction_failures = results.iter().filter(|(_, result)| result.is_err()).count();
     ExtractionOutcome {
         data: collect_extraction_results(results),
-        failed: rust_files.len() - contents.len() + extraction_failures,
+        failed: extractable_files.len() - contents.len() + extraction_failures,
     }
 }
 
@@ -572,7 +579,7 @@ mod tests {
     }
 
     #[test]
-    fn filter_rust_files_includes_only_rs_extension() {
+    fn filter_extractable_files_includes_rust_and_python() {
         let files = vec![
             PathBuf::from("src/main.rs"),
             PathBuf::from("src/lib.py"),
@@ -580,41 +587,42 @@ mod tests {
             PathBuf::from("src/utils.rs"),
         ];
 
-        let result = filter_rust_files(&files);
+        let result = filter_extractable_files(&files);
 
-        assert_eq!(result.len(), 2);
+        assert_eq!(result.len(), 3);
         assert!(result.contains(&PathBuf::from("src/main.rs")));
+        assert!(result.contains(&PathBuf::from("src/lib.py")));
         assert!(result.contains(&PathBuf::from("src/utils.rs")));
     }
 
     #[test]
-    fn filter_rust_files_handles_empty_input() {
+    fn filter_extractable_files_handles_empty_input() {
         let files: Vec<PathBuf> = vec![];
-        let result = filter_rust_files(&files);
+        let result = filter_extractable_files(&files);
         assert!(result.is_empty());
     }
 
     #[test]
-    fn filter_rust_files_handles_no_rust_files() {
+    fn filter_extractable_files_handles_unsupported_files() {
         let files = vec![
-            PathBuf::from("src/main.py"),
+            PathBuf::from("src/main.ts"),
             PathBuf::from("README.md"),
             PathBuf::from("Cargo.toml"),
         ];
 
-        let result = filter_rust_files(&files);
+        let result = filter_extractable_files(&files);
         assert!(result.is_empty());
     }
 
     #[test]
-    fn filter_rust_files_handles_files_without_extension() {
+    fn filter_extractable_files_handles_files_without_extension() {
         let files = vec![
             PathBuf::from("Makefile"),
             PathBuf::from("src/main.rs"),
             PathBuf::from(".gitignore"),
         ];
 
-        let result = filter_rust_files(&files);
+        let result = filter_extractable_files(&files);
         assert_eq!(result.len(), 1);
         assert_eq!(result[0], PathBuf::from("src/main.rs"));
     }

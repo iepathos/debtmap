@@ -311,6 +311,74 @@ fn markdown_reports_applied_suppressions() {
     assert!(markdown.contains("directive line"));
 }
 
+#[test]
+fn python_calls_contribute_to_shared_dependency_scoring() {
+    let fixture = TempDir::new().unwrap();
+    let source = r#"def alpha_entry(value):
+    return hotspot(value)
+
+def beta_entry(value):
+    return hotspot(value + 1)
+
+def helper(value):
+    return value * 2
+
+def alternate(value):
+    return value - 1
+
+def hotspot(value):
+    if value > 0:
+        if value > 1:
+            if value > 2:
+                if value > 3:
+                    if value > 4:
+                        if value > 5:
+                            if value > 6:
+                                if value > 7:
+                                    if value > 8:
+                                        if value > 9:
+                                            if value > 10:
+                                                return helper(value)
+                                            return alternate(value)
+                                        return 9
+                                    return 8
+                                return 7
+                            return 6
+                        return 5
+    return 0
+"#;
+    fs::write(fixture.path().join("analysis.py"), source).unwrap();
+    let parallel = analyze(
+        fixture.path(),
+        &fixture.path().join("python-parallel.json"),
+        &["--jobs", "2", "--no-god-object"],
+    );
+    let sequential = analyze(
+        fixture.path(),
+        &fixture.path().join("python-sequential.json"),
+        &["--no-parallel", "--no-god-object"],
+    );
+    assert_eq!(
+        canonical_report(parallel.clone(), fixture.path()),
+        canonical_report(sequential, fixture.path())
+    );
+    let hotspot = parallel["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["location"]["function"] == "hotspot")
+        .unwrap_or_else(|| panic!("{}", serde_json::to_string_pretty(&parallel).unwrap()));
+
+    assert_eq!(hotspot["dependencies"]["upstream_count"], 2);
+    assert_eq!(hotspot["dependencies"]["downstream_count"], 2);
+    assert!(
+        hotspot["scoring_details"]["dependency_score"]
+            .as_f64()
+            .unwrap()
+            > 0.0
+    );
+}
+
 fn canonical_report(mut report: Value, root: &Path) -> Value {
     report["metadata"]["generated_at"] = Value::String("<time>".into());
     report["receipt"]["reference_time"] = Value::String("<time>".into());

@@ -185,6 +185,7 @@ pub enum CallEdgeProvenance {
     AstDirect,
     ImportResolution,
     TypeResolution,
+    NameHeuristic,
     FrameworkRegistration,
     Legacy,
 }
