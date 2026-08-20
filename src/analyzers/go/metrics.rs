@@ -10,6 +10,12 @@ pub fn build_file_metrics(
     dependencies: Vec<Dependency>,
     total_lines: usize,
 ) -> FileMetrics {
+    let test_lines = crate::analysis::role_policy::estimate_test_lines(
+        &path,
+        Language::Go,
+        &functions,
+        total_lines,
+    );
     let complexity = complexity_totals(functions);
 
     FileMetrics {
@@ -20,6 +26,7 @@ pub fn build_file_metrics(
         dependencies,
         duplications: vec![],
         total_lines,
+        test_lines,
         module_scope: None,
         classes: None,
     }

@@ -123,6 +123,7 @@ pub fn to_file_metrics(extracted: &ExtractedFileData) -> FileMetrics {
         dependencies: dependencies_from_imports(extracted),
         duplications: vec![],
         total_lines: extracted.total_lines,
+        test_lines: extracted.test_lines,
         module_scope: None,
         classes: classes_from_extracted(extracted),
     }

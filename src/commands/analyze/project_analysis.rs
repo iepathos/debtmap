@@ -44,6 +44,10 @@ pub struct FileOutcomeSummary {
     pub analyzed: usize,
     pub failed: usize,
     pub omitted_by_limit: usize,
+    pub production_loc: usize,
+    pub test_loc: usize,
+    pub production_functions: usize,
+    pub test_functions: usize,
 }
 
 /// Run project analysis (I/O).
@@ -261,14 +265,30 @@ fn parse_and_extract_metrics_hybrid(
 
     complete_parsing(files.len());
 
+    let code = summarize_code_breakdown(&all_metrics);
     let outcomes = FileOutcomeSummary {
         discovered: discovered_count,
         analyzed: all_metrics.len(),
         failed,
         omitted_by_limit,
+        production_loc: code.0,
+        test_loc: code.1,
+        production_functions: code.2,
+        test_functions: code.3,
     };
 
     Ok((all_metrics, extracted_data, outcomes))
+}
+
+fn summarize_code_breakdown(metrics: &[FileMetrics]) -> (usize, usize, usize, usize) {
+    metrics.iter().fold((0, 0, 0, 0), |summary, file| {
+        (
+            summary.0 + file.production_lines(),
+            summary.1 + file.test_lines,
+            summary.2 + file.production_function_count(),
+            summary.3 + file.test_function_count(),
+        )
+    })
 }
 
 fn apply_configured_file_limit(files: Vec<PathBuf>) -> (Vec<PathBuf>, usize) {

@@ -55,8 +55,9 @@ pub use func_item::{
 pub use location::UnifiedLocation;
 pub use priority::Priority;
 pub use receipt::{
-    AnalysisPolicyReceipt, AnalysisReceipt, EvidenceReceipt, ExecutionReceipt,
-    LanguagePolicyReceipt, ScopeReceipt, ScopeStatus, SelectionReceipt, SourceRevisionReceipt,
+    AnalysisPolicyReceipt, AnalysisReceipt, CodeBreakdownReceipt, EvidenceReceipt,
+    ExecutionReceipt, LanguagePolicyReceipt, ScopeReceipt, ScopeStatus, SelectionReceipt,
+    SourceRevisionReceipt,
 };
 pub use types::{
     DebtSummary, OutputMetadata, ScoreDistribution, TypeBreakdown, UnifiedDebtItemOutput,

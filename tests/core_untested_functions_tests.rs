@@ -49,6 +49,7 @@ fn create_test_metrics_simple() -> FileMetrics {
         dependencies: vec![],
         duplications: vec![],
         total_lines: 0,
+        test_lines: 0,
         module_scope: None,
         classes: None,
     }
@@ -126,6 +127,7 @@ fn create_test_metrics_complex() -> FileMetrics {
         dependencies: vec![],
         duplications: vec![],
         total_lines: 0,
+        test_lines: 0,
         module_scope: None,
         classes: None,
     }

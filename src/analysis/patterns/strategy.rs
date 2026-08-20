@@ -264,6 +264,7 @@ mod tests {
             dependencies: vec![],
             duplications: vec![],
             total_lines: 0,
+            test_lines: 0,
             module_scope: None,
             classes: Some(vec![
                 create_strategy_interface(),
@@ -289,6 +290,7 @@ mod tests {
             dependencies: vec![],
             duplications: vec![],
             total_lines: 0,
+            test_lines: 0,
             module_scope: None,
             classes: Some(vec![
                 create_strategy_interface(),
@@ -375,6 +377,7 @@ mod tests {
             dependencies: vec![],
             duplications: vec![],
             total_lines: 0,
+            test_lines: 0,
             module_scope: None,
             classes: Some(vec![
                 create_strategy_interface(),
@@ -399,6 +402,7 @@ mod tests {
             dependencies: vec![],
             duplications: vec![],
             total_lines: 0,
+            test_lines: 0,
             module_scope: None,
             classes: None, // No classes in file
         };
@@ -419,6 +423,7 @@ mod tests {
             dependencies: vec![],
             duplications: vec![],
             total_lines: 0,
+            test_lines: 0,
             module_scope: None,
             classes: Some(vec![create_strategy_interface()]), // Only interface, no implementation
         };
@@ -457,6 +462,7 @@ mod tests {
             dependencies: vec![],
             duplications: vec![],
             total_lines: 0,
+            test_lines: 0,
             module_scope: None,
             classes: Some(vec![orphan_impl]),
         };
@@ -509,6 +515,7 @@ mod tests {
             dependencies: vec![],
             duplications: vec![],
             total_lines: 0,
+            test_lines: 0,
             module_scope: None,
             classes: Some(vec![regular_base, derived]),
         };
@@ -529,6 +536,7 @@ mod tests {
             dependencies: vec![],
             duplications: vec![],
             total_lines: 0,
+            test_lines: 0,
             module_scope: None,
             classes: Some(vec![
                 create_strategy_interface(),
@@ -575,6 +583,7 @@ mod tests {
             dependencies: vec![],
             duplications: vec![],
             total_lines: 0,
+            test_lines: 0,
             module_scope: None,
             classes: Some(vec![strategy_interface, multi_inheritance]),
         };
@@ -630,6 +639,7 @@ mod tests {
             dependencies: vec![],
             duplications: vec![],
             total_lines: 0,
+            test_lines: 0,
             module_scope: None,
             classes: Some(vec![protocol_strategy, json_serializer]),
         };

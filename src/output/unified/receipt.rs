@@ -95,6 +95,16 @@ pub struct ScopeReceipt {
     pub omitted_by_limit: Option<usize>,
     pub total_loc: usize,
     pub status: ScopeStatus,
+    #[serde(default)]
+    pub code_breakdown: CodeBreakdownReceipt,
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CodeBreakdownReceipt {
+    pub production_loc: usize,
+    pub test_loc: usize,
+    pub production_functions: usize,
+    pub test_functions: usize,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

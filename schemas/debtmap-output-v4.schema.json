@@ -748,7 +748,8 @@
         "failed_files",
         "omitted_by_limit",
         "total_loc",
-        "status"
+        "status",
+        "code_breakdown"
       ],
       "properties": {
         "discovered_files": {
@@ -785,6 +786,22 @@
             "limited",
             "unknown"
           ]
+        },
+        "code_breakdown": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "production_loc",
+            "test_loc",
+            "production_functions",
+            "test_functions"
+          ],
+          "properties": {
+            "production_loc": { "$ref": "#/$defs/nonNegativeInteger" },
+            "test_loc": { "$ref": "#/$defs/nonNegativeInteger" },
+            "production_functions": { "$ref": "#/$defs/nonNegativeInteger" },
+            "test_functions": { "$ref": "#/$defs/nonNegativeInteger" }
+          }
         }
       }
     }

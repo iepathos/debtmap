@@ -79,6 +79,23 @@ pub fn roles_for_metric(metric: &FunctionMetrics) -> CodeRoles {
     classify_roles(&evidence_for_metric(metric))
 }
 
+pub fn estimate_test_lines(
+    path: &Path,
+    language: Language,
+    functions: &[FunctionMetrics],
+    total_lines: usize,
+) -> usize {
+    if is_test_path(path, language) {
+        return total_lines;
+    }
+    functions
+        .iter()
+        .filter(|metric| roles_for_metric(metric).is_test)
+        .map(|metric| metric.length)
+        .sum::<usize>()
+        .min(total_lines)
+}
+
 pub fn is_entry_name(name: &str, language: Language) -> bool {
     let unqualified = name.rsplit("::").next().unwrap_or(name);
     match language {

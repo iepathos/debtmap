@@ -27,6 +27,7 @@ fn create_test_file_metrics() -> FileMetrics {
         dependencies: vec![],
         duplications: vec![],
         total_lines: 0,
+        test_lines: 0,
         module_scope: None,
         classes: Some(vec![
             // Observer pattern
@@ -274,6 +275,7 @@ fn test_dependency_injection_pattern_detection() {
         dependencies: vec![],
         duplications: vec![],
         total_lines: 0,
+        test_lines: 0,
         module_scope: None,
         classes: Some(vec![ClassDef {
             name: "DatabaseService".to_string(),

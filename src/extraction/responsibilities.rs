@@ -39,27 +39,30 @@ impl FileResponsibilityGroups {
 pub fn file_responsibility_groups(functions: &[ExtractedFunctionData]) -> FileResponsibilityGroups {
     let mut seen = HashSet::new();
 
-    let mut grouped = functions.iter().fold(
-        FileResponsibilityGroups {
-            groups: HashMap::new(),
-            unique_function_names: Vec::new(),
-        },
-        |mut grouped, func| {
-            let display_name = function_display_name(func);
-            if seen.insert(display_name.clone()) {
-                grouped.unique_function_names.push(display_name.clone());
-                if let Some(responsibility) = file_level_responsibility(func) {
-                    grouped
-                        .groups
-                        .entry(responsibility)
-                        .or_default()
-                        .push(display_name);
+    let mut grouped = functions
+        .iter()
+        .filter(|function| !function.is_test && !function.in_test_module)
+        .fold(
+            FileResponsibilityGroups {
+                groups: HashMap::new(),
+                unique_function_names: Vec::new(),
+            },
+            |mut grouped, func| {
+                let display_name = function_display_name(func);
+                if seen.insert(display_name.clone()) {
+                    grouped.unique_function_names.push(display_name.clone());
+                    if let Some(responsibility) = file_level_responsibility(func) {
+                        grouped
+                            .groups
+                            .entry(responsibility)
+                            .or_default()
+                            .push(display_name);
+                    }
                 }
-            }
 
-            grouped
-        },
-    );
+                grouped
+            },
+        );
 
     grouped.unique_function_names.sort();
     grouped

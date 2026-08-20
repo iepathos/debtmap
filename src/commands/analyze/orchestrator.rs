@@ -357,6 +357,12 @@ fn create_scope_receipt(
         omitted_by_limit: Some(outcomes.omitted_by_limit),
         total_loc: analysis.total_lines_of_code,
         status: scope_status(outcomes),
+        code_breakdown: crate::output::unified::CodeBreakdownReceipt {
+            production_loc: outcomes.production_loc,
+            test_loc: outcomes.test_loc,
+            production_functions: outcomes.production_functions,
+            test_functions: outcomes.test_functions,
+        },
     }
 }
 

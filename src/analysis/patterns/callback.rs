@@ -222,6 +222,7 @@ mod tests {
             dependencies: vec![],
             duplications: vec![],
             total_lines: 0,
+            test_lines: 0,
             module_scope: None,
             classes: None,
         }

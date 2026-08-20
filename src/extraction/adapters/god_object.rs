@@ -72,13 +72,13 @@ fn build_impl_map(impls: &[ExtractedImplData]) -> HashMap<String, Vec<&Extracted
 fn extract_trait_impls(
     impl_blocks: &[&ExtractedImplData],
     registry: &KnownTraitRegistry,
+    extracted: &ExtractedFileData,
 ) -> Vec<TraitImplInfo> {
     impl_blocks
         .iter()
         .filter_map(|impl_block| {
             impl_block.trait_name.as_ref().map(|trait_name| {
-                let method_names: Vec<String> =
-                    impl_block.methods.iter().map(|m| m.name.clone()).collect();
+                let method_names = production_method_names(impl_block, extracted);
                 let category = registry.categorize_trait(trait_name);
                 TraitImplInfo::new(trait_name.clone(), method_names, category)
             })
@@ -99,12 +99,11 @@ fn calculate_struct_metrics(
     extracted: &ExtractedFileData,
 ) -> StructMetrics {
     let registry = KnownTraitRegistry::default();
-    let method_count: usize = impl_blocks.iter().map(|i| i.methods.len()).sum();
-
     let method_names: Vec<String> = impl_blocks
         .iter()
-        .flat_map(|i| i.methods.iter().map(|m| m.name.clone()))
+        .flat_map(|block| production_method_names(block, extracted))
         .collect();
+    let method_count = method_names.len();
 
     // Spec 209: Calculate weighted method count
     // Accessors and boilerplate contribute less to the god object score
@@ -112,7 +111,7 @@ fn calculate_struct_metrics(
         calculate_weighted_count_from_names(method_names.iter().map(String::as_str));
 
     // Spec 217: Extract trait implementations and calculate trait-weighted count
-    let trait_impls = extract_trait_impls(impl_blocks, &registry);
+    let trait_impls = extract_trait_impls(impl_blocks, &registry, extracted);
     let classified_methods = classify_all_methods(&method_names, &trait_impls, &registry);
     let trait_summary = TraitMethodSummary::from_classifications(&classified_methods);
 
@@ -126,11 +125,8 @@ fn calculate_struct_metrics(
         .iter()
         .flat_map(|impl_block| {
             impl_block.methods.iter().filter_map(|method| {
-                let qualified = format!("{}::{}", impl_block.type_name, method.name);
-                extracted
-                    .functions
-                    .iter()
-                    .find(|f| f.qualified_name == qualified || f.name == method.name)
+                find_extracted_method(impl_block, &method.name, extracted)
+                    .filter(|function| !function.is_test && !function.in_test_module)
                     .map(|f| f.cyclomatic)
             })
         })
@@ -152,6 +148,33 @@ fn calculate_struct_metrics(
         avg_complexity,
         complexity_sum,
     }
+}
+
+fn production_method_names(
+    impl_block: &ExtractedImplData,
+    extracted: &ExtractedFileData,
+) -> Vec<String> {
+    impl_block
+        .methods
+        .iter()
+        .filter(|method| {
+            find_extracted_method(impl_block, &method.name, extracted)
+                .is_none_or(|function| !function.is_test && !function.in_test_module)
+        })
+        .map(|method| method.name.clone())
+        .collect()
+}
+
+fn find_extracted_method<'a>(
+    impl_block: &ExtractedImplData,
+    method_name: &str,
+    extracted: &'a ExtractedFileData,
+) -> Option<&'a crate::extraction::ExtractedFunctionData> {
+    let qualified = format!("{}::{method_name}", impl_block.type_name);
+    extracted
+        .functions
+        .iter()
+        .find(|function| function.qualified_name == qualified)
 }
 
 /// Pure function: determine if struct qualifies as god object based on metrics.
@@ -452,7 +475,12 @@ fn analyze_file_level(
     let total_fields: usize = extracted.structs.iter().map(|s| s.fields.len()).sum();
     let responsibility_count = responsibility_groups.responsibility_count();
     let production_lines = extracted.production_lines();
-    let complexity_sum: u32 = extracted.functions.iter().map(|f| f.cyclomatic).sum();
+    let complexity_sum: u32 = extracted
+        .functions
+        .iter()
+        .filter(|function| !function.is_test && !function.in_test_module)
+        .map(|function| function.cyclomatic)
+        .sum();
 
     // Need significant file-level evidence before flagging a mixed module.
     if total_functions <= thresholds.max_methods
@@ -739,6 +767,39 @@ mod tests {
         let result = analyze_god_object(&file_data.path, &file_data);
 
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn inline_test_functions_do_not_change_production_god_object_result() {
+        let production_functions: Vec<_> = (0..5)
+            .map(|index| create_test_function(&format!("worker_{index}"), index * 10 + 1))
+            .collect();
+        let mut with_tests = ExtractedFileData {
+            path: PathBuf::from("src/service.rs"),
+            functions: production_functions.clone(),
+            structs: vec![],
+            impls: vec![],
+            imports: vec![],
+            total_lines: 100,
+            detected_patterns: vec![],
+            test_lines: 0,
+        };
+        let baseline = analyze_god_objects(&with_tests.path, &with_tests);
+        assert!(baseline.is_empty());
+
+        let tests = (0..30).map(|index| {
+            let mut function =
+                create_test_function(&format!("test_worker_{index}"), index * 20 + 101);
+            function.is_test = true;
+            function.in_test_module = true;
+            function.cyclomatic = 50;
+            function
+        });
+        with_tests.functions.extend(tests);
+        with_tests.total_lines = 1000;
+        with_tests.test_lines = 900;
+
+        assert!(analyze_god_objects(&with_tests.path, &with_tests).is_empty());
     }
 
     #[test]

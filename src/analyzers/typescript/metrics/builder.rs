@@ -23,6 +23,8 @@ pub fn build_file_metrics(
     } else {
         Language::JavaScript
     };
+    let test_lines =
+        crate::analysis::role_policy::estimate_test_lines(&path, language, &functions, total_lines);
 
     FileMetrics {
         path,
@@ -36,6 +38,7 @@ pub fn build_file_metrics(
         dependencies,
         duplications: vec![],
         total_lines,
+        test_lines,
         module_scope: None,
         classes: None,
     }

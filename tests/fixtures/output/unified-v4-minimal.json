@@ -55,7 +55,13 @@
       "failed_files": 0,
       "omitted_by_limit": 0,
       "total_loc": 0,
-      "status": "complete"
+      "status": "complete",
+      "code_breakdown": {
+        "production_loc": 0,
+        "test_loc": 0,
+        "production_functions": 0,
+        "test_functions": 0
+      }
     },
     "warnings": []
   },

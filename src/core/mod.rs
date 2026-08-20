@@ -404,10 +404,31 @@ pub struct FileMetrics {
     /// Used to avoid redundant file I/O in later analysis phases.
     #[serde(default)]
     pub total_lines: usize,
+    /// Lines attributable to test-only regions.
+    #[serde(default)]
+    pub test_lines: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub module_scope: Option<ast::ModuleScopeAnalysis>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub classes: Option<Vec<ast::ClassDef>>,
+}
+
+impl FileMetrics {
+    pub fn production_lines(&self) -> usize {
+        self.total_lines.saturating_sub(self.test_lines)
+    }
+
+    pub fn production_function_count(&self) -> usize {
+        self.complexity
+            .functions
+            .iter()
+            .filter(|metric| crate::analysis::role_policy::roles_for_metric(metric).is_production())
+            .count()
+    }
+
+    pub fn test_function_count(&self) -> usize {
+        self.complexity.functions.len() - self.production_function_count()
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]

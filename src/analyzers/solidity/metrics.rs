@@ -14,6 +14,12 @@ pub fn build_file_metrics(
     total_lines: usize,
     classes: Option<Vec<crate::core::ast::ClassDef>>,
 ) -> FileMetrics {
+    let test_lines = crate::analysis::role_policy::estimate_test_lines(
+        &path,
+        Language::Solidity,
+        &functions,
+        total_lines,
+    );
     FileMetrics {
         path,
         language: Language::Solidity,
@@ -22,6 +28,7 @@ pub fn build_file_metrics(
         dependencies,
         duplications: vec![],
         total_lines,
+        test_lines,
         module_scope: None,
         classes,
     }

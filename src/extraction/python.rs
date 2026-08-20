@@ -169,7 +169,10 @@ impl<'a> PythonExtractor<'a> {
                 Some("pub".to_string())
             },
             is_trait_method: false,
-            in_test_module: self.path.to_string_lossy().contains("test"),
+            in_test_module: crate::analysis::role_policy::is_test_path(
+                self.path,
+                crate::core::Language::Python,
+            ),
         })
     }
 

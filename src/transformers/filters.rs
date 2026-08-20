@@ -297,6 +297,7 @@ mod tests {
             dependencies: Vec::new(),
             duplications: Vec::new(),
             total_lines: 0,
+            test_lines: 0,
             module_scope: None,
             classes: None,
         }

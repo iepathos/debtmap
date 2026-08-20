@@ -23,6 +23,12 @@ pub fn build_file_metrics(
     dependencies: Vec<Dependency>,
     total_lines: usize,
 ) -> FileMetrics {
+    let test_lines = crate::analysis::role_policy::estimate_test_lines(
+        &path,
+        Language::Rust,
+        &functions,
+        total_lines,
+    );
     FileMetrics {
         path,
         language: Language::Rust,
@@ -35,6 +41,7 @@ pub fn build_file_metrics(
         dependencies,
         duplications: vec![],
         total_lines,
+        test_lines,
         module_scope: None,
         classes: None,
     }
