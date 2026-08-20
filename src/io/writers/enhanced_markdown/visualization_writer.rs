@@ -74,12 +74,12 @@ pub fn write_dependency_graph<W: Write>(writer: &mut W, analysis: &UnifiedAnalys
     Ok(())
 }
 
-/// Write complexity trends chart
+/// Write a snapshot of sampled function complexity.
 pub fn write_distribution_charts<W: Write>(
     writer: &mut W,
     results: &AnalysisResults,
 ) -> Result<()> {
-    writeln!(writer, "### Complexity Trends\n")?;
+    writeln!(writer, "### Complexity Snapshot\n")?;
 
     let sample_values: Vec<u32> = results
         .complexity
@@ -92,7 +92,7 @@ pub fn write_distribution_charts<W: Write>(
     if !sample_values.is_empty() {
         writeln!(
             writer,
-            "Recent complexity trend: {}\n",
+            "Cyclomatic complexity sample across analyzed functions: {}\n",
             create_sparkline(&sample_values)
         )?;
     }
@@ -127,24 +127,17 @@ pub fn write_complexity_hotspots<W: Write>(
 
     hotspots.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
 
-    writeln!(
-        writer,
-        "| File | Avg Complexity | Max | Functions | Trend |"
-    )?;
-    writeln!(
-        writer,
-        "|------|----------------|-----|-----------|-------|"
-    )?;
+    writeln!(writer, "| File | Avg Complexity | Max | Functions |")?;
+    writeln!(writer, "|------|----------------|-----|-----------|")?;
 
     for (path, avg, max, count) in hotspots.iter().take(10) {
         writeln!(
             writer,
-            "| {} | {:.1} | {} | {} | {} |",
+            "| {} | {:.1} | {} | {} |",
             path.display(),
             avg,
             max,
-            count,
-            get_trend_indicator(0.0)
+            count
         )?;
     }
 
@@ -289,5 +282,20 @@ mod tests {
         assert!(output.contains("Complexity Hotspots"));
         assert!(output.contains("test1.rs"));
         assert!(output.contains("test2.rs"));
+        assert!(!output.contains("| Trend |"));
+        assert!(!output.contains("->"));
+    }
+
+    #[test]
+    fn distribution_chart_is_labeled_snapshot() {
+        let results = create_test_results();
+        let mut buffer = Cursor::new(Vec::new());
+
+        write_distribution_charts(&mut buffer, &results).unwrap();
+        let output = String::from_utf8(buffer.into_inner()).unwrap();
+
+        assert!(output.contains("Complexity Snapshot"));
+        assert!(output.contains("Cyclomatic complexity sample"));
+        assert!(!output.contains("Recent complexity trend"));
     }
 }

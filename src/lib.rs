@@ -14,7 +14,7 @@
 //!
 //! - **Coverage-Risk Correlation** - Combines complexity metrics with test coverage to identify genuinely risky code (high complexity + low coverage = critical risk)
 //! - **Reduced False Positives** - Uses entropy analysis and pattern detection to distinguish genuinely complex code from repetitive patterns, reducing false positives by up to 70%
-//! - **Actionable Recommendations** - Provides specific guidance with quantified impact metrics instead of generic warnings
+//! - **Risk-Ranked Findings** - Prioritizes concrete debt evidence with quantified impact metrics
 //! - **Multi-Factor Analysis** - Analyzes complexity, coverage, dependencies, and call graphs for comprehensive prioritization
 //! - **Fast & Open Source** - Written in Rust for 10-100x faster analysis, MIT licensed
 //!

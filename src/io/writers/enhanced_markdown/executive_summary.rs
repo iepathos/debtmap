@@ -55,6 +55,7 @@ pub enum TrendIndicator {
     Improving,
     Stable,
     Declining,
+    Unavailable,
 }
 
 impl TrendIndicator {
@@ -63,6 +64,7 @@ impl TrendIndicator {
             TrendIndicator::Improving => "/\\",
             TrendIndicator::Stable => "--",
             TrendIndicator::Declining => "\\/",
+            TrendIndicator::Unavailable => "N/A",
         }
     }
 
@@ -71,6 +73,16 @@ impl TrendIndicator {
             TrendIndicator::Improving => "Improving",
             TrendIndicator::Stable => "Stable",
             TrendIndicator::Declining => "Declining",
+            TrendIndicator::Unavailable => "Unavailable",
+        }
+    }
+
+    pub fn interpretation(&self) -> &'static str {
+        match self {
+            TrendIndicator::Improving => "Health is improving over time",
+            TrendIndicator::Stable => "Health is stable over time",
+            TrendIndicator::Declining => "Health is declining over time",
+            TrendIndicator::Unavailable => "No comparison baseline provided",
         }
     }
 }
@@ -308,7 +320,7 @@ pub fn identify_strategic_priorities(
         let blocking_factor = calculate_blocking_factor(item);
 
         priorities.push(StrategicPriority {
-            title: item.recommendation.primary_action.clone(),
+            title: item.location.function.clone(),
             description: format!(
                 "In {}: {}",
                 item.location.file.display(),
@@ -572,7 +584,7 @@ pub fn generate_executive_summary(
     // Generate health dashboard
     let health_dashboard = HealthDashboard {
         overall_health: HealthStatus::from_score(health_score),
-        trend: TrendIndicator::Stable, // Would need historical data for real trend
+        trend: TrendIndicator::Unavailable,
         velocity_impact: VelocityImpact::from_debt_analysis(debt_count, avg_complexity),
         risk_level: RiskLevel::from_metrics(health_score, debt_count, avg_complexity),
     };

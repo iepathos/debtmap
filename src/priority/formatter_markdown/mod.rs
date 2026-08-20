@@ -3,7 +3,7 @@
 //! This module has been refactored (Spec 206) to use shared classification
 //! modules and a modular structure. It provides three main formatting modes:
 //!
-//! - **Mixed priorities**: Top recommendations across all debt types
+//! - **Mixed priorities**: Top findings across all debt types
 //! - **Categorical**: Debt grouped by category (Testing, Complexity, etc.)
 //! - **Tiered**: Debt grouped by severity tier (Critical, High, Moderate, Low)
 //!
@@ -54,7 +54,7 @@ pub fn format_priorities_markdown(
     let top_items = analysis.get_top_mixed_priorities(limit);
     let count = top_items.len().min(limit);
 
-    writeln!(output, "## Top {} Recommendations\n", count).unwrap();
+    writeln!(output, "## Top {} Findings\n", count).unwrap();
 
     for (idx, item) in top_items.iter().enumerate() {
         format_mixed_priority_item_markdown(&mut output, idx + 1, item, verbosity, &config);

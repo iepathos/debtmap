@@ -167,6 +167,30 @@ pub struct ActionableRecommendation {
     pub estimated_effort_hours: Option<f32>,
 }
 
+impl ActionableRecommendation {
+    /// Returns true when the compatibility value contains no computed guidance.
+    pub fn is_empty(&self) -> bool {
+        self.primary_action().is_none()
+            && self.rationale().is_none()
+            && self.implementation_steps.is_empty()
+            && self.related_items.is_empty()
+            && self.steps.as_ref().is_none_or(Vec::is_empty)
+            && self.estimated_effort_hours.is_none()
+    }
+
+    /// Returns a computed action when one is available.
+    pub fn primary_action(&self) -> Option<&str> {
+        let action = self.primary_action.trim();
+        (!action.is_empty()).then_some(action)
+    }
+
+    /// Returns a computed rationale when one is available.
+    pub fn rationale(&self) -> Option<&str> {
+        let rationale = self.rationale.trim();
+        (!rationale.is_empty()).then_some(rationale)
+    }
+}
+
 /// Single actionable step with clear impact (spec 138a)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActionStep {

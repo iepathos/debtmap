@@ -195,7 +195,7 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
             write_dependency_graph(&mut self.writer, analysis)?;
         }
 
-        self.toc_builder.add_entry(2, "Complexity Trends");
+        self.toc_builder.add_entry(2, "Complexity Snapshot");
         write_distribution_charts(&mut self.writer, results)?;
 
         Ok(())

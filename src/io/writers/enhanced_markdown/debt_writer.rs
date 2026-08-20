@@ -20,7 +20,7 @@ pub fn write_priority_matrix<W: Write>(writer: &mut W, analysis: &UnifiedAnalysi
             writer,
             "| {} | {} | {} days | {} |",
             get_priority_label(i),
-            item.recommendation.primary_action.clone(),
+            item.location.function,
             estimate_effort_hours(item) / 8,
             item.expected_impact.complexity_reduction
         )?;
@@ -305,7 +305,7 @@ mod tests {
 
         let output = String::from_utf8(buffer.into_inner()).unwrap();
         assert!(output.contains("Priority Matrix"));
-        assert!(output.contains("Refactor complex function"));
+        assert!(output.contains("test_func"));
     }
 
     #[test]

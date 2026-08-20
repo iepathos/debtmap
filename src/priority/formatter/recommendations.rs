@@ -1,6 +1,6 @@
-//! Detailed recommendations formatting for priority analysis
+//! Detailed finding formatting for priority analysis
 //!
-//! This module provides formatted recommendations for technical debt items,
+//! This module provides formatted findings for technical debt items,
 //! showing detailed information about each priority item with context.
 
 use crate::formatting::FormattingConfig;
@@ -46,7 +46,7 @@ fn generate_legend(verbosity: u8, has_coverage_data: bool) -> String {
     legend
 }
 
-/// Format top priority items with detailed recommendations
+/// Format top priority findings with available details
 pub fn format_default_with_config(
     analysis: &UnifiedAnalysis,
     limit: usize,
@@ -75,9 +75,7 @@ pub fn format_default_with_config(
     writeln!(
         output,
         "{}",
-        format!("TOP {count} RECOMMENDATIONS")
-            .bright_yellow()
-            .bold()
+        format!("TOP {count} FINDINGS").bright_yellow().bold()
     )
     .unwrap();
     writeln!(output).unwrap();

@@ -146,7 +146,9 @@ pub(crate) fn format_function_debt_item(
 
     writeln!(output, "**Type:** {}", format_debt_type(&item.debt_type)).unwrap();
 
-    writeln!(output, "**Action:** {}", item.recommendation.primary_action).unwrap();
+    if let Some(action) = item.recommendation.primary_action() {
+        writeln!(output, "**Action:** {action}").unwrap();
+    }
 
     if let Some(complexity) = extract_complexity_info(&item.debt_type) {
         writeln!(output, "**Complexity:** {}", complexity).unwrap();
@@ -159,7 +161,9 @@ pub(crate) fn format_function_debt_item(
             format_impact(&item.expected_impact)
         )
         .unwrap();
-        writeln!(output, "**Why:** {}", item.recommendation.rationale).unwrap();
+        if let Some(rationale) = item.recommendation.rationale() {
+            writeln!(output, "**Why:** {rationale}").unwrap();
+        }
     }
 }
 

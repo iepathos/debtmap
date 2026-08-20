@@ -131,9 +131,9 @@ pub fn write_enhanced_health_dashboard<W: Write>(
     )?;
     writeln!(
         writer,
-        "| **Trend** | {} | Health is {} over time |",
+        "| **Historical Trend** | {} | {} |",
         dashboard.trend.as_string(),
-        dashboard.trend.as_string().to_lowercase()
+        dashboard.trend.interpretation()
     )?;
     writeln!(
         writer,
@@ -288,6 +288,9 @@ pub fn write_success_metrics_section<W: Write>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::io::writers::enhanced_markdown::{
+        HealthStatus, RiskLevel, TrendIndicator, VelocityImpact,
+    };
 
     #[test]
     fn test_classify_health_status() {
@@ -322,5 +325,26 @@ mod tests {
         assert!(metrics[0].contains("Overall Health"));
         assert!(metrics[1].contains("Average Complexity"));
         assert!(metrics[2].contains("Technical Debt"));
+    }
+
+    #[test]
+    fn health_dashboard_does_not_claim_trend_without_baseline() {
+        let dashboard = HealthDashboard {
+            overall_health: HealthStatus::Good(90),
+            trend: TrendIndicator::Unavailable,
+            velocity_impact: VelocityImpact {
+                slowdown_percentage: 0.0,
+                description: "No measured impact".to_string(),
+            },
+            risk_level: RiskLevel::Low,
+        };
+        let mut output = Vec::new();
+
+        write_enhanced_health_dashboard(&mut output, &dashboard).unwrap();
+        let output = String::from_utf8(output).unwrap();
+
+        assert!(output.contains("Historical Trend"));
+        assert!(output.contains("No comparison baseline provided"));
+        assert!(!output.contains("Health is stable over time"));
     }
 }

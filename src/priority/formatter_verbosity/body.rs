@@ -114,24 +114,28 @@ fn format_impact_section(output: &mut String, item: &UnifiedDebtItem) {
 
 /// Format the why this matters section
 fn format_why_section(output: &mut String, item: &UnifiedDebtItem) {
-    writeln!(
-        output,
-        "{} {}",
-        "├─ WHY THIS MATTERS:".bright_blue(),
-        item.recommendation.rationale
-    )
-    .unwrap();
+    if let Some(rationale) = item.recommendation.rationale() {
+        writeln!(
+            output,
+            "{} {}",
+            "├─ WHY THIS MATTERS:".bright_blue(),
+            rationale
+        )
+        .unwrap();
+    }
 }
 
 /// Format the recommended action section
 fn format_action_section(output: &mut String, item: &UnifiedDebtItem) {
-    writeln!(
-        output,
-        "├─ {} {}",
-        "RECOMMENDED ACTION:".bright_blue(),
-        item.recommendation.primary_action.bright_green().bold()
-    )
-    .unwrap();
+    if let Some(action) = item.recommendation.primary_action() {
+        writeln!(
+            output,
+            "├─ {} {}",
+            "RECOMMENDED ACTION:".bright_blue(),
+            action.bright_green().bold()
+        )
+        .unwrap();
+    }
 }
 
 /// Format the main body of the item (location, action, impact, etc.)
@@ -376,6 +380,44 @@ mod tests {
                 .any(|f| f.contains("Performance impact (High)"))
         );
         assert!(factors.iter().any(|f| f.contains("3 level nested loops")));
+    }
+
+    #[test]
+    fn empty_recommendation_omits_action_and_why_labels() {
+        let mut item = create_test_item();
+        item.recommendation = crate::priority::ActionableRecommendation::default();
+        let mut output = String::new();
+
+        format_priority_item_with_config(
+            &mut output,
+            1,
+            &item,
+            0,
+            FormattingConfig::plain(),
+            false,
+        );
+
+        assert!(output.contains("test_function"));
+        assert!(!output.contains("RECOMMENDED ACTION"));
+        assert!(!output.contains("WHY THIS MATTERS"));
+    }
+
+    #[test]
+    fn populated_recommendation_keeps_action_and_why_labels() {
+        let item = create_test_item();
+        let mut output = String::new();
+
+        format_priority_item_with_config(
+            &mut output,
+            1,
+            &item,
+            0,
+            FormattingConfig::plain(),
+            false,
+        );
+
+        assert!(output.contains("RECOMMENDED ACTION"));
+        assert!(output.contains("WHY THIS MATTERS"));
     }
 
     // Helper function to create a test UnifiedDebtItem

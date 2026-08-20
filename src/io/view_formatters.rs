@@ -460,13 +460,10 @@ fn format_terminal_item(output: &mut String, item: &ViewItem, rank: usize, verbo
                 f.cyclomatic_complexity, f.cognitive_complexity, f.nesting_depth
             )
             .ok();
-            if verbosity >= 1 {
-                writeln!(
-                    output,
-                    "   Recommendation: {}",
-                    f.recommendation.primary_action
-                )
-                .ok();
+            if verbosity >= 1
+                && let Some(action) = f.recommendation.primary_action()
+            {
+                writeln!(output, "   Recommendation: {action}").ok();
             }
         }
         ViewItem::File(f) => {
@@ -639,13 +636,10 @@ fn format_markdown_item(output: &mut String, item: &ViewItem, rank: usize, verbo
             }
             writeln!(output).ok();
 
-            if verbosity >= 1 {
-                writeln!(
-                    output,
-                    "**Recommendation:** {}\n",
-                    f.recommendation.primary_action
-                )
-                .ok();
+            if verbosity >= 1
+                && let Some(action) = f.recommendation.primary_action()
+            {
+                writeln!(output, "**Recommendation:** {action}\n").ok();
             }
         }
         ViewItem::File(f) => {

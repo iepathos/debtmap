@@ -6,12 +6,12 @@ use std::io::Write;
 use super::executive_summary::estimate_effort_hours;
 use super::statistics::calculate_average_complexity;
 
-/// Write priority actions section
+/// Write priority findings section.
 pub fn write_priority_actions<W: Write>(
     writer: &mut W,
     unified_analysis: Option<&UnifiedAnalysis>,
 ) -> Result<()> {
-    writeln!(writer, "### [CRITICAL] Priority Actions\n")?;
+    writeln!(writer, "### [CRITICAL] Priority Findings\n")?;
 
     if let Some(analysis) = unified_analysis {
         let priority_items: Vec<_> = analysis
@@ -21,7 +21,7 @@ pub fn write_priority_actions<W: Write>(
             .enumerate()
             .flat_map(|(i, item)| {
                 vec![
-                    format!("{}. **{}**", i + 1, item.recommendation.primary_action),
+                    format!("{}. **{}**", i + 1, item.location.function),
                     format!("   - Location: `{}`", item.location.file.display()),
                     format!(
                         "   - Estimated Effort: {} hours",
@@ -293,8 +293,8 @@ mod tests {
         assert!(result.is_ok());
 
         let output = String::from_utf8(buffer.into_inner()).unwrap();
-        assert!(output.contains("Priority Actions"));
-        assert!(output.contains("Refactor complex function"));
+        assert!(output.contains("Priority Findings"));
+        assert!(output.contains("test_func"));
     }
 
     #[test]

@@ -85,13 +85,10 @@ pub(crate) fn format_categorized_debt_item(
             )
             .unwrap();
             writeln!(output, "   - Type: {}", format_debt_type(&func.debt_type)).unwrap();
-            if verbosity >= 1 {
-                writeln!(
-                    output,
-                    "   - Action: {}",
-                    func.recommendation.primary_action
-                )
-                .unwrap();
+            if verbosity >= 1
+                && let Some(action) = func.recommendation.primary_action()
+            {
+                writeln!(output, "   - Action: {}", action).unwrap();
             }
         }
         DebtItem::File(file) => {

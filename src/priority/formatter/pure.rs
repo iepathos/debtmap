@@ -105,7 +105,7 @@ fn build_all_sections(
     ];
 
     sections.extend(build_context_dampening_section(context));
-    sections.push(build_action_section(context));
+    sections.extend(build_action_section(context));
     sections.push(build_impact_section(context));
     sections.extend(build_evidence_section(sections_data));
     sections.extend(build_complexity_section(context));
@@ -114,7 +114,7 @@ fn build_all_sections(
     sections.extend(build_contextual_risk_section(&item.contextual_risk));
     sections.extend(build_dependencies_section(context));
     sections.extend(build_debt_specific_section(sections_data));
-    sections.push(build_rationale_section(context));
+    sections.extend(build_rationale_section(context));
 
     sections
 }
@@ -152,10 +152,10 @@ fn build_context_dampening_section(context: &FormatContext) -> Option<FormattedS
         })
 }
 
-fn build_action_section(context: &FormatContext) -> FormattedSection {
-    FormattedSection::Action {
+fn build_action_section(context: &FormatContext) -> Option<FormattedSection> {
+    (!context.action.is_empty()).then(|| FormattedSection::Action {
         action: context.action.clone(),
-    }
+    })
 }
 
 fn build_impact_section(context: &FormatContext) -> FormattedSection {
@@ -315,10 +315,10 @@ fn build_debt_specific_section(
         .map(|text| FormattedSection::DebtSpecific { text: text.clone() })
 }
 
-fn build_rationale_section(context: &FormatContext) -> FormattedSection {
-    FormattedSection::Rationale {
+fn build_rationale_section(context: &FormatContext) -> Option<FormattedSection> {
+    (!context.rationale.is_empty()).then(|| FormattedSection::Rationale {
         text: context.rationale.clone(),
-    }
+    })
 }
 
 #[cfg(test)]
@@ -451,6 +451,21 @@ mod tests {
         assert!(has_action, "Should have action section");
         assert!(has_impact, "Should have impact section");
         assert!(has_rationale, "Should have rationale section");
+    }
+
+    #[test]
+    fn empty_recommendation_omits_action_and_rationale_sections() {
+        let mut item = create_test_item(8.5);
+        item.recommendation = ActionableRecommendation::default();
+
+        let formatted = format_priority_item(1, &item, 0, FormattingConfig::default(), false);
+
+        assert!(!formatted.sections.iter().any(|section| {
+            matches!(
+                section,
+                FormattedSection::Action { .. } | FormattedSection::Rationale { .. }
+            )
+        }));
     }
 
     #[test]

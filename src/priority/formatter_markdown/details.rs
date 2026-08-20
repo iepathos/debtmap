@@ -27,7 +27,9 @@ pub(crate) fn format_priority_item_markdown(
         format_git_context_section(output, item);
     }
 
-    writeln!(output, "\n**Why:** {}", item.recommendation.rationale).unwrap();
+    if let Some(rationale) = item.recommendation.rationale() {
+        writeln!(output, "\n**Why:** {rationale}").unwrap();
+    }
 
     if verbosity >= 2
         && let Some(context) = &item.context_suggestion
@@ -76,7 +78,9 @@ fn format_location_and_impact(output: &mut String, item: &UnifiedDebtItem) {
     )
     .unwrap();
 
-    writeln!(output, "**Action:** {}", item.recommendation.primary_action).unwrap();
+    if let Some(action) = item.recommendation.primary_action() {
+        writeln!(output, "**Action:** {action}").unwrap();
+    }
     writeln!(
         output,
         "**Impact:** {}",

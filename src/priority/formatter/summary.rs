@@ -263,13 +263,9 @@ fn format_compact_item(
             )
             .unwrap();
 
-            // Show brief action
-            writeln!(
-                output,
-                "      -> {}",
-                func.recommendation.primary_action.green()
-            )
-            .unwrap();
+            if let Some(action) = func.recommendation.primary_action() {
+                writeln!(output, "      -> {}", action.green()).unwrap();
+            }
         }
         priority::DebtItem::File(file) => {
             writeln!(
