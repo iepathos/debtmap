@@ -128,7 +128,9 @@ impl PurityPropagator {
         let sorted = self.call_graph.topological_sort()?;
 
         for func_id in sorted {
-            self.propagate_for_function(&func_id)?;
+            if self.cache.contains_key(&func_id) {
+                self.propagate_for_function(&func_id)?;
+            }
         }
 
         Ok(())
@@ -254,16 +256,16 @@ fn propagate_dependency_result(
     result: PurityResult,
     summary: DependencyPuritySummary,
 ) -> PurityResult {
-    if has_pure_dependencies(&result, &summary) {
-        return propagated_pure_result(result, &summary);
-    }
-
-    if !summary.impure_reasons.is_empty() {
+    if !summary.all_deps_pure {
         return propagated_impure_result(summary);
     }
 
     if summary.unknown_count > 0 {
         return propagated_unknown_result(result, &summary);
+    }
+
+    if has_pure_dependencies(&result, &summary) {
+        return propagated_pure_result(result, &summary);
     }
 
     result
@@ -419,10 +421,8 @@ mod tests {
         );
 
         assert_eq!(propagated.level, PurityLevel::StrictlyPure);
-        assert_eq!(
-            propagated.reason,
-            PurityReason::PropagatedFromDeps { depth: 1 }
-        );
+        assert_eq!(propagated.reason, PurityReason::UnknownDeps { count: 2 });
+        assert!(propagated.confidence < 0.8);
     }
 
     #[test]

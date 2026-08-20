@@ -7,7 +7,9 @@ use debtmap::analysis::call_graph::{
     TraitRegistry,
 };
 use debtmap::analysis::purity_analysis::PurityAnalyzer;
-use debtmap::analysis::purity_propagation::{PurityCallGraphAdapter, PurityPropagator};
+use debtmap::analysis::purity_propagation::{
+    PurityCallGraphAdapter, PurityPropagator, PurityReason,
+};
 use debtmap::core::FunctionMetrics;
 use debtmap::priority::call_graph::{CallGraph, CallType, FunctionId};
 use std::path::PathBuf;
@@ -305,4 +307,39 @@ fn test_impure_caller_propagates_impurity() {
         caller_result.level == debtmap::analysis::purity_analysis::PurityLevel::Impure,
         "Calling impure function should make caller impure"
     );
+}
+
+#[test]
+fn external_callee_does_not_abort_project_propagation() {
+    let mut call_graph = CallGraph::new();
+    let caller_id = FunctionId::new(PathBuf::from("test.rs"), "caller".to_string(), 20);
+    let external_id = FunctionId::new(
+        PathBuf::from("external.rs"),
+        "external_crate::send".to_string(),
+        1,
+    );
+    call_graph.add_call_parts(caller_id.clone(), external_id, CallType::Direct);
+
+    let rust_graph = RustCallGraph {
+        base_graph: call_graph,
+        trait_registry: TraitRegistry::new(),
+        function_pointer_tracker: FunctionPointerTracker::new(),
+        framework_patterns: FrameworkPatternDetector::new(),
+        cross_module_tracker: CrossModuleTracker::new(),
+    };
+    let adapter = PurityCallGraphAdapter::from_rust_graph(rust_graph);
+    let mut propagator = PurityPropagator::new(adapter, PurityAnalyzer::new());
+    let metrics = vec![create_test_metric(
+        "caller",
+        "test.rs",
+        20,
+        Some(true),
+        Some(0.95),
+    )];
+
+    propagator.propagate(&metrics).unwrap();
+
+    let result = propagator.get_result(&caller_id).unwrap();
+    assert_eq!(result.reason, PurityReason::UnknownDeps { count: 1 });
+    assert!(result.confidence < 0.95);
 }
