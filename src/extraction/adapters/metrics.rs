@@ -30,7 +30,7 @@ use std::path::Path;
 /// A `FunctionMetrics` struct populated from the extracted data.
 pub fn to_function_metrics(file_path: &Path, extracted: &ExtractedFunctionData) -> FunctionMetrics {
     FunctionMetrics {
-        name: extracted.name.clone(),
+        name: metric_function_name(file_path, extracted),
         file: file_path.to_path_buf(),
         line: extracted.line,
         cyclomatic: extracted.cyclomatic,
@@ -64,6 +64,13 @@ pub fn to_function_metrics(file_path: &Path, extracted: &ExtractedFunctionData) 
         mapping_pattern_result: None,
         // entropy_analysis will be populated when entropy_score is converted
         entropy_analysis: None,
+    }
+}
+
+fn metric_function_name(file_path: &Path, extracted: &ExtractedFunctionData) -> String {
+    match Language::from_path(file_path) {
+        Language::Python => extracted.qualified_name.clone(),
+        _ => extracted.name.clone(),
     }
 }
 
@@ -465,6 +472,16 @@ mod tests {
         assert!(metrics.is_trait_method);
         assert!(metrics.in_test_module);
         assert_eq!(metrics.visibility, Some("pub(crate)".to_string()));
+    }
+
+    #[test]
+    fn python_metrics_use_qualified_method_identity() {
+        let mut function = create_test_function("run", 1, 2);
+        function.qualified_name = "Worker.run".to_string();
+
+        let metrics = to_function_metrics(Path::new("worker.py"), &function);
+
+        assert_eq!(metrics.name, "Worker.run");
     }
 
     #[test]

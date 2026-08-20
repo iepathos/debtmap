@@ -505,7 +505,7 @@ pub fn build_call_graph_from_extracted(
         for func in &file_data.functions {
             let caller = extracted_function_id(path, func);
             for call in &func.calls {
-                let outcome = resolve_callee_from_extracted(call, path, &callee_index);
+                let outcome = resolve_callee_from_extracted(call, &caller, path, &callee_index);
                 final_graph.add_resolution(caller.clone(), GraphCallType::Direct, outcome);
             }
         }
@@ -603,6 +603,7 @@ fn add_candidate(
 /// Resolve a callee name to a FunctionId using extracted data.
 fn resolve_callee_from_extracted(
     call: &crate::extraction::CallSite,
+    caller: &FunctionId,
     caller_file: &Path,
     index: &CalleeResolutionIndex,
 ) -> crate::priority::call_graph::ResolutionOutcome {
@@ -614,6 +615,9 @@ fn resolve_callee_from_extracted(
             resolve_direct_callee(call, caller_file, index)
         }
         CallType::Method => {
+            if crate::core::Language::from_path(caller_file) == crate::core::Language::Python {
+                return resolve_python_method(call, caller, caller_file, index);
+            }
             if crate::analyzers::call_graph::CallResolver::is_common_library_method(
                 &call.callee_name,
             ) {
@@ -638,6 +642,49 @@ fn resolve_callee_from_extracted(
             reason: "dynamic callable".to_string(),
         },
     }
+}
+
+fn resolve_python_method(
+    call: &crate::extraction::CallSite,
+    caller: &FunctionId,
+    caller_file: &Path,
+    index: &CalleeResolutionIndex,
+) -> crate::priority::call_graph::ResolutionOutcome {
+    use crate::priority::call_graph::{CallEdgeProvenance, ResolutionOutcome};
+
+    let Some((receiver, method)) = call.callee_name.rsplit_once('.') else {
+        return ResolutionOutcome::Unresolved {
+            query: call.callee_name.clone(),
+        };
+    };
+    let qualified_name = if receiver == "self" {
+        caller
+            .name
+            .rsplit_once('.')
+            .map(|(owner, _)| format!("{owner}.{method}"))
+    } else if !receiver.contains('.') && receiver.starts_with(char::is_uppercase) {
+        Some(call.callee_name.clone())
+    } else {
+        None
+    };
+    let Some(qualified_name) = qualified_name else {
+        return ResolutionOutcome::Unresolved {
+            query: call.callee_name.clone(),
+        };
+    };
+    let candidates = index
+        .same_file_functions
+        .get(caller_file)
+        .and_then(|functions| functions.get(&qualified_name))
+        .cloned()
+        .unwrap_or_default();
+    outcome_for_candidates(
+        candidates,
+        call,
+        caller_file,
+        CallEdgeProvenance::TypeResolution,
+        95,
+    )
 }
 
 fn resolve_direct_callee(
@@ -719,8 +766,13 @@ mod extracted_call_resolution_tests {
         ]);
         let index = CalleeResolutionIndex::from_sorted_extracted(&sorted(&extracted));
 
-        let outcome =
-            resolve_callee_from_extracted(&call("helper", CallType::Direct, 6), &caller, &index);
+        let caller_id = FunctionId::new(caller.clone(), "entry".to_string(), 1);
+        let outcome = resolve_callee_from_extracted(
+            &call("helper", CallType::Direct, 6),
+            &caller_id,
+            &caller,
+            &index,
+        );
         let crate::priority::call_graph::ResolutionOutcome::Resolved {
             target: resolved, ..
         } = outcome
@@ -748,8 +800,13 @@ mod extracted_call_resolution_tests {
         ]);
         let index = CalleeResolutionIndex::from_sorted_extracted(&sorted(&extracted));
 
-        let outcome =
-            resolve_callee_from_extracted(&call("run", CallType::Method, 6), &first, &index);
+        let caller_id = FunctionId::new(first.clone(), "entry".to_string(), 1);
+        let outcome = resolve_callee_from_extracted(
+            &call("run", CallType::Method, 6),
+            &caller_id,
+            &first,
+            &index,
+        );
 
         assert!(matches!(
             outcome,
@@ -780,8 +837,13 @@ mod extracted_call_resolution_tests {
         let index = CalleeResolutionIndex::from_sorted_extracted(&sorted(&extracted));
 
         for method in ["filter", "map", "take", "get"] {
-            let outcome =
-                resolve_callee_from_extracted(&call(method, CallType::Method, 6), &caller, &index);
+            let caller_id = FunctionId::new(caller.clone(), "entry".to_string(), 1);
+            let outcome = resolve_callee_from_extracted(
+                &call(method, CallType::Method, 6),
+                &caller_id,
+                &caller,
+                &index,
+            );
 
             assert!(
                 matches!(
@@ -862,6 +924,41 @@ mod extracted_call_resolution_tests {
         let (graph, _, _) = build_call_graph_from_extracted(base_graph, &extracted);
 
         assert_eq!(graph.nodes[&function_id].roles, roles);
+    }
+
+    #[test]
+    fn python_self_calls_resolve_only_within_the_callers_class() {
+        let path = PathBuf::from("src/service.py");
+        let mut run = function("run", "First.run", 1);
+        run.calls = vec![
+            call("self.validate", CallType::Method, 2),
+            call("service.validate", CallType::Method, 3),
+        ];
+        let extracted = extracted_files(vec![(
+            path.clone(),
+            vec![
+                run,
+                function("validate", "First.validate", 10),
+                function("validate", "Second.validate", 20),
+            ],
+        )]);
+
+        let (graph, _, _) = build_call_graph_from_extracted(CallGraph::new(), &extracted);
+        let caller = FunctionId::new(path.clone(), "First.run".to_string(), 1);
+        let callees = graph.get_callees_exact(&caller);
+        let evidence: Vec<_> = graph.edge_evidence().collect();
+
+        assert_eq!(
+            callees,
+            vec![FunctionId::new(path, "First.validate".into(), 10)]
+        );
+        assert_eq!(evidence.len(), 1);
+        assert_eq!(
+            evidence[0].provenance,
+            crate::priority::call_graph::CallEdgeProvenance::TypeResolution
+        );
+        assert_eq!(evidence[0].confidence, 95);
+        assert_eq!(evidence[0].call_site.as_ref().unwrap().line, 2);
     }
 
     fn extracted_files(

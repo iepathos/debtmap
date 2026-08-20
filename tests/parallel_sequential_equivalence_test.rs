@@ -314,38 +314,39 @@ fn markdown_reports_applied_suppressions() {
 #[test]
 fn python_calls_contribute_to_shared_dependency_scoring() {
     let fixture = TempDir::new().unwrap();
-    let source = r#"def alpha_entry(value):
-    return hotspot(value)
+    let source = r#"class Service:
+    def alpha_entry(self, value):
+        return self.hotspot(value)
 
-def beta_entry(value):
-    return hotspot(value + 1)
+    def beta_entry(self, value):
+        return self.hotspot(value + 1)
 
-def helper(value):
-    return value * 2
+    def helper(self, value):
+        return value * 2
 
-def alternate(value):
-    return value - 1
+    def alternate(self, value):
+        return value - 1
 
-def hotspot(value):
-    if value > 0:
-        if value > 1:
-            if value > 2:
-                if value > 3:
-                    if value > 4:
-                        if value > 5:
-                            if value > 6:
-                                if value > 7:
-                                    if value > 8:
-                                        if value > 9:
-                                            if value > 10:
-                                                return helper(value)
-                                            return alternate(value)
-                                        return 9
-                                    return 8
-                                return 7
-                            return 6
-                        return 5
-    return 0
+    def hotspot(self, value):
+        if value > 0:
+            if value > 1:
+                if value > 2:
+                    if value > 3:
+                        if value > 4:
+                            if value > 5:
+                                if value > 6:
+                                    if value > 7:
+                                        if value > 8:
+                                            if value > 9:
+                                                if value > 10:
+                                                    return self.helper(value)
+                                                return self.alternate(value)
+                                            return 9
+                                        return 8
+                                    return 7
+                                return 6
+                            return 5
+        return 0
 "#;
     fs::write(fixture.path().join("analysis.py"), source).unwrap();
     let parallel = analyze(
@@ -366,7 +367,7 @@ def hotspot(value):
         .as_array()
         .unwrap()
         .iter()
-        .find(|item| item["location"]["function"] == "hotspot")
+        .find(|item| item["location"]["function"] == "Service.hotspot")
         .unwrap_or_else(|| panic!("{}", serde_json::to_string_pretty(&parallel).unwrap()));
 
     assert_eq!(hotspot["dependencies"]["upstream_count"], 2);

@@ -444,19 +444,19 @@ impl<'a> PythonExtractor<'a> {
 
     fn extract_calls(&self, node: Node) -> Vec<CallSite> {
         let mut calls = Vec::new();
-        self.find_calls(node, &mut calls);
+        self.find_calls(node, &mut calls, true);
         calls
     }
 
-    fn find_calls(&self, node: Node, calls: &mut Vec<CallSite>) {
+    fn find_calls(&self, node: Node, calls: &mut Vec<CallSite>, is_root: bool) {
+        if !is_root && is_python_callable_boundary(node) {
+            return;
+        }
         if node.kind() == "call" {
             let func_node = node.child_by_field_name("function").unwrap();
             let (name, call_type) = match func_node.kind() {
                 "identifier" => (self.node_text(func_node).to_string(), CallType::Direct),
-                "attribute" => {
-                    let attr_node = func_node.child_by_field_name("attribute").unwrap();
-                    (self.node_text(attr_node).to_string(), CallType::Method)
-                }
+                "attribute" => (self.node_text(func_node).to_string(), CallType::Method),
                 _ => (self.node_text(func_node).to_string(), CallType::Direct),
             };
 
@@ -470,7 +470,7 @@ impl<'a> PythonExtractor<'a> {
         let mut cursor = node.walk();
         if cursor.goto_first_child() {
             loop {
-                self.find_calls(cursor.node(), calls);
+                self.find_calls(cursor.node(), calls, false);
                 if !cursor.goto_next_sibling() {
                     break;
                 }
@@ -655,6 +655,15 @@ fn traverse_complexity(
 fn is_python_callable_boundary(node: Node) -> bool {
     match node.kind() {
         "function_definition" | "async_function_definition" => true,
+        "decorated_definition" => {
+            let mut cursor = node.walk();
+            node.named_children(&mut cursor).any(|child| {
+                matches!(
+                    child.kind(),
+                    "function_definition" | "async_function_definition"
+                )
+            })
+        }
         // Ignore bare `lambda` keyword tokens; only count lambda expressions.
         "lambda" => node.child_by_field_name("parameters").is_some(),
         _ => false,

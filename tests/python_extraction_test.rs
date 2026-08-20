@@ -203,3 +203,33 @@ class Account:
     assert!(account.fields[0].is_public);
     assert!(!account.fields[1].is_public);
 }
+
+#[test]
+fn test_python_calls_preserve_receivers_and_nested_boundaries() {
+    let source = r#"
+class Service:
+    def outer(self):
+        self.validate()
+
+        def inner():
+            self.hidden()
+
+        return inner
+
+    def validate(self):
+        return True
+
+    def hidden(self):
+        return False
+"#;
+    let data =
+        UnifiedFileExtractor::extract(Path::new("service.py"), source).expect("Failed to extract");
+    let outer = data
+        .functions
+        .iter()
+        .find(|function| function.qualified_name == "Service.outer")
+        .expect("outer method should be extracted");
+
+    assert_eq!(outer.calls.len(), 1);
+    assert_eq!(outer.calls[0].callee_name, "self.validate");
+}

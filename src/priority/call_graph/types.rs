@@ -90,9 +90,10 @@ impl FunctionId {
 
     /// Convert the legacy location-bearing identifier to stable symbol identity.
     pub fn canonical_symbol(&self) -> CanonicalSymbolKey {
-        let (owner, name) = split_owner(&Self::normalize_name(&self.name));
+        let language = Language::from_path(&self.file);
+        let (owner, name) = split_owner(language, &Self::normalize_name(&self.name));
         CanonicalSymbolKey {
-            language: Language::from_path(&self.file),
+            language,
             path: normalize_symbol_path(&self.file),
             module: self.module_path.clone(),
             owner,
@@ -117,9 +118,13 @@ impl FunctionId {
     }
 }
 
-fn split_owner(qualified_name: &str) -> (Option<String>, String) {
+fn split_owner(language: Language, qualified_name: &str) -> (Option<String>, String) {
+    let separator = match language {
+        Language::Python | Language::Go => ".",
+        _ => "::",
+    };
     qualified_name
-        .rsplit_once("::")
+        .rsplit_once(separator)
         .map(|(owner, name)| (Some(owner.to_string()), name.to_string()))
         .unwrap_or_else(|| (None, qualified_name.to_string()))
 }
@@ -477,6 +482,23 @@ mod tests {
         assert_eq!(first.canonical_symbol(), moved.canonical_symbol());
         assert_eq!(first.canonical_symbol().owner.as_deref(), Some("Worker"));
         assert_eq!(first.canonical_symbol().name, "run");
+    }
+
+    #[test]
+    fn canonical_symbol_extracts_python_and_go_owners() {
+        for (path, qualified_name) in [
+            ("src/worker.py", "Worker.run"),
+            ("pkg/worker.go", "Worker.Run"),
+        ] {
+            let symbol =
+                FunctionId::new(PathBuf::from(path), qualified_name.into(), 10).canonical_symbol();
+
+            assert_eq!(symbol.owner.as_deref(), Some("Worker"));
+            assert_eq!(
+                symbol.name,
+                if path.ends_with(".go") { "Run" } else { "run" }
+            );
+        }
     }
 
     #[test]
