@@ -14,6 +14,9 @@ use crate::pipeline::stage::Stage;
 pub struct ParsingStage;
 
 impl ParsingStage {
+    #[deprecated(
+        note = "the composable analysis pipeline is incomplete and fails closed; use the canonical unified analysis API"
+    )]
     pub fn new() -> Self {
         Self
     }
@@ -21,7 +24,7 @@ impl ParsingStage {
 
 impl Default for ParsingStage {
     fn default() -> Self {
-        Self::new()
+        Self
     }
 }
 
@@ -30,11 +33,10 @@ impl Stage for ParsingStage {
     type Output = PipelineData;
     type Error = AnalysisError;
 
-    fn execute(&self, data: Self::Input) -> Result<Self::Output, Self::Error> {
-        // TODO: Integrate with existing analysis code
-        // For now, return empty metrics to allow pipeline to compile
-        log::warn!("ParsingStage not fully implemented - returning empty metrics");
-        Ok(data)
+    fn execute(&self, _data: Self::Input) -> Result<Self::Output, Self::Error> {
+        Err(AnalysisError::analysis(
+            "Composable analysis parsing is not implemented; use `debtmap analyze` or the canonical unified analysis API",
+        ))
     }
 
     fn name(&self) -> &str {
@@ -44,6 +46,8 @@ impl Stage for ParsingStage {
 
 #[cfg(test)]
 mod tests {
+    #![allow(deprecated)]
+
     use super::*;
 
     #[test]

@@ -1,22 +1,9 @@
 //! Standard pipeline configurations for common analysis workflows.
 //!
-//! This module provides pre-configured pipelines for typical use cases:
-//! - `example_pipeline()`: Simple example demonstrating the architecture
-//! - `standard_pipeline()`: Full analysis with all stages
-//! - `fast_pipeline()`: Quick analysis skipping coverage and context
-//! - `complexity_only_pipeline()`: Just complexity metrics
-//! - `call_graph_pipeline()`: Call graph and purity analysis
-//!
-//! # Example Usage
-//!
-//! ```rust,ignore
-//! use debtmap::pipeline::configs::standard_pipeline;
-//! use std::path::Path;
-//! use debtmap::core::Language;
-//!
-//! let pipeline = standard_pipeline(Path::new("."), &[Language::Rust], None, false);
-//! let result = pipeline.execute()?;
-//! ```
+//! `example_pipeline()` demonstrates the generic composition infrastructure.
+//! The analysis presets are incomplete, deprecated, and fail closed instead of
+//! returning empty analysis results. Use `debtmap analyze` or the canonical
+//! unified analysis API for project analysis.
 
 use super::{PipelineBuilder, stage::PureStage, stages::*};
 use crate::core::Language;
@@ -94,6 +81,10 @@ pub fn example_pipeline() -> super::BuiltPipeline<String> {
 /// );
 /// let result = pipeline.execute()?;
 /// ```
+#[deprecated(
+    note = "incomplete and fails closed; use `debtmap analyze` or the canonical unified analysis API"
+)]
+#[allow(deprecated)]
 pub fn standard_pipeline(
     project_path: &Path,
     languages: &[Language],
@@ -141,6 +132,10 @@ pub fn standard_pipeline(
 ///
 /// * `project_path` - Root path of the project to analyze
 /// * `languages` - Languages to analyze (currently only Rust supported)
+#[deprecated(
+    note = "incomplete and fails closed; use `debtmap analyze` or the canonical unified analysis API"
+)]
+#[allow(deprecated)]
 pub fn fast_pipeline(
     project_path: &Path,
     languages: &[Language],
@@ -169,6 +164,10 @@ pub fn fast_pipeline(
 ///
 /// * `project_path` - Root path of the project to analyze
 /// * `languages` - Languages to analyze (currently only Rust supported)
+#[deprecated(
+    note = "incomplete and fails closed; use `debtmap analyze` or the canonical unified analysis API"
+)]
+#[allow(deprecated)]
 pub fn complexity_only_pipeline(
     project_path: &Path,
     languages: &[Language],
@@ -196,6 +195,10 @@ pub fn complexity_only_pipeline(
 ///
 /// * `project_path` - Root path of the project to analyze
 /// * `languages` - Languages to analyze (currently only Rust supported)
+#[deprecated(
+    note = "incomplete and fails closed; use `debtmap analyze` or the canonical unified analysis API"
+)]
+#[allow(deprecated)]
 pub fn call_graph_pipeline(
     project_path: &Path,
     languages: &[Language],
@@ -212,7 +215,11 @@ pub fn call_graph_pipeline(
 
 #[cfg(test)]
 mod tests {
+    #![allow(deprecated)]
+
     use super::*;
+    use std::fs;
+    use tempfile::TempDir;
 
     #[test]
     fn test_example_pipeline() {
@@ -258,5 +265,24 @@ mod tests {
     fn test_call_graph_pipeline_builds() {
         let pipeline = call_graph_pipeline(Path::new("."), &[Language::Rust]);
         assert_eq!(pipeline.stage_count(), 5);
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn analysis_presets_fail_closed_at_parsing() {
+        let fixture = TempDir::new().unwrap();
+        fs::write(fixture.path().join("hotspot.rs"), "fn hotspot() {}").unwrap();
+        let pipelines = vec![
+            standard_pipeline(fixture.path(), &[Language::Rust], None, false),
+            fast_pipeline(fixture.path(), &[Language::Rust]),
+            complexity_only_pipeline(fixture.path(), &[Language::Rust]),
+            call_graph_pipeline(fixture.path(), &[Language::Rust]),
+        ];
+
+        for pipeline in pipelines {
+            let error = pipeline.execute().unwrap_err().to_string();
+            assert!(error.contains("Failed in stage 'Parsing'"), "{error}");
+            assert!(error.contains("debtmap analyze"), "{error}");
+        }
     }
 }

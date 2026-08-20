@@ -1,9 +1,9 @@
 //! Debt detection and scoring stages.
 //!
-//! These are thin wrapper stages that delegate to pure functions in sibling modules:
-//! - `super::debt::detect_debt_from_pipeline`
-//! - `super::scoring::score_debt_items`
+//! These compatibility stages fail closed until they can delegate to the
+//! canonical unified analysis implementation.
 
+use crate::errors::AnalysisError;
 use crate::pipeline::data::PipelineData;
 use crate::pipeline::stage::Stage;
 
@@ -13,6 +13,9 @@ use crate::pipeline::stage::Stage;
 pub struct DebtDetectionStage;
 
 impl DebtDetectionStage {
+    #[deprecated(
+        note = "the composable analysis pipeline is incomplete and fails closed; use the canonical unified analysis API"
+    )]
     pub fn new() -> Self {
         Self
     }
@@ -20,20 +23,19 @@ impl DebtDetectionStage {
 
 impl Default for DebtDetectionStage {
     fn default() -> Self {
-        Self::new()
+        Self
     }
 }
 
 impl Stage for DebtDetectionStage {
     type Input = PipelineData;
     type Output = PipelineData;
-    type Error = std::convert::Infallible;
+    type Error = AnalysisError;
 
-    fn execute(&self, mut data: Self::Input) -> Result<Self::Output, Self::Error> {
-        let debt_items =
-            super::super::debt::detect_debt_from_pipeline(&data.metrics, data.call_graph.as_ref());
-        data.debt_items = debt_items;
-        Ok(data)
+    fn execute(&self, _data: Self::Input) -> Result<Self::Output, Self::Error> {
+        Err(AnalysisError::analysis(
+            "Composable analysis debt detection is not implemented; use `debtmap analyze` or the canonical unified analysis API",
+        ))
     }
 
     fn name(&self) -> &str {
@@ -47,6 +49,9 @@ impl Stage for DebtDetectionStage {
 pub struct ScoringStage;
 
 impl ScoringStage {
+    #[deprecated(
+        note = "the composable analysis pipeline is incomplete and fails closed; use the canonical unified analysis API"
+    )]
     pub fn new() -> Self {
         Self
     }
@@ -54,24 +59,19 @@ impl ScoringStage {
 
 impl Default for ScoringStage {
     fn default() -> Self {
-        Self::new()
+        Self
     }
 }
 
 impl Stage for ScoringStage {
     type Input = PipelineData;
     type Output = PipelineData;
-    type Error = std::convert::Infallible;
+    type Error = AnalysisError;
 
-    fn execute(&self, mut data: Self::Input) -> Result<Self::Output, Self::Error> {
-        let scored_items = super::super::scoring::score_debt_items(
-            &data.debt_items,
-            data.call_graph.as_ref(),
-            data.coverage.as_ref(),
-            data.purity_scores.as_ref(),
-        );
-        data.scored_items = scored_items;
-        Ok(data)
+    fn execute(&self, _data: Self::Input) -> Result<Self::Output, Self::Error> {
+        Err(AnalysisError::analysis(
+            "Composable analysis scoring is not implemented; use `debtmap analyze` or the canonical unified analysis API",
+        ))
     }
 
     fn name(&self) -> &str {
@@ -81,6 +81,8 @@ impl Stage for ScoringStage {
 
 #[cfg(test)]
 mod tests {
+    #![allow(deprecated)]
+
     use super::*;
 
     #[test]
@@ -90,8 +92,32 @@ mod tests {
     }
 
     #[test]
+    fn debt_detection_stage_fails_closed() {
+        let error = DebtDetectionStage::new()
+            .execute(PipelineData::new(Vec::new()))
+            .unwrap_err();
+
+        assert!(
+            error
+                .to_string()
+                .contains("debt detection is not implemented")
+        );
+        assert!(error.to_string().contains("debtmap analyze"));
+    }
+
+    #[test]
     fn test_scoring_stage_creation() {
         let stage = ScoringStage::new();
         assert_eq!(stage.name(), "Scoring & Prioritization");
+    }
+
+    #[test]
+    fn scoring_stage_fails_closed() {
+        let error = ScoringStage::new()
+            .execute(PipelineData::new(Vec::new()))
+            .unwrap_err();
+
+        assert!(error.to_string().contains("scoring is not implemented"));
+        assert!(error.to_string().contains("debtmap analyze"));
     }
 }
