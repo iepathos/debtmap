@@ -175,6 +175,14 @@ fn validate_thresholds_config(thresholds: Option<&ThresholdsConfig>) -> Analysis
         ));
     }
 
+    if let Some(similarity) = thresholds.duplication_similarity
+        && !(0.0..=1.0).contains(&similarity)
+    {
+        errors.push(AnalysisError::config(format!(
+            "Duplication similarity must be 0.0-1.0: {similarity}"
+        )));
+    }
+
     // Validate max_file_length
     if let Some(max_len) = thresholds.max_file_length
         && max_len == 0

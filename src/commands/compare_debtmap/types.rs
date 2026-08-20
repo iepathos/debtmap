@@ -3,7 +3,10 @@
 //! This module defines all the data structures used in comparing
 //! before and after debtmap analysis results.
 
-use crate::output::unified::{UNIFIED_FORMAT_VERSION, UnifiedDebtItemOutput, UnifiedOutput};
+use crate::output::unified::{
+    AnalysisReceipt, LEGACY_UNIFIED_FORMAT_VERSION, UNIFIED_FORMAT_VERSION, UnifiedDebtItemOutput,
+    UnifiedOutput,
+};
 use crate::priority::ImpactMetrics;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -24,14 +27,19 @@ pub struct DebtmapJsonInput {
     pub total_lines_of_code: usize,
     #[serde(default)]
     pub overall_coverage: Option<f64>,
+    #[serde(default)]
+    pub receipt: Option<AnalysisReceipt>,
 }
 
 pub(crate) fn parse_debtmap_json(contents: &str) -> anyhow::Result<DebtmapJsonInput> {
     let value: serde_json::Value = serde_json::from_str(contents)?;
     match value.get("format_version") {
-        Some(serde_json::Value::String(version)) if version == UNIFIED_FORMAT_VERSION => {
+        Some(serde_json::Value::String(version))
+            if version == UNIFIED_FORMAT_VERSION || version == LEGACY_UNIFIED_FORMAT_VERSION =>
+        {
             let output: UnifiedOutput = serde_json::from_value(value)?;
             Ok(DebtmapJsonInput {
+                receipt: output.receipt,
                 items: output.items,
                 total_impact: default_impact_metrics(),
                 total_debt_score: output.summary.total_debt_score,
@@ -41,7 +49,7 @@ pub(crate) fn parse_debtmap_json(contents: &str) -> anyhow::Result<DebtmapJsonIn
             })
         }
         Some(serde_json::Value::String(version)) => anyhow::bail!(
-            "Unsupported debtmap format version `{version}`; expected `{UNIFIED_FORMAT_VERSION}`"
+            "Unsupported debtmap format version `{version}`; expected `{LEGACY_UNIFIED_FORMAT_VERSION}` or `{UNIFIED_FORMAT_VERSION}`"
         ),
         Some(_) => anyhow::bail!("Invalid debtmap format version; expected a string"),
         None => serde_json::from_value(value).map_err(Into::into),
@@ -59,6 +67,7 @@ fn default_impact_metrics() -> ImpactMetrics {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ValidationResult {
+    pub comparability: Comparability,
     pub completion_percentage: f64,
     pub status: String,
     pub improvements: Vec<String>,
@@ -66,6 +75,20 @@ pub struct ValidationResult {
     pub gaps: HashMap<String, GapDetail>,
     pub before_summary: AnalysisSummary,
     pub after_summary: AnalysisSummary,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Comparability {
+    pub status: ComparabilityStatus,
+    pub reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ComparabilityStatus {
+    Comparable,
+    Unknown,
+    Incompatible,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

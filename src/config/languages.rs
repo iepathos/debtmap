@@ -30,7 +30,7 @@ pub struct LanguagesConfig {
 }
 
 /// Language-specific feature configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LanguageFeatures {
     /// Whether to detect dead code for this language
     #[serde(default = "default_detect_dead_code")]

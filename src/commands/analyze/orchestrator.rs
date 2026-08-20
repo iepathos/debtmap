@@ -9,6 +9,10 @@ use super::{diagnostics, pipeline, project_analysis};
 use crate::builders::unified_analysis;
 use crate::core::AnalysisResults;
 use crate::io;
+use crate::output::unified::{
+    AnalysisPolicyReceipt, AnalysisReceipt, EvidenceReceipt, ExecutionReceipt, ScopeReceipt,
+    ScopeStatus, SelectionReceipt, SourceRevisionReceipt,
+};
 use crate::output::{self, OutputConfig};
 use crate::progress::ProgressManager;
 use anyhow::Result;
@@ -20,8 +24,8 @@ pub use project_analysis::analyze_project;
 /// Main entry point - orchestrates analysis (thin wrapper).
 pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
     setup_analysis_environment(&config);
-    let (results, unified) = run_analysis_phases(&config)?;
-    process_and_output_results(unified, &config, &results)
+    let (results, unified, file_outcomes) = run_analysis_phases(&config)?;
+    process_and_output_results(unified, &config, &results, &file_outcomes)
 }
 
 /// Setup analysis environment (I/O).
@@ -33,16 +37,24 @@ fn setup_analysis_environment(config: &AnalyzeConfig) {
 /// Run analysis and build unified results (I/O).
 fn run_analysis_phases(
     config: &AnalyzeConfig,
-) -> Result<(AnalysisResults, crate::priority::UnifiedAnalysis)> {
+) -> Result<(
+    AnalysisResults,
+    crate::priority::UnifiedAnalysis,
+    project_analysis::FileOutcomeSummary,
+)> {
     // Spec 214: Use extraction with metrics adapter for single-pass parsing
     let output = project_analysis::run_analysis_with_extraction(config)?;
-    let mut unified =
-        build_unified_analysis_options(config, &output.results, output.extracted_data)?;
+    let project_analysis::ProjectAnalysisOutput {
+        results,
+        extracted_data,
+        file_outcomes,
+    } = output;
+    let mut unified = build_unified_analysis_options(config, &results, extracted_data)?;
 
-    pipeline::apply_file_context(&mut unified, &output.results.file_contexts);
+    pipeline::apply_file_context(&mut unified, &results.file_contexts);
     let filtered = pipeline::filter_by_categories(unified, config.filter_categories.as_deref());
 
-    Ok((output.results, filtered))
+    Ok((results, filtered, file_outcomes))
 }
 
 /// Build unified analysis from results (I/O).
@@ -111,11 +123,12 @@ fn process_and_output_results(
     unified: crate::priority::UnifiedAnalysis,
     config: &AnalyzeConfig,
     results: &AnalysisResults,
+    file_outcomes: &project_analysis::FileOutcomeSummary,
 ) -> Result<()> {
     run_diagnostics_if_needed(&unified, config)?;
     handle_empty_results(&unified);
     cleanup_progress();
-    output_results(unified, config, results)
+    output_results(unified, config, results, file_outcomes)
 }
 
 /// Run diagnostics if needed (I/O).
@@ -169,11 +182,12 @@ fn output_results(
     analysis: crate::priority::UnifiedAnalysis,
     config: &AnalyzeConfig,
     results: &AnalysisResults,
+    file_outcomes: &project_analysis::FileOutcomeSummary,
 ) -> Result<()> {
     if should_use_tui(config) {
         launch_tui(analysis)
     } else {
-        output_traditional(analysis, config, results)
+        output_traditional(analysis, config, results, file_outcomes)
     }
 }
 
@@ -202,8 +216,9 @@ fn output_traditional(
     analysis: crate::priority::UnifiedAnalysis,
     config: &AnalyzeConfig,
     results: &AnalysisResults,
+    file_outcomes: &project_analysis::FileOutcomeSummary,
 ) -> Result<()> {
-    let output_config = create_output_config(config);
+    let output_config = create_output_config(config, &analysis, file_outcomes)?;
     output::output_unified_priorities_with_config(
         analysis,
         output_config,
@@ -213,8 +228,12 @@ fn output_traditional(
 }
 
 /// Create output configuration from analyze config.
-fn create_output_config(config: &AnalyzeConfig) -> OutputConfig {
-    OutputConfig {
+fn create_output_config(
+    config: &AnalyzeConfig,
+    analysis: &crate::priority::UnifiedAnalysis,
+    file_outcomes: &project_analysis::FileOutcomeSummary,
+) -> Result<OutputConfig> {
+    Ok(OutputConfig {
         top: config.top,
         tail: config.tail,
         summary: config.summary,
@@ -223,5 +242,191 @@ fn create_output_config(config: &AnalyzeConfig) -> OutputConfig {
         output_format: Some(config.format),
         formatting_config: config._formatting_config,
         show_filter_stats: config.show_filter_stats,
+        analysis_receipt: Some(create_analysis_receipt(config, analysis, file_outcomes)?),
+    })
+}
+
+fn create_analysis_receipt(
+    config: &AnalyzeConfig,
+    analysis: &crate::priority::UnifiedAnalysis,
+    file_outcomes: &project_analysis::FileOutcomeSummary,
+) -> Result<AnalysisReceipt> {
+    let policy = create_policy_receipt(config);
+    let policy_fingerprint = policy.fingerprint()?;
+    Ok(AnalysisReceipt {
+        analysis_target: canonical_analysis_target(config),
+        source_revision: detect_source_revision(config),
+        reference_time: Some(config.reference_time.to_rfc3339()),
+        policy,
+        policy_fingerprint,
+        evidence: create_evidence_receipt(config, analysis),
+        selection: create_selection_receipt(config),
+        execution: create_execution_receipt(config),
+        scope: create_scope_receipt(analysis, file_outcomes),
+        warnings: create_receipt_warnings(config, analysis, file_outcomes),
+    })
+}
+
+fn create_policy_receipt(config: &AnalyzeConfig) -> AnalysisPolicyReceipt {
+    let effective = crate::config::AnalysisPolicy::from_config(crate::config::get_config());
+    let selected = canonical_language_names(config);
+    AnalysisPolicyReceipt {
+        languages: selected.clone(),
+        language_policies: effective
+            .languages
+            .iter()
+            .map(|policy| crate::output::unified::LanguagePolicyReceipt {
+                language: policy.language.to_string().to_lowercase(),
+                enabled: selected
+                    .iter()
+                    .any(|language| language == &policy.language.to_string().to_lowercase()),
+                detect_complexity: policy.features.detect_complexity,
+                detect_dead_code: policy.features.detect_dead_code,
+                detect_duplication: policy.features.detect_duplication,
+                generated_code: format!("{:?}", policy.generated_code).to_lowercase(),
+            })
+            .collect(),
+        complexity_threshold: config.threshold_complexity,
+        duplication_threshold_lines: config.threshold_duplication,
+        duplication_similarity: effective.duplication.similarity_threshold,
+        threshold_preset: debug_name(config.threshold_preset),
+        semantic_analysis: !config.semantic_off,
+        context_aware_scoring: !config.no_context_aware,
+        god_object_detection: !config.no_god_object,
+        functional_analysis: config.ast_functional_analysis,
+        functional_analysis_profile: debug_name(config.functional_analysis_profile),
+        aggregation: !config.no_aggregation,
+        aggregation_method: config.aggregation_method.clone(),
+        minimum_problematic_functions: config.min_problematic,
     }
+}
+
+fn canonical_language_names(config: &AnalyzeConfig) -> Vec<String> {
+    crate::utils::language_parser::parse_languages(config.languages.clone())
+        .into_iter()
+        .map(|language| language.to_string().to_lowercase())
+        .collect()
+}
+
+fn debug_name<T: std::fmt::Debug + Copy>(value: Option<T>) -> Option<String> {
+    value.map(|item| format!("{item:?}").to_lowercase())
+}
+
+fn create_evidence_receipt(
+    config: &AnalyzeConfig,
+    analysis: &crate::priority::UnifiedAnalysis,
+) -> EvidenceReceipt {
+    EvidenceReceipt {
+        coverage_requested: config.coverage_file.is_some(),
+        coverage_loaded: analysis.has_coverage_data,
+        coverage_source_kind: config.coverage_file.as_ref().map(|_| "lcov".to_string()),
+        context_requested: config.enable_context,
+        context_providers_requested: config.context_providers.clone(),
+        context_providers_disabled: config.disable_context.clone().unwrap_or_default(),
+    }
+}
+
+fn create_selection_receipt(config: &AnalyzeConfig) -> SelectionReceipt {
+    SelectionReceipt {
+        minimum_score_requested: config.min_score,
+        minimum_priority_requested: config.min_priority.clone(),
+        categories_requested: config.filter_categories.clone().unwrap_or_default(),
+        aggregate_only: config.aggregate_only,
+        top: config.top,
+        tail: config.tail,
+        file_limit_requested: config.max_files,
+    }
+}
+
+fn create_execution_receipt(config: &AnalyzeConfig) -> ExecutionReceipt {
+    ExecutionReceipt {
+        parallel: config.parallel,
+        jobs: config.jobs,
+        multi_pass: config.multi_pass,
+    }
+}
+
+fn create_scope_receipt(
+    analysis: &crate::priority::UnifiedAnalysis,
+    outcomes: &project_analysis::FileOutcomeSummary,
+) -> ScopeReceipt {
+    ScopeReceipt {
+        discovered_files: Some(outcomes.discovered),
+        analyzed_files: outcomes.analyzed,
+        failed_files: Some(outcomes.failed),
+        omitted_by_limit: Some(outcomes.omitted_by_limit),
+        total_loc: analysis.total_lines_of_code,
+        status: scope_status(outcomes),
+    }
+}
+
+fn scope_status(outcomes: &project_analysis::FileOutcomeSummary) -> ScopeStatus {
+    if outcomes.omitted_by_limit > 0 {
+        ScopeStatus::Limited
+    } else if outcomes.failed > 0 {
+        ScopeStatus::Partial
+    } else {
+        ScopeStatus::Complete
+    }
+}
+
+fn create_receipt_warnings(
+    config: &AnalyzeConfig,
+    analysis: &crate::priority::UnifiedAnalysis,
+    outcomes: &project_analysis::FileOutcomeSummary,
+) -> Vec<String> {
+    let mut warnings = Vec::new();
+    if outcomes.failed > 0 {
+        warnings.push(format!(
+            "{} discovered files failed analysis",
+            outcomes.failed
+        ));
+    }
+    if outcomes.omitted_by_limit > 0 {
+        warnings.push(format!(
+            "{} discovered files were omitted by the file limit",
+            outcomes.omitted_by_limit
+        ));
+    }
+    if config.coverage_file.is_some() && !analysis.has_coverage_data {
+        warnings.push("Coverage was requested but no coverage evidence was loaded".to_string());
+    }
+    if config.enable_context {
+        warnings.push("Context provider success is not yet retained in the receipt".to_string());
+    }
+    warnings
+}
+
+fn canonical_analysis_target(config: &AnalyzeConfig) -> Option<std::path::PathBuf> {
+    std::fs::canonicalize(&config.path)
+        .or_else(|_| std::path::absolute(&config.path))
+        .ok()
+}
+
+fn detect_source_revision(config: &AnalyzeConfig) -> Option<SourceRevisionReceipt> {
+    let target = canonical_analysis_target(config)?;
+    let directory = if target.is_dir() {
+        target
+    } else {
+        target.parent()?.to_path_buf()
+    };
+    let commit = git_output(&directory, &["rev-parse", "HEAD"])?;
+    let status = git_output(&directory, &["status", "--porcelain"])?;
+    Some(SourceRevisionReceipt {
+        commit,
+        dirty: !status.is_empty(),
+    })
+}
+
+fn git_output(directory: &std::path::Path, args: &[&str]) -> Option<String> {
+    let output = std::process::Command::new("git")
+        .arg("-C")
+        .arg(directory)
+        .args(args)
+        .output()
+        .ok()?;
+    output
+        .status
+        .success()
+        .then(|| String::from_utf8_lossy(&output.stdout).trim().to_string())
 }

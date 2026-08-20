@@ -44,6 +44,7 @@ pub struct OutputConfig {
     pub output_format: Option<crate::cli::OutputFormat>,
     pub formatting_config: FormattingConfig,
     pub show_filter_stats: bool,
+    pub analysis_receipt: Option<unified::AnalysisReceipt>,
 }
 
 // ============================================================================
@@ -202,7 +203,7 @@ pub fn output_unified_priorities_with_config(
     results: &AnalysisResults,
     _coverage_file: Option<&PathBuf>,
 ) -> Result<()> {
-    output_unified_priorities_with_summary(
+    output_unified_priorities_with_summary_and_receipt(
         analysis,
         config.top,
         config.tail,
@@ -213,6 +214,7 @@ pub fn output_unified_priorities_with_config(
         config.formatting_config,
         results,
         config.show_filter_stats,
+        config.analysis_receipt,
     )
 }
 
@@ -254,15 +256,45 @@ pub fn output_unified_priorities_with_summary(
     _results: &AnalysisResults,
     show_filter_stats: bool,
 ) -> Result<()> {
+    output_unified_priorities_with_summary_and_receipt(
+        analysis,
+        top,
+        tail,
+        summary,
+        verbosity,
+        output_file,
+        output_format,
+        formatting_config,
+        _results,
+        show_filter_stats,
+        None,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn output_unified_priorities_with_summary_and_receipt(
+    analysis: priority::UnifiedAnalysis,
+    top: Option<usize>,
+    tail: Option<usize>,
+    summary: bool,
+    verbosity: u8,
+    output_file: Option<PathBuf>,
+    output_format: Option<crate::cli::OutputFormat>,
+    formatting_config: FormattingConfig,
+    _results: &AnalysisResults,
+    show_filter_stats: bool,
+    analysis_receipt: Option<unified::AnalysisReceipt>,
+) -> Result<()> {
     match output_format {
         Some(crate::cli::OutputFormat::Json) => {
             let include_scoring_details = verbosity >= 2;
-            json::output_json_with_format(
+            json::output_json_with_format_and_receipt(
                 &analysis,
                 top,
                 tail,
                 output_file,
                 include_scoring_details,
+                analysis_receipt,
             )
         }
         Some(crate::cli::OutputFormat::Markdown) => {

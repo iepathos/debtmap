@@ -65,6 +65,10 @@ pub fn print_summary(result: &ValidationResult) {
     println!("\n=== Debtmap Validation Results ===");
     println!("Completion: {:.1}%", result.completion_percentage);
     println!("Status: {}", result.status);
+    println!("Comparability: {:?}", result.comparability.status);
+    for reason in &result.comparability.reasons {
+        println!("  ! {reason}");
+    }
 
     if !result.improvements.is_empty() {
         println!("\nImprovements:");

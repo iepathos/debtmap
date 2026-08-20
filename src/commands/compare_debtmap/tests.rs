@@ -40,6 +40,7 @@ fn create_empty_output() -> DebtmapJsonInput {
         debt_density: 0.0,
         total_lines_of_code: 0,
         overall_coverage: None,
+        receipt: None,
     }
 }
 
@@ -56,6 +57,7 @@ fn create_output_with_items(items: Vec<UnifiedDebtItemOutput>) -> DebtmapJsonInp
         debt_density: 0.0,
         total_lines_of_code: 1000,
         overall_coverage: None,
+        receipt: None,
     }
 }
 
@@ -157,7 +159,26 @@ fn create_test_output(items: Vec<UnifiedDebtItemOutput>) -> DebtmapJsonInput {
         debt_density: 0.0,
         total_lines_of_code: 1000,
         overall_coverage: Some(50.0),
+        receipt: None,
     }
+}
+
+#[test]
+fn incompatible_receipts_do_not_produce_improvement_claims() {
+    let fixture = include_str!("../../../tests/fixtures/output/unified-v4-minimal.json");
+    let before = super::parse_debtmap_json(fixture).unwrap();
+    let mut after = before.clone();
+    after.receipt.as_mut().unwrap().policy_fingerprint = "f".repeat(64);
+
+    let result = super::perform_validation(&before, &after).unwrap();
+
+    assert_eq!(result.status, "non_comparable");
+    assert_eq!(result.completion_percentage, 0.0);
+    assert!(result.improvements.is_empty());
+    assert_eq!(
+        result.comparability.status,
+        super::ComparabilityStatus::Incompatible
+    );
 }
 
 // =============================================================================
@@ -1138,6 +1159,7 @@ fn test_output_json_deserializes_for_compare() {
             project_root: None,
             analysis_type: "unified".to_string(),
         },
+        receipt: None,
         summary: DebtSummary {
             total_items: 0,
             total_debt_score: 75.0,

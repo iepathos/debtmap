@@ -15,6 +15,8 @@ use std::path::PathBuf;
 pub struct UnifiedOutput {
     pub format_version: String,
     pub metadata: OutputMetadata,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub receipt: Option<super::receipt::AnalysisReceipt>,
     pub summary: DebtSummary,
     pub items: Vec<UnifiedDebtItemOutput>,
 }

@@ -4,10 +4,10 @@
 //! ensuring data quality and consistency.
 
 use debtmap::output::unified::{
-    CohesionClassification, CohesionOutput, Dependencies, FileDebtItemOutput, FileImpactOutput,
-    FileMetricsOutput, FunctionDebtItemOutput, FunctionImpactOutput, FunctionMetricsOutput,
-    Priority, PurityAnalysis, UNIFIED_FORMAT_VERSION, UnifiedDebtItemOutput, UnifiedLocation,
-    UnifiedOutput,
+    AnalysisReceipt, CohesionClassification, CohesionOutput, Dependencies, FileDebtItemOutput,
+    FileImpactOutput, FileMetricsOutput, FunctionDebtItemOutput, FunctionImpactOutput,
+    FunctionMetricsOutput, Priority, PurityAnalysis, UNIFIED_FORMAT_VERSION, UnifiedDebtItemOutput,
+    UnifiedLocation, UnifiedOutput,
 };
 use debtmap::priority::{DebtType, FunctionRole};
 use serde_json::Value;
@@ -29,6 +29,9 @@ fn test_function_role() -> FunctionRole {
 /// Test that the unified output structure matches expected schema
 #[test]
 fn test_unified_output_has_required_fields() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("fixtures/output/unified-v4-minimal.json")).unwrap();
+    let receipt: AnalysisReceipt = serde_json::from_value(fixture["receipt"].clone()).unwrap();
     // Create a minimal valid output
     let output = UnifiedOutput {
         format_version: UNIFIED_FORMAT_VERSION.to_string(),
@@ -38,6 +41,7 @@ fn test_unified_output_has_required_fields() {
             project_root: None,
             analysis_type: "unified".to_string(),
         },
+        receipt: Some(receipt),
         summary: debtmap::output::unified::DebtSummary {
             total_items: 0,
             total_debt_score: 0.0,
@@ -66,6 +70,7 @@ fn test_unified_output_has_required_fields() {
     // Validate required top-level fields
     assert!(json["format_version"].is_string());
     assert!(json["metadata"].is_object());
+    assert!(json["receipt"].is_object());
     assert!(json["summary"].is_object());
     assert!(json["items"].is_array());
     assert_eq!(json["format_version"], UNIFIED_FORMAT_VERSION);

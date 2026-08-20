@@ -1,6 +1,7 @@
-# Unified Analyze JSON v3
+# Unified Analyze JSON v3 (Legacy)
 
-This is the canonical machine-readable contract produced by:
+This frozen contract remains readable for compatibility. New CLI reports use
+[`JSON v4`](json-output-v4.md), which adds an analysis receipt.
 
 ```bash
 debtmap analyze . --format json --output report.json
@@ -45,6 +46,10 @@ subset while retaining codebase-wide `total_loc` and cohesion.
 Consumers must check `format_version` before parsing. Version 3.0 is frozen: every emitted shape
 change requires a new format version and an immutable schema artifact. Incompatible changes bump
 the major version.
+
+V3 does not record effective policy, requested versus loaded evidence, selection settings, or
+scope completeness. Do not infer that two v3 reports are directly comparable merely because both
+parsed successfully.
 
 The schema strictly freezes the envelope, discriminator, summary, locations, and metric fields.
 Some deeply nested analysis payloads are intentionally opaque objects in 3.0; consumers that use

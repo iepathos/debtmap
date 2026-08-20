@@ -29,6 +29,7 @@ mod func_item;
 mod location;
 mod patterns;
 mod priority;
+mod receipt;
 mod types;
 
 // Re-export all public items
@@ -52,13 +53,18 @@ pub use func_item::{
 };
 pub use location::UnifiedLocation;
 pub use priority::Priority;
+pub use receipt::{
+    AnalysisPolicyReceipt, AnalysisReceipt, EvidenceReceipt, ExecutionReceipt,
+    LanguagePolicyReceipt, ScopeReceipt, ScopeStatus, SelectionReceipt, SourceRevisionReceipt,
+};
 pub use types::{
     DebtSummary, OutputMetadata, ScoreDistribution, TypeBreakdown, UnifiedDebtItemOutput,
     UnifiedOutput,
 };
 
 /// Version of the canonical `debtmap analyze --format json` contract.
-pub const UNIFIED_FORMAT_VERSION: &str = "3.0";
+pub const UNIFIED_FORMAT_VERSION: &str = "4.0";
+pub const LEGACY_UNIFIED_FORMAT_VERSION: &str = "3.0";
 
 use std::collections::HashMap;
 
@@ -221,17 +227,22 @@ pub(crate) fn summarize_items(items: &[UnifiedDebtItemOutput], total_loc: usize)
 }
 
 /// Build the final UnifiedOutput from items and statistics (pure function)
-fn build_unified_output(items: Vec<UnifiedDebtItemOutput>, total_loc: usize) -> UnifiedOutput {
+fn build_unified_output(
+    items: Vec<UnifiedDebtItemOutput>,
+    total_loc: usize,
+    receipt: Option<AnalysisReceipt>,
+) -> UnifiedOutput {
     let summary = summarize_items(&items, total_loc);
 
     UnifiedOutput {
-        format_version: UNIFIED_FORMAT_VERSION.to_string(),
+        format_version: LEGACY_UNIFIED_FORMAT_VERSION.to_string(),
         metadata: OutputMetadata {
             debtmap_version: env!("CARGO_PKG_VERSION").to_string(),
             generated_at: chrono::Utc::now().to_rfc3339(),
             project_root: None,
             analysis_type: "unified".to_string(),
         },
+        receipt,
         summary,
         items,
     }
@@ -253,7 +264,20 @@ pub fn convert_to_unified_format(
     let unified_items = convert_items(&all_items, include_scoring_details, &analysis.call_graph);
     let deduplicated = deduplicate_items(unified_items);
     let sorted_items = sort_by_score_descending(deduplicated);
-    build_unified_output(sorted_items, analysis.total_lines_of_code)
+    build_unified_output(sorted_items, analysis.total_lines_of_code, None)
+}
+
+/// Convert analysis results with a receipt for the canonical JSON v4 envelope.
+pub fn convert_to_unified_format_with_receipt(
+    analysis: &crate::priority::UnifiedAnalysis,
+    include_scoring_details: bool,
+    receipt: AnalysisReceipt,
+) -> UnifiedOutput {
+    let mut output = convert_to_unified_format(analysis, include_scoring_details);
+    output.format_version = UNIFIED_FORMAT_VERSION.to_string();
+    output.metadata.project_root = receipt.analysis_target.clone();
+    output.receipt = Some(receipt);
+    output
 }
 
 // ============================================================================

@@ -118,10 +118,12 @@ pub fn get_language_features(language: &crate::core::Language) -> LanguageFeatur
         Language::Python => languages_config
             .and_then(|lc| lc.python.clone())
             .unwrap_or_default(),
-        Language::JavaScript | Language::TypeScript => {
-            // JS/TS also uses defaults (dead code: false)
-            LanguageFeatures::default()
-        }
+        Language::JavaScript => languages_config
+            .and_then(|lc| lc.javascript.clone())
+            .unwrap_or_default(),
+        Language::TypeScript => languages_config
+            .and_then(|lc| lc.typescript.clone())
+            .unwrap_or_default(),
         Language::Go => languages_config
             .and_then(|lc| lc.go.clone())
             .map(|go| go.features)

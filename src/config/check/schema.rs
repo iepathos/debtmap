@@ -104,6 +104,7 @@ const ROOT_KEYS: &[&str] = &[
 const THRESHOLD_KEYS: &[&str] = &[
     "complexity",
     "duplication",
+    "duplication_similarity",
     "file_size",
     "max_file_length",
     "max_function_length",

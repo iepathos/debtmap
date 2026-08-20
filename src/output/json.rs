@@ -31,9 +31,35 @@ pub fn output_json_with_format(
     output_file: Option<PathBuf>,
     include_scoring_details: bool,
 ) -> Result<()> {
+    output_json_with_format_and_receipt(
+        analysis,
+        top,
+        tail,
+        output_file,
+        include_scoring_details,
+        None,
+    )
+}
+
+pub fn output_json_with_format_and_receipt(
+    analysis: &priority::UnifiedAnalysis,
+    top: Option<usize>,
+    tail: Option<usize>,
+    output_file: Option<PathBuf>,
+    include_scoring_details: bool,
+    receipt: Option<crate::output::unified::AnalysisReceipt>,
+) -> Result<()> {
     // Always use unified format (spec 202 - removed legacy format)
-    let unified_output =
-        crate::output::unified::convert_to_unified_format(analysis, include_scoring_details);
+    let unified_output = match receipt {
+        Some(receipt) => crate::output::unified::convert_to_unified_format_with_receipt(
+            analysis,
+            include_scoring_details,
+            receipt,
+        ),
+        None => {
+            crate::output::unified::convert_to_unified_format(analysis, include_scoring_details)
+        }
+    };
 
     // Apply filtering to unified output
     let filtered = apply_filters_to_unified_output(unified_output, top, tail);
@@ -63,6 +89,7 @@ fn apply_filters_to_unified_output(
     let crate::output::unified::UnifiedOutput {
         format_version,
         metadata,
+        receipt,
         summary: original_summary,
         items: original_items,
     } = output;
@@ -75,6 +102,7 @@ fn apply_filters_to_unified_output(
     crate::output::unified::UnifiedOutput {
         format_version,
         metadata,
+        receipt,
         items,
         summary,
     }
@@ -301,6 +329,7 @@ mod tests {
                 project_root: None,
                 analysis_type: "unified".to_string(),
             },
+            receipt: None,
             summary: DebtSummary {
                 total_items: items.len(),
                 total_debt_score: items.iter().map(UnifiedDebtItemOutput::score).sum(),

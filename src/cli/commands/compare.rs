@@ -75,7 +75,9 @@ pub fn handle_compare_command(
     let target = resolve_compare_target(plan, target_location)?;
     let before_results = load_analysis_from_path(before)?;
     let after_results = load_analysis_from_path(after)?;
-    let comparison = Comparator::new(before_results, after_results, target).compare()?;
+    let comparison = Comparator::new(before_results, after_results, target)
+        .with_source_paths(before.display().to_string(), after.display().to_string())
+        .compare()?;
     write_comparison_output(&comparison, format, output)
 }
 

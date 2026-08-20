@@ -1,0 +1,782 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docs.debtmap.dev/schemas/debtmap-output-v4.schema.json",
+  "title": "Debtmap unified analyze JSON v4",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format_version",
+    "metadata",
+    "receipt",
+    "summary",
+    "items"
+  ],
+  "properties": {
+    "format_version": {
+      "const": "4.0"
+    },
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/functionItem"
+          },
+          {
+            "$ref": "#/$defs/fileItem"
+          }
+        ]
+      }
+    },
+    "receipt": {
+      "$ref": "#/$defs/receipt"
+    }
+  },
+  "$defs": {
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "nonNegativeNumber": {
+      "type": "number",
+      "minimum": 0
+    },
+    "ratio": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "debtmap_version",
+        "generated_at",
+        "project_root",
+        "analysis_type"
+      ],
+      "properties": {
+        "debtmap_version": {
+          "type": "string"
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "project_root": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "analysis_type": {
+          "const": "unified"
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total_items",
+        "total_debt_score",
+        "debt_density",
+        "total_loc",
+        "by_type",
+        "by_category",
+        "score_distribution"
+      ],
+      "properties": {
+        "total_items": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "total_debt_score": {
+          "$ref": "#/$defs/nonNegativeNumber"
+        },
+        "debt_density": {
+          "$ref": "#/$defs/nonNegativeNumber"
+        },
+        "total_loc": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "by_type": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "File",
+            "Function"
+          ],
+          "properties": {
+            "File": {
+              "$ref": "#/$defs/nonNegativeInteger"
+            },
+            "Function": {
+              "$ref": "#/$defs/nonNegativeInteger"
+            }
+          }
+        },
+        "by_category": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/nonNegativeInteger"
+          }
+        },
+        "score_distribution": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "critical",
+            "high",
+            "medium",
+            "low"
+          ],
+          "properties": {
+            "critical": {
+              "$ref": "#/$defs/nonNegativeInteger"
+            },
+            "high": {
+              "$ref": "#/$defs/nonNegativeInteger"
+            },
+            "medium": {
+              "$ref": "#/$defs/nonNegativeInteger"
+            },
+            "low": {
+              "$ref": "#/$defs/nonNegativeInteger"
+            }
+          }
+        },
+        "cohesion": {
+          "type": "object"
+        }
+      }
+    },
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "file"
+      ],
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "line": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "function": {
+          "type": "string"
+        },
+        "file_context_label": {
+          "type": "string"
+        }
+      }
+    },
+    "priority": {
+      "enum": [
+        "critical",
+        "high",
+        "medium",
+        "low"
+      ]
+    },
+    "functionMetrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cyclomatic_complexity",
+        "cognitive_complexity",
+        "length",
+        "nesting_depth"
+      ],
+      "properties": {
+        "cyclomatic_complexity": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "cognitive_complexity": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "length": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "nesting_depth": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "coverage": {
+          "$ref": "#/$defs/ratio"
+        },
+        "uncovered_lines": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonNegativeInteger"
+          }
+        },
+        "entropy_score": {
+          "$ref": "#/$defs/ratio"
+        },
+        "pattern_repetition": {
+          "$ref": "#/$defs/ratio"
+        },
+        "branch_similarity": {
+          "$ref": "#/$defs/ratio"
+        },
+        "entropy_adjusted_cognitive": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "transitive_coverage": {
+          "$ref": "#/$defs/ratio"
+        }
+      }
+    },
+    "fileMetrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lines",
+        "functions",
+        "classes",
+        "avg_complexity",
+        "max_complexity",
+        "total_complexity",
+        "coverage",
+        "uncovered_lines"
+      ],
+      "properties": {
+        "lines": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "functions": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "classes": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "avg_complexity": {
+          "$ref": "#/$defs/nonNegativeNumber"
+        },
+        "max_complexity": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "total_complexity": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "coverage": {
+          "$ref": "#/$defs/ratio"
+        },
+        "uncovered_lines": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "distribution": {
+          "type": "object"
+        }
+      }
+    },
+    "functionItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "score",
+        "category",
+        "priority",
+        "location",
+        "metrics",
+        "debt_type",
+        "function_role",
+        "dependencies",
+        "impact"
+      ],
+      "properties": {
+        "type": {
+          "const": "Function"
+        },
+        "score": {
+          "$ref": "#/$defs/nonNegativeNumber"
+        },
+        "category": {
+          "type": "string"
+        },
+        "priority": {
+          "$ref": "#/$defs/priority"
+        },
+        "location": {
+          "$ref": "#/$defs/location"
+        },
+        "metrics": {
+          "$ref": "#/$defs/functionMetrics"
+        },
+        "debt_type": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 1
+        },
+        "function_role": {
+          "enum": [
+            "PureLogic",
+            "Orchestrator",
+            "IOWrapper",
+            "EntryPoint",
+            "PatternMatch",
+            "Debug",
+            "Unknown"
+          ]
+        },
+        "purity_analysis": {
+          "type": "object"
+        },
+        "dependencies": {
+          "type": "object"
+        },
+        "impact": {
+          "type": "object"
+        },
+        "scoring_details": {
+          "type": "object"
+        },
+        "adjusted_complexity": {
+          "type": "object"
+        },
+        "complexity_pattern": {
+          "type": "string"
+        },
+        "pattern_type": {
+          "type": "string"
+        },
+        "pattern_confidence": {
+          "$ref": "#/$defs/ratio"
+        },
+        "pattern_details": {},
+        "context": {
+          "type": "object"
+        },
+        "git_history": {
+          "type": "object"
+        },
+        "contextual_risk": {
+          "type": "object"
+        }
+      }
+    },
+    "fileItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "score",
+        "category",
+        "priority",
+        "location",
+        "metrics",
+        "impact"
+      ],
+      "properties": {
+        "type": {
+          "const": "File"
+        },
+        "score": {
+          "$ref": "#/$defs/nonNegativeNumber"
+        },
+        "category": {
+          "type": "string"
+        },
+        "priority": {
+          "$ref": "#/$defs/priority"
+        },
+        "location": {
+          "$ref": "#/$defs/location"
+        },
+        "metrics": {
+          "$ref": "#/$defs/fileMetrics"
+        },
+        "debt_type": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 1
+        },
+        "god_object_indicators": {
+          "type": "object"
+        },
+        "dependencies": {
+          "type": "object"
+        },
+        "anti_patterns": {
+          "type": "object"
+        },
+        "cohesion": {
+          "type": "object"
+        },
+        "impact": {
+          "type": "object"
+        },
+        "scoring_details": {
+          "type": "object"
+        }
+      }
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "analysis_target",
+        "reference_time",
+        "policy",
+        "policy_fingerprint",
+        "evidence",
+        "selection",
+        "execution",
+        "scope",
+        "warnings",
+        "source_revision"
+      ],
+      "properties": {
+        "analysis_target": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reference_time": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "policy": {
+          "$ref": "#/$defs/analysisPolicyReceipt"
+        },
+        "policy_fingerprint": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidenceReceipt"
+        },
+        "selection": {
+          "$ref": "#/$defs/selectionReceipt"
+        },
+        "execution": {
+          "$ref": "#/$defs/executionReceipt"
+        },
+        "scope": {
+          "$ref": "#/$defs/scopeReceipt"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "source_revision": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "commit",
+                "dirty"
+              ],
+              "properties": {
+                "commit": {
+                  "type": "string",
+                  "pattern": "^[0-9a-fA-F]{40}([0-9a-fA-F]{24})?$"
+                },
+                "dirty": {
+                  "type": "boolean"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "analysisPolicyReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "languages",
+        "language_policies",
+        "complexity_threshold",
+        "duplication_threshold_lines",
+        "duplication_similarity",
+        "threshold_preset",
+        "semantic_analysis",
+        "context_aware_scoring",
+        "god_object_detection",
+        "functional_analysis",
+        "functional_analysis_profile",
+        "aggregation",
+        "aggregation_method",
+        "minimum_problematic_functions"
+      ],
+      "properties": {
+        "languages": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "rust",
+              "python",
+              "javascript",
+              "typescript",
+              "go",
+              "solidity"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "language_policies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "language",
+              "enabled",
+              "detect_complexity",
+              "detect_dead_code",
+              "detect_duplication",
+              "generated_code"
+            ],
+            "properties": {
+              "language": { "type": "string" },
+              "enabled": { "type": "boolean" },
+              "detect_complexity": { "type": "boolean" },
+              "detect_dead_code": { "type": "boolean" },
+              "detect_duplication": { "type": "boolean" },
+              "generated_code": { "type": "string" }
+            }
+          }
+        },
+        "complexity_threshold": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "duplication_threshold_lines": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "duplication_similarity": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "threshold_preset": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "semantic_analysis": {
+          "type": "boolean"
+        },
+        "context_aware_scoring": {
+          "type": "boolean"
+        },
+        "god_object_detection": {
+          "type": "boolean"
+        },
+        "functional_analysis": {
+          "type": "boolean"
+        },
+        "functional_analysis_profile": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "aggregation": {
+          "type": "boolean"
+        },
+        "aggregation_method": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "minimum_problematic_functions": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "evidenceReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "coverage_requested",
+        "coverage_loaded",
+        "context_requested",
+        "context_providers_requested",
+        "context_providers_disabled",
+        "coverage_source_kind"
+      ],
+      "properties": {
+        "coverage_requested": {
+          "type": "boolean"
+        },
+        "coverage_loaded": {
+          "type": "boolean"
+        },
+        "context_requested": {
+          "type": "boolean"
+        },
+        "context_providers_requested": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "context_providers_disabled": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "coverage_source_kind": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "selectionReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minimum_score_requested",
+        "minimum_priority_requested",
+        "categories_requested",
+        "aggregate_only",
+        "top",
+        "tail",
+        "file_limit_requested"
+      ],
+      "properties": {
+        "minimum_score_requested": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "minimum_priority_requested": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "categories_requested": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "aggregate_only": {
+          "type": "boolean"
+        },
+        "top": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "tail": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "file_limit_requested": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "executionReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parallel",
+        "jobs",
+        "multi_pass"
+      ],
+      "properties": {
+        "parallel": {
+          "type": "boolean"
+        },
+        "jobs": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "multi_pass": {
+          "type": "boolean"
+        }
+      }
+    },
+    "scopeReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "discovered_files",
+        "analyzed_files",
+        "failed_files",
+        "omitted_by_limit",
+        "total_loc",
+        "status"
+      ],
+      "properties": {
+        "discovered_files": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "analyzed_files": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "failed_files": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "omitted_by_limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "total_loc": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "status": {
+          "enum": [
+            "complete",
+            "partial",
+            "limited",
+            "unknown"
+          ]
+        }
+      }
+    }
+  }
+}

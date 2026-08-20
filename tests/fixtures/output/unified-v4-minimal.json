@@ -1,0 +1,80 @@
+{
+  "format_version": "4.0",
+  "metadata": {
+    "debtmap_version": "0.22.0",
+    "generated_at": "2026-08-19T00:00:00Z",
+    "project_root": null,
+    "analysis_type": "unified"
+  },
+  "receipt": {
+    "analysis_target": null,
+    "source_revision": null,
+    "reference_time": "2026-08-19T00:00:00Z",
+    "policy": {
+      "languages": ["rust"],
+      "language_policies": [],
+      "complexity_threshold": 10,
+      "duplication_threshold_lines": 50,
+      "duplication_similarity": 1.0,
+      "threshold_preset": null,
+      "semantic_analysis": true,
+      "context_aware_scoring": true,
+      "god_object_detection": true,
+      "functional_analysis": false,
+      "functional_analysis_profile": null,
+      "aggregation": true,
+      "aggregation_method": "weighted_sum",
+      "minimum_problematic_functions": null
+    },
+    "policy_fingerprint": "08b2da933d2731d36a54496bfad00ae6e7e5147ff7b12ca93f65a275c8d241dc",
+    "evidence": {
+      "coverage_requested": false,
+      "coverage_loaded": false,
+      "coverage_source_kind": null,
+      "context_requested": false,
+      "context_providers_requested": null,
+      "context_providers_disabled": []
+    },
+    "selection": {
+      "minimum_score_requested": null,
+      "minimum_priority_requested": null,
+      "categories_requested": [],
+      "aggregate_only": false,
+      "top": null,
+      "tail": null,
+      "file_limit_requested": null
+    },
+    "execution": {
+      "parallel": false,
+      "jobs": 1,
+      "multi_pass": false
+    },
+    "scope": {
+      "discovered_files": 0,
+      "analyzed_files": 0,
+      "failed_files": 0,
+      "omitted_by_limit": 0,
+      "total_loc": 0,
+      "status": "complete"
+    },
+    "warnings": []
+  },
+  "summary": {
+    "total_items": 0,
+    "total_debt_score": 0.0,
+    "debt_density": 0.0,
+    "total_loc": 0,
+    "by_type": {
+      "File": 0,
+      "Function": 0
+    },
+    "by_category": {},
+    "score_distribution": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    }
+  },
+  "items": []
+}

@@ -926,6 +926,7 @@ mod tests {
                 project_root: None,
                 analysis_type: "unified".to_string(),
             },
+            receipt: None,
             summary: crate::output::unified::DebtSummary {
                 total_items: 0,
                 total_debt_score: 0.0,

@@ -35,6 +35,15 @@ pub struct ProjectAnalysisOutput {
     pub results: AnalysisResults,
     /// Pre-extracted Rust file data for reuse (avoids re-parsing)
     pub extracted_data: Option<HashMap<PathBuf, ExtractedFileData>>,
+    pub file_outcomes: FileOutcomeSummary,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct FileOutcomeSummary {
+    pub discovered: usize,
+    pub analyzed: usize,
+    pub failed: usize,
+    pub omitted_by_limit: usize,
 }
 
 /// Run project analysis (I/O).
@@ -101,11 +110,18 @@ pub fn analyze_project_with_extraction(
 
     start_files_phase();
 
-    let files = discover_files(&path, &languages, config)?;
+    let discovered_files = discover_files(&path, &languages, config)?;
+    let discovered_count = discovered_files.len();
+    let (files, omitted_by_limit) = apply_configured_file_limit(discovered_files);
 
     // Spec 214: Extract Rust files first, convert to metrics via adapter
-    let (file_metrics, extracted_data) =
-        parse_and_extract_metrics_hybrid(&files, parallel_enabled, formatting_config)?;
+    let (file_metrics, extracted_data, file_outcomes) = parse_and_extract_metrics_hybrid(
+        &files,
+        discovered_count,
+        omitted_by_limit,
+        parallel_enabled,
+        formatting_config,
+    )?;
 
     let (all_functions, all_debt_items, file_contexts) = extract_analysis_data(&file_metrics);
 
@@ -125,6 +141,7 @@ pub fn analyze_project_with_extraction(
     Ok(ProjectAnalysisOutput {
         results,
         extracted_data,
+        file_outcomes,
     })
 }
 
@@ -185,6 +202,7 @@ fn parse_and_extract_metrics(
 type HybridMetricsResult = (
     Vec<FileMetrics>,
     Option<HashMap<PathBuf, ExtractedFileData>>,
+    FileOutcomeSummary,
 );
 
 /// Parse files using hybrid approach: extract Rust files, parse others (Spec 214).
@@ -197,6 +215,8 @@ type HybridMetricsResult = (
 /// 5. Returns combined metrics and extracted data for downstream reuse
 fn parse_and_extract_metrics_hybrid(
     files: &[PathBuf],
+    discovered_count: usize,
+    omitted_by_limit: usize,
     parallel_enabled: bool,
     formatting_config: FormattingConfig,
 ) -> Result<HybridMetricsResult> {
@@ -212,25 +232,27 @@ fn parse_and_extract_metrics_hybrid(
         .partition(|p| p.extension().map(|e| e == "rs").unwrap_or(false));
 
     // Extract Rust files and convert to metrics via adapter
-    let (rust_metrics, extracted_data) = if !rust_files.is_empty() {
-        let extracted = extract_all_files(&rust_files);
+    let (rust_metrics, extracted_data, rust_failures) = if !rust_files.is_empty() {
+        let extracted = extract_all_files_with_outcomes(&rust_files);
         let metrics =
-            crate::extraction::adapters::metrics::all_file_metrics_from_extracted(&extracted);
-        (metrics, Some(extracted))
+            crate::extraction::adapters::metrics::all_file_metrics_from_extracted(&extracted.data);
+        (metrics, Some(extracted.data), extracted.failed)
     } else {
-        (vec![], None)
+        (vec![], None, 0)
     };
 
     // Parse non-Rust files using traditional path
-    let non_rust_metrics = if !non_rust_files.is_empty() {
-        analysis_utils::collect_file_metrics(&non_rust_files)
+    let non_rust_outcomes = if !non_rust_files.is_empty() {
+        analysis_utils::collect_file_metrics_with_errors(&non_rust_files)
     } else {
-        vec![]
+        crate::errors::AnalysisResults::new(vec![], vec![])
     };
 
     // Combine metrics
+    let non_rust_failures = non_rust_outcomes.failure_count();
     let mut all_metrics = rust_metrics;
-    all_metrics.extend(non_rust_metrics);
+    all_metrics.extend(non_rust_outcomes.successes);
+    let failed = rust_failures + non_rust_failures;
 
     // Sort metrics by path to ensure deterministic analysis results (spec 214 fix)
     // Non-deterministic order from HashMap iteration was causing unstable scores
@@ -239,7 +261,28 @@ fn parse_and_extract_metrics_hybrid(
 
     complete_parsing(files.len());
 
-    Ok((all_metrics, extracted_data))
+    let outcomes = FileOutcomeSummary {
+        discovered: discovered_count,
+        analyzed: all_metrics.len(),
+        failed,
+        omitted_by_limit,
+    };
+
+    Ok((all_metrics, extracted_data, outcomes))
+}
+
+fn apply_configured_file_limit(files: Vec<PathBuf>) -> (Vec<PathBuf>, usize) {
+    let limit = std::env::var("DEBTMAP_MAX_FILES")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .filter(|limit| *limit > 0);
+    limit_files(files, limit)
+}
+
+fn limit_files(files: Vec<PathBuf>, limit: Option<usize>) -> (Vec<PathBuf>, usize) {
+    let retained = limit.unwrap_or(files.len()).min(files.len());
+    let omitted = files.len() - retained;
+    (files.into_iter().take(retained).collect(), omitted)
 }
 
 /// Update progress with file count.
@@ -451,15 +494,27 @@ fn collect_extraction_results(
 /// This function implements the "Unified Extraction" phase that runs after
 /// file discovery. It parses each file exactly once and extracts all data
 /// needed by downstream analysis phases.
-pub fn extract_all_files(files: &[PathBuf]) -> HashMap<PathBuf, ExtractedFileData> {
+struct ExtractionOutcome {
+    data: HashMap<PathBuf, ExtractedFileData>,
+    failed: usize,
+}
+
+fn extract_all_files_with_outcomes(files: &[PathBuf]) -> ExtractionOutcome {
     let rust_files = filter_rust_files(files);
     if rust_files.is_empty() {
-        return HashMap::new();
+        return ExtractionOutcome {
+            data: HashMap::new(),
+            failed: 0,
+        };
     }
 
     let contents = read_file_contents(&rust_files);
     let results = UnifiedFileExtractor::extract_batch(&contents, EXTRACTION_BATCH_SIZE);
-    collect_extraction_results(results)
+    let extraction_failures = results.iter().filter(|(_, result)| result.is_err()).count();
+    ExtractionOutcome {
+        data: collect_extraction_results(results),
+        failed: rust_files.len() - contents.len() + extraction_failures,
+    }
 }
 
 // Note: Metrics conversion from extracted data moved to extraction adapters (spec 214).
@@ -468,6 +523,28 @@ pub fn extract_all_files(files: &[PathBuf]) -> HashMap<PathBuf, ExtractedFileDat
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn file_limit_reports_omitted_files() {
+        let files = vec![
+            PathBuf::from("a.rs"),
+            PathBuf::from("b.rs"),
+            PathBuf::from("c.rs"),
+        ];
+
+        let (retained, omitted) = limit_files(files, Some(2));
+
+        assert_eq!(retained, vec![PathBuf::from("a.rs"), PathBuf::from("b.rs")]);
+        assert_eq!(omitted, 1);
+    }
+
+    #[test]
+    fn extraction_outcome_counts_read_failures() {
+        let outcome = extract_all_files_with_outcomes(&[PathBuf::from("missing.rs")]);
+
+        assert!(outcome.data.is_empty());
+        assert_eq!(outcome.failed, 1);
+    }
 
     #[test]
     fn filter_rust_files_includes_only_rs_extension() {

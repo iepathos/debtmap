@@ -9,6 +9,8 @@ pub struct Comparator {
     before: UnifiedAnalysis,
     after: UnifiedAnalysis,
     target_location: Option<String>,
+    before_file: Option<String>,
+    after_file: Option<String>,
 }
 
 impl Comparator {
@@ -21,7 +23,19 @@ impl Comparator {
             before,
             after,
             target_location,
+            before_file: None,
+            after_file: None,
         }
+    }
+
+    pub fn with_source_paths(
+        mut self,
+        before: impl Into<String>,
+        after: impl Into<String>,
+    ) -> Self {
+        self.before_file = Some(before.into());
+        self.after_file = Some(after.into());
+        self
     }
 
     /// Perform full comparison
@@ -432,8 +446,14 @@ impl Comparator {
     fn build_metadata(&self) -> ComparisonMetadata {
         ComparisonMetadata {
             comparison_date: chrono::Utc::now().to_rfc3339(),
-            before_file: "before.json".to_string(),
-            after_file: "after.json".to_string(),
+            before_file: self
+                .before_file
+                .clone()
+                .unwrap_or_else(|| "unspecified".to_string()),
+            after_file: self
+                .after_file
+                .clone()
+                .unwrap_or_else(|| "unspecified".to_string()),
             target_location: self.target_location.clone(),
         }
     }
