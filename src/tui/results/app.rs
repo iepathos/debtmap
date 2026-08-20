@@ -187,11 +187,41 @@ impl ResultsApp {
                 .and_then(|&idx| self.analysis.items.get(idx));
         }
 
-        let groups =
-            super::grouping::group_by_location(self.filtered_items(), self.query.sort_by());
-        groups
-            .get(self.list.selected_index())
-            .and_then(|group| group.items.first().copied())
+        let group = self.selected_group()?;
+        group
+            .items
+            .get(self.nav.detail_group_item_index())
+            .or_else(|| group.items.first())
+            .copied()
+    }
+
+    /// Position of the active finding within a grouped location row.
+    pub fn selected_group_item_position(&self) -> Option<(usize, usize)> {
+        let group = self.selected_group()?;
+        let item_count = group.items.len();
+        let index = self
+            .nav
+            .detail_group_item_index()
+            .min(item_count.saturating_sub(1));
+        Some((index, item_count))
+    }
+
+    /// Cycle the active finding within the selected location group.
+    pub fn cycle_selected_group_item(&mut self, forward: bool) {
+        let item_count = self
+            .selected_group()
+            .map(|group| group.items.len())
+            .unwrap_or(0);
+        self.nav.cycle_detail_group_item(item_count, forward);
+    }
+
+    fn selected_group(&self) -> Option<super::grouping::LocationGroup<'_>> {
+        if !self.list.is_grouped() {
+            return None;
+        }
+        super::grouping::group_by_location(self.filtered_items(), self.query.sort_by())
+            .into_iter()
+            .nth(self.list.selected_index())
     }
 
     /// Get all filtered items

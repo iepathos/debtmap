@@ -36,6 +36,12 @@ pub enum DetailAction {
     /// Positive values move down, negative values move up.
     MoveSelection(i32),
 
+    /// Select the previous finding within a grouped location row.
+    PrevGroupItem,
+
+    /// Select the next finding within a grouped location row.
+    NextGroupItem,
+
     /// Scroll content up by one line.
     ScrollUp,
 
@@ -124,6 +130,7 @@ pub fn page_from_digit(c: char) -> Option<DetailPage> {
 /// - `←`, `BackTab`: Previous page
 /// - `1-8`: Jump to page
 /// - `↑/↓`, `j/k`: Previous/next item
+/// - `[`/`]`: Previous/next finding within a grouped location
 ///
 /// ## Content Scrolling
 /// - `Ctrl+U`: Scroll up half page
@@ -165,6 +172,10 @@ pub fn classify_detail_key(key: KeyEvent, _ctx: DetailActionContext) -> Option<D
         // Item navigation - up/down moves through the list (without Ctrl)
         KeyCode::Down | KeyCode::Char('j') if !ctrl => Some(DetailAction::MoveSelection(1)),
         KeyCode::Up | KeyCode::Char('k') if !ctrl => Some(DetailAction::MoveSelection(-1)),
+
+        // Group member navigation - cycle findings at the selected location
+        KeyCode::Char('[') => Some(DetailAction::PrevGroupItem),
+        KeyCode::Char(']') => Some(DetailAction::NextGroupItem),
 
         // Content scrolling - Ctrl+D/U for half page (vim-style)
         KeyCode::Char('d') if ctrl => Some(DetailAction::ScrollHalfPageDown),
@@ -366,6 +377,19 @@ mod tests {
         assert_eq!(
             classify_detail_key(key(KeyCode::Char('k')), ctx),
             Some(DetailAction::MoveSelection(-1))
+        );
+    }
+
+    #[test]
+    fn brackets_cycle_findings_within_grouped_location() {
+        let ctx = DetailActionContext::new(DetailPage::ScoreBreakdown);
+        assert_eq!(
+            classify_detail_key(key(KeyCode::Char('[')), ctx),
+            Some(DetailAction::PrevGroupItem)
+        );
+        assert_eq!(
+            classify_detail_key(key(KeyCode::Char(']')), ctx),
+            Some(DetailAction::NextGroupItem)
         );
     }
 

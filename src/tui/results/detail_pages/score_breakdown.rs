@@ -1785,7 +1785,7 @@ pub fn build_item_indicator_section(
         let debt_name = super::overview::format_debt_type_name(debt_type);
         lines.push(Line::from(vec![Span::styled(
             format!(
-                "viewing item {} of {}: {}",
+                "viewing item {} of {}: {}  ([ / ] to switch)",
                 current_index + 1,
                 total_items,
                 debt_name
@@ -1939,8 +1939,12 @@ pub fn render(
     // Get all items at this location for multi-item context
     let location_items = super::overview::get_items_at_location(app, item);
 
-    // Always show first item (grouping is always on, no cycling)
-    let lines = build_page_lines_with_context(item, &location_items, 0, theme, area.width);
+    let current_index = app
+        .selected_group_item_position()
+        .map(|(index, _)| index)
+        .unwrap_or(0);
+    let lines =
+        build_page_lines_with_context(item, &location_items, current_index, theme, area.width);
 
     // I/O boundary: render the widget with scroll support
     let paragraph = Paragraph::new(lines)
@@ -2190,6 +2194,29 @@ mod tests {
 
         // Should have lines from multiple sections
         assert!(lines.len() > 10);
+    }
+
+    #[test]
+    fn grouped_item_indicator_explains_navigation() {
+        let theme = Theme::default();
+        let lines = build_item_indicator_section(
+            1,
+            2,
+            &DebtType::ComplexityHotspot {
+                cyclomatic: 15,
+                cognitive: 25,
+            },
+            &theme,
+            80,
+        );
+        let content: String = lines
+            .iter()
+            .flat_map(|line| line.spans.iter())
+            .map(|span| span.content.as_ref())
+            .collect();
+
+        assert!(content.contains("viewing item 2 of 2"));
+        assert!(content.contains("[ / ] to switch"));
     }
 
     #[test]

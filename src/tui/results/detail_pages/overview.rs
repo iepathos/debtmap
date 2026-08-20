@@ -440,9 +440,7 @@ pub fn get_items_at_location<'a>(
     app: &'a ResultsApp,
     selected: &UnifiedDebtItem,
 ) -> Vec<&'a UnifiedDebtItem> {
-    app.analysis()
-        .items
-        .iter()
+    app.filtered_items()
         .filter(|item| {
             item.location.file == selected.location.file
                 && item.location.function == selected.location.function

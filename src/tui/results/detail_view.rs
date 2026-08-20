@@ -119,13 +119,19 @@ fn render_header(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
     let total_pages = available.len();
     let page_name = app.nav().detail_page.name();
 
+    let grouped_item = app
+        .selected_group_item_position()
+        .filter(|(_, total)| *total > 1)
+        .map(|(index, total)| format!("  [Finding {}/{}]", index + 1, total))
+        .unwrap_or_default();
     let position = format!(
-        "Detail View ({}/{})  [Page {}/{}] {}",
+        "Detail View ({}/{})  [Page {}/{}] {}{}",
         app.list().selected_index() + 1,
         app.item_count(),
         current_page,
         total_pages,
-        page_name
+        page_name,
+        grouped_item,
     );
 
     // Apply horizontal margin per DESIGN.md
@@ -152,11 +158,9 @@ fn render_footer(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
         Span::styled("←/→", Style::default().fg(theme.accent())),
         Span::raw(":Pages  "),
         Span::styled("j/k", Style::default().fg(theme.accent())),
-        Span::raw(":Items  "),
-        Span::styled("c", Style::default().fg(theme.accent())),
-        Span::raw(":Copy page  "),
-        Span::styled("C", Style::default().fg(theme.accent())),
-        Span::raw(":Copy item  "),
+        Span::raw(":Locations  "),
+        Span::styled("[ / ]", Style::default().fg(theme.accent())),
+        Span::raw(":Findings  "),
         Span::styled("?", Style::default().fg(theme.accent())),
         Span::raw(":Help"),
     ]);

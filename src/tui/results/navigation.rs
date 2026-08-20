@@ -91,6 +91,7 @@ fn execute_list_action(app: &mut ResultsApp, action: ListAction) -> Result<bool>
 
         ListAction::ToggleGrouping => {
             app.list_mut().toggle_grouping();
+            app.nav_mut().reset_detail_group_item();
             let mode = if app.list().is_grouped() {
                 "grouped by location"
             } else {
@@ -100,6 +101,7 @@ fn execute_list_action(app: &mut ResultsApp, action: ListAction) -> Result<bool>
         }
 
         ListAction::EnterDetail => {
+            app.nav_mut().reset_detail_group_item();
             app.nav_mut().push_and_set_view(ViewMode::Detail);
         }
 
@@ -213,6 +215,18 @@ fn execute_detail_action(app: &mut ResultsApp, action: DetailAction) -> Result<b
             move_selection(app, delta as isize);
             ensure_valid_page(app);
             // Reset scroll when changing items
+            app.nav_mut().reset_detail_scroll();
+        }
+
+        DetailAction::PrevGroupItem => {
+            app.cycle_selected_group_item(false);
+            ensure_valid_page(app);
+            app.nav_mut().reset_detail_scroll();
+        }
+
+        DetailAction::NextGroupItem => {
+            app.cycle_selected_group_item(true);
+            ensure_valid_page(app);
             app.nav_mut().reset_detail_scroll();
         }
 
@@ -441,6 +455,7 @@ fn move_selection(app: &mut ResultsApp, delta: isize) {
     let new_index = (current + delta).max(0).min(count as isize - 1) as usize;
 
     app.list_mut().set_selected_index(new_index, count);
+    app.nav_mut().reset_detail_group_item();
     adjust_scroll(app);
 }
 
@@ -598,9 +613,13 @@ mod tests {
         analysis
             .items
             .push(create_test_item("same.rs", "same_fn", 10));
-        analysis
-            .items
-            .push(create_test_item("same.rs", "same_fn", 10));
+        let mut testing_gap = create_test_item("same.rs", "same_fn", 10);
+        testing_gap.debt_type = DebtType::TestingGap {
+            coverage: 0.0,
+            cyclomatic: 5,
+            cognitive: 3,
+        };
+        analysis.items.push(testing_gap);
         analysis
             .items
             .push(create_test_item("other.rs", "other_fn", 20));
@@ -843,6 +862,38 @@ mod tests {
 
         execute_detail_action(&mut app, DetailAction::MoveSelection(-1)).unwrap();
         assert_eq!(app.list().selected_index(), 1);
+    }
+
+    #[test]
+    fn grouped_detail_actions_cycle_findings_without_changing_location() {
+        let mut app = create_duplicate_location_app();
+        execute_list_action(&mut app, ListAction::EnterDetail).unwrap();
+
+        assert!(matches!(
+            app.selected_item().unwrap().debt_type,
+            DebtType::Complexity { .. }
+        ));
+        assert_eq!(app.selected_group_item_position(), Some((0, 2)));
+
+        execute_detail_action(&mut app, DetailAction::NextGroupItem).unwrap();
+        assert!(matches!(
+            app.selected_item().unwrap().debt_type,
+            DebtType::TestingGap { .. }
+        ));
+        assert_eq!(app.list().selected_index(), 0);
+        assert_eq!(app.selected_group_item_position(), Some((1, 2)));
+
+        execute_detail_action(&mut app, DetailAction::NextGroupItem).unwrap();
+        assert!(matches!(
+            app.selected_item().unwrap().debt_type,
+            DebtType::Complexity { .. }
+        ));
+        assert_eq!(app.selected_group_item_position(), Some((0, 2)));
+
+        execute_detail_action(&mut app, DetailAction::NextGroupItem).unwrap();
+        execute_detail_action(&mut app, DetailAction::MoveSelection(1)).unwrap();
+        execute_detail_action(&mut app, DetailAction::MoveSelection(-1)).unwrap();
+        assert_eq!(app.selected_group_item_position(), Some((0, 2)));
     }
 
     #[test]

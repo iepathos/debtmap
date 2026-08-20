@@ -88,6 +88,9 @@ pub struct NavigationState {
     /// Current detail page (when in Detail mode).
     pub detail_page: DetailPage,
 
+    /// Selected member within a location-grouped result row.
+    detail_group_item_index: usize,
+
     /// Navigation history for back navigation.
     pub history: Vec<ViewMode>,
 
@@ -108,6 +111,7 @@ impl NavigationState {
         Self {
             view_mode: ViewMode::List,
             detail_page: DetailPage::Overview,
+            detail_group_item_index: 0,
             history: vec![],
             detail_scroll: ScrollViewState::new(),
         }
@@ -119,6 +123,19 @@ impl NavigationState {
     /// viewing from the beginning.
     pub fn reset_detail_scroll(&mut self) {
         self.detail_scroll = ScrollViewState::new();
+    }
+
+    pub fn detail_group_item_index(&self) -> usize {
+        self.detail_group_item_index
+    }
+
+    pub fn reset_detail_group_item(&mut self) {
+        self.detail_group_item_index = 0;
+    }
+
+    pub fn cycle_detail_group_item(&mut self, item_count: usize, forward: bool) {
+        self.detail_group_item_index =
+            cycle_index(self.detail_group_item_index, item_count, forward);
     }
 
     /// Push current view mode to history before transitioning.
@@ -137,6 +154,14 @@ impl NavigationState {
     /// Clear navigation history.
     pub fn clear_history(&mut self) {
         self.history.clear();
+    }
+}
+
+fn cycle_index(current: usize, item_count: usize, forward: bool) -> usize {
+    match (item_count, forward) {
+        (0 | 1, _) => 0,
+        (_, true) => (current + 1) % item_count,
+        (_, false) => (current + item_count - 1) % item_count,
     }
 }
 
@@ -356,6 +381,21 @@ mod tests {
 
         state.clear_history();
         assert!(state.history.is_empty());
+    }
+
+    #[test]
+    fn grouped_item_navigation_cycles_and_resets() {
+        let mut state = NavigationState::new();
+
+        state.cycle_detail_group_item(2, true);
+        assert_eq!(state.detail_group_item_index(), 1);
+        state.cycle_detail_group_item(2, true);
+        assert_eq!(state.detail_group_item_index(), 0);
+        state.cycle_detail_group_item(2, false);
+        assert_eq!(state.detail_group_item_index(), 1);
+
+        state.reset_detail_group_item();
+        assert_eq!(state.detail_group_item_index(), 0);
     }
 }
 
