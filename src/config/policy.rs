@@ -158,7 +158,62 @@ fn language_policy(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{LanguagesConfig, ThresholdsConfig};
+    use crate::config::{
+        GoLanguageConfig, LanguagesConfig, SolidityLanguageConfig, ThresholdsConfig,
+    };
+
+    fn features(complexity: bool, dead_code: bool, duplication: bool) -> LanguageFeatures {
+        LanguageFeatures {
+            detect_complexity: complexity,
+            detect_dead_code: dead_code,
+            detect_duplication: duplication,
+        }
+    }
+
+    fn feature_matrix_policy() -> AnalysisPolicy {
+        AnalysisPolicy::from_config(&DebtmapConfig {
+            languages: Some(LanguagesConfig {
+                rust: Some(features(true, false, false)),
+                python: Some(features(false, true, false)),
+                javascript: Some(features(false, false, true)),
+                typescript: Some(features(true, true, false)),
+                go: Some(GoLanguageConfig {
+                    features: features(true, false, true),
+                    ..GoLanguageConfig::default()
+                }),
+                solidity: Some(SolidityLanguageConfig {
+                    features: features(false, true, true),
+                    ..SolidityLanguageConfig::default()
+                }),
+                ..LanguagesConfig::default()
+            }),
+            ..DebtmapConfig::default()
+        })
+    }
+
+    #[test]
+    fn resolves_feature_matrix_for_all_supported_languages() {
+        let policy = feature_matrix_policy();
+        let expected = [
+            (Language::Rust, [true, false, false]),
+            (Language::Python, [false, true, false]),
+            (Language::JavaScript, [false, false, true]),
+            (Language::TypeScript, [true, true, false]),
+            (Language::Go, [true, false, true]),
+            (Language::Solidity, [false, true, true]),
+        ];
+        let features = [
+            AnalysisFeature::Complexity,
+            AnalysisFeature::DeadCode,
+            AnalysisFeature::Duplication,
+        ];
+
+        for (language, decisions) in expected {
+            for (feature, expected) in features.into_iter().zip(decisions) {
+                assert_eq!(policy.allows(language, feature), expected);
+            }
+        }
+    }
 
     #[test]
     fn javascript_and_typescript_have_independent_features() {

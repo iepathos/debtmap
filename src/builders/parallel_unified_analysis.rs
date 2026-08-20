@@ -1,7 +1,8 @@
 use crate::{
     builders::unified_analysis_phases::phases::scoring::{
-        PreparedScoringInput, ScoringExecution, SuppressionContextCache, score_metrics,
+        PreparedScoringInput, ScoringExecution, SuppressionContextCache, score_metrics_with_policy,
     },
+    config::AnalysisPolicy,
     core::FunctionMetrics,
     data_flow::DataFlowGraph,
     extraction::ExtractedFileData,
@@ -251,6 +252,7 @@ pub struct ParallelUnifiedAnalysisBuilder {
     /// Immutable source snapshot shared by suppression and file analysis.
     file_content_index: HashMap<PathBuf, Option<String>>,
     suppression_contexts: SuppressionContextCache,
+    analysis_policy: AnalysisPolicy,
     /// Pre-extracted file data from unified extraction phase (spec 213).
     /// When present, avoids re-parsing files during analysis.
     extracted_data: Option<Arc<HashMap<PathBuf, ExtractedFileData>>>,
@@ -267,8 +269,15 @@ impl ParallelUnifiedAnalysisBuilder {
             line_count_index: HashMap::new(),
             file_content_index: HashMap::new(),
             suppression_contexts: HashMap::new(),
+            analysis_policy: AnalysisPolicy::from_config(crate::config::get_config()),
             extracted_data: None,
         }
+    }
+
+    /// Use a pre-resolved immutable policy for every analysis phase.
+    pub fn with_analysis_policy(mut self, policy: AnalysisPolicy) -> Self {
+        self.analysis_policy = policy;
+        self
     }
 
     /// Set pre-extracted file data from unified extraction phase (spec 213).
@@ -708,7 +717,7 @@ impl ParallelUnifiedAnalysisBuilder {
             ScoringExecution::Sequential
         };
         let scoring_start = Instant::now();
-        let items = score_metrics(metrics, &input, execution);
+        let items = score_metrics_with_policy(metrics, &input, execution, &self.analysis_policy);
         self.timings.score_functions = scoring_start.elapsed();
 
         self.timings.function_analysis = start.elapsed();
@@ -865,6 +874,7 @@ impl ParallelUnifiedAnalysisBuilder {
         add_unified_items(&mut unified, items);
         let finalize_start = Instant::now();
         self.add_finalized_file_items(&mut unified, file_data, coverage_data);
+        apply_analysis_policy(&mut unified, &self.analysis_policy);
         self.timings.finalize_files = finalize_start.elapsed();
 
         agg_progress.set_message("Sorting by priority and calculating impact");
@@ -1012,6 +1022,20 @@ fn add_unified_items(unified: &mut UnifiedAnalysis, items: Vec<UnifiedDebtItem>)
     for item in items {
         unified.add_item(item);
     }
+}
+
+fn apply_analysis_policy(unified: &mut UnifiedAnalysis, policy: &AnalysisPolicy) {
+    unified.items = unified
+        .items
+        .iter()
+        .filter(|item| {
+            policy.allows_debt_type(
+                crate::core::Language::from_path(&item.location.file),
+                &item.debt_type,
+            )
+        })
+        .cloned()
+        .collect();
 }
 
 fn apply_coverage_summary(unified: &mut UnifiedAnalysis, coverage_data: Option<&LcovData>) {

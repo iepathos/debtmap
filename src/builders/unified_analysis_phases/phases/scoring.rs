@@ -340,14 +340,24 @@ pub fn score_metrics(
     execution: ScoringExecution,
 ) -> Vec<UnifiedDebtItem> {
     let policy = crate::config::AnalysisPolicy::from_config(crate::config::get_config());
+    score_metrics_with_policy(metrics, input, execution, &policy)
+}
+
+/// Score metrics with an explicit immutable analysis policy.
+pub fn score_metrics_with_policy(
+    metrics: &[FunctionMetrics],
+    input: &PreparedScoringInput<'_>,
+    execution: ScoringExecution,
+    policy: &crate::config::AnalysisPolicy,
+) -> Vec<UnifiedDebtItem> {
     let items: Vec<UnifiedDebtItem> = match execution {
         ScoringExecution::Sequential => metrics
             .iter()
-            .flat_map(|metric| score_metric(metric, input, &policy))
+            .flat_map(|metric| score_metric(metric, input, policy))
             .collect(),
         ScoringExecution::Parallel => metrics
             .par_iter()
-            .flat_map(|metric| score_metric(metric, input, &policy))
+            .flat_map(|metric| score_metric(metric, input, policy))
             .collect(),
     };
 

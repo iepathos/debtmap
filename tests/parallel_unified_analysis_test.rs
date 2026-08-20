@@ -1,9 +1,10 @@
 use debtmap::builders::parallel_unified_analysis::{
     ParallelUnifiedAnalysisBuilder, ParallelUnifiedAnalysisOptions,
 };
+use debtmap::config::{AnalysisPolicy, DebtmapConfig, LanguageFeatures, LanguagesConfig};
 use debtmap::core::FunctionMetrics;
 use debtmap::extraction::UnifiedFileExtractor;
-use debtmap::priority::call_graph::CallGraph;
+use debtmap::priority::{DebtType, call_graph::CallGraph};
 use std::path::PathBuf;
 
 /// Helper function to create test metrics
@@ -62,6 +63,61 @@ fn parallel_options() -> ParallelUnifiedAnalysisOptions {
         progress: false,
         reference_time: chrono::Utc::now(),
     }
+}
+
+fn rust_policy(detect_complexity: bool) -> AnalysisPolicy {
+    AnalysisPolicy::from_config(&DebtmapConfig {
+        languages: Some(LanguagesConfig {
+            rust: Some(LanguageFeatures {
+                detect_complexity,
+                ..LanguageFeatures::default()
+            }),
+            ..LanguagesConfig::default()
+        }),
+        ..DebtmapConfig::default()
+    })
+}
+
+fn is_complexity(debt_type: &DebtType) -> bool {
+    matches!(
+        debt_type,
+        DebtType::Complexity { .. }
+            | DebtType::ComplexityHotspot { .. }
+            | DebtType::TestComplexity { .. }
+            | DebtType::TestComplexityHotspot { .. }
+    )
+}
+
+#[test]
+fn explicit_policy_blocks_disabled_complexity_findings() {
+    let metrics = create_test_metrics(20);
+    let mut builder = ParallelUnifiedAnalysisBuilder::new(CallGraph::new(), parallel_options())
+        .with_analysis_policy(rust_policy(true));
+    let (data_flow, purity, test_functions, aggregator) =
+        builder.execute_phase1_parallel(&metrics, None);
+
+    let items = builder.execute_phase2_parallel(
+        &metrics,
+        &test_functions,
+        &aggregator,
+        &data_flow,
+        None,
+        &Default::default(),
+        None,
+    );
+    assert!(items.iter().any(|item| is_complexity(&item.debt_type)));
+
+    let disabled_builder =
+        ParallelUnifiedAnalysisBuilder::new(CallGraph::new(), parallel_options())
+            .with_analysis_policy(rust_policy(false));
+    let (analysis, _) = disabled_builder.build(data_flow, purity, items, Vec::new(), None);
+
+    assert!(
+        analysis
+            .items
+            .iter()
+            .all(|item| !is_complexity(&item.debt_type))
+    );
 }
 
 #[test]
