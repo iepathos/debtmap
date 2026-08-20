@@ -151,6 +151,11 @@ fn cli_json_matches_v4_schema_with_receipt_and_details() {
             report["summary"]["total_items"],
             report["items"].as_array().unwrap().len()
         );
+        assert!(
+            report["items"][0]["finding_id"]
+                .as_str()
+                .is_some_and(|id| id.starts_with("dm4_") && id.len() == 68)
+        );
         assert_eq!(report["items"][0].get("scoring_details").is_some(), verbose);
     }
 }

@@ -24,6 +24,7 @@ mod coupling;
 mod dedup;
 mod dependencies;
 mod file_item;
+mod finding_id;
 mod format;
 mod func_item;
 mod location;
@@ -276,6 +277,7 @@ pub fn convert_to_unified_format_with_receipt(
     let mut output = convert_to_unified_format(analysis, include_scoring_details);
     output.format_version = UNIFIED_FORMAT_VERSION.to_string();
     output.metadata.project_root = receipt.analysis_target.clone();
+    finding_id::assign_finding_ids(&mut output.items, receipt.analysis_target.as_deref());
     output.receipt = Some(receipt);
     output
 }

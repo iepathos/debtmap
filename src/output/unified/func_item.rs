@@ -52,6 +52,8 @@ fn generate_side_effects_from_purity(
 /// Function-level debt item in unified format
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FunctionDebtItemOutput {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub finding_id: Option<String>,
     pub score: f64,
     pub category: String,
     pub priority: Priority,
@@ -155,6 +157,7 @@ impl FunctionDebtItemOutput {
         let rounded_pattern_confidence = pattern_confidence.map(round_ratio);
 
         FunctionDebtItemOutput {
+            finding_id: None,
             score: rounded_score,
             category: crate::priority::DebtCategory::from_debt_type(&item.debt_type).to_string(),
             priority: Priority::from_score(rounded_score),
@@ -620,6 +623,7 @@ mod tests {
     #[test]
     fn test_function_debt_item_serialization_roundtrip() {
         let item = FunctionDebtItemOutput {
+            finding_id: None,
             score: 42.57,
             category: "Testing".to_string(),
             priority: Priority::from_score(42.57),
@@ -687,6 +691,7 @@ mod tests {
     #[test]
     fn test_no_floating_point_noise_in_output() {
         let item = FunctionDebtItemOutput {
+            finding_id: None,
             score: 42.57, // Already rounded
             category: "Testing".to_string(),
             priority: Priority::Medium,

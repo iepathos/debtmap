@@ -281,6 +281,7 @@
       "additionalProperties": false,
       "required": [
         "type",
+        "finding_id",
         "score",
         "category",
         "priority",
@@ -294,6 +295,10 @@
       "properties": {
         "type": {
           "const": "Function"
+        },
+        "finding_id": {
+          "type": "string",
+          "pattern": "^dm4_[0-9a-f]{64}$"
         },
         "score": {
           "$ref": "#/$defs/nonNegativeNumber"
@@ -367,6 +372,7 @@
       "additionalProperties": false,
       "required": [
         "type",
+        "finding_id",
         "score",
         "category",
         "priority",
@@ -377,6 +383,10 @@
       "properties": {
         "type": {
           "const": "File"
+        },
+        "finding_id": {
+          "type": "string",
+          "pattern": "^dm4_[0-9a-f]{64}$"
         },
         "score": {
           "$ref": "#/$defs/nonNegativeNumber"

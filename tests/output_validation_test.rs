@@ -91,6 +91,7 @@ fn test_unified_output_has_required_fields() {
 #[test]
 fn test_function_item_required_fields_and_ranges() {
     let item = FunctionDebtItemOutput {
+        finding_id: None,
         score: 42.5,
         category: "Testing".to_string(),
         priority: Priority::Medium,
@@ -182,6 +183,7 @@ fn test_function_item_required_fields_and_ranges() {
 #[test]
 fn test_file_item_required_fields_and_ranges() {
     let item = FileDebtItemOutput {
+        finding_id: None,
         score: 75.25,
         category: "Architecture".to_string(),
         priority: Priority::High,
@@ -270,6 +272,7 @@ fn test_priority_matches_score_thresholds() {
 
     for (score, expected_priority) in test_cases {
         let item = UnifiedDebtItemOutput::Function(Box::new(FunctionDebtItemOutput {
+            finding_id: None,
             score,
             category: "Test".to_string(),
             priority: priority_from_score(score),
@@ -334,6 +337,7 @@ fn test_priority_matches_score_thresholds() {
 #[test]
 fn test_no_floating_point_noise_in_serialized_output() {
     let item = FunctionDebtItemOutput {
+        finding_id: None,
         score: 42.57,
         category: "Testing".to_string(),
         priority: Priority::Medium,
@@ -438,6 +442,7 @@ fn test_cohesion_classification_consistency() {
 #[test]
 fn test_unified_debt_item_tagged_serialization() {
     let function_item = UnifiedDebtItemOutput::Function(Box::new(FunctionDebtItemOutput {
+        finding_id: None,
         score: 25.0,
         category: "Testing".to_string(),
         priority: Priority::Medium,

@@ -71,6 +71,7 @@ fn create_function_item(
     coverage: Option<f64>,
 ) -> UnifiedDebtItemOutput {
     UnifiedDebtItemOutput::Function(Box::new(FunctionDebtItemOutput {
+        finding_id: None,
         score: score.max(0.0),
         category: "Complexity".to_string(),
         priority: if score >= 8.0 {

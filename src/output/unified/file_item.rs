@@ -18,6 +18,8 @@ use serde::{Deserialize, Serialize};
 /// File-level debt item in unified format
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileDebtItemOutput {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub finding_id: Option<String>,
     pub score: f64,
     pub category: String,
     pub priority: Priority,
@@ -92,6 +94,7 @@ impl FileDebtItemOutput {
         let debt_type = derive_file_debt_type(item);
 
         FileDebtItemOutput {
+            finding_id: None,
             score: rounded_score,
             category: categorize_file_debt(item),
             priority: Priority::from_score(rounded_score),
@@ -258,6 +261,7 @@ mod tests {
         use super::super::cohesion::CohesionClassification;
 
         let item = FileDebtItemOutput {
+            finding_id: None,
             score: 75.25,
             category: "Architecture".to_string(),
             priority: Priority::from_score(75.25),

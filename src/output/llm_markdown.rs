@@ -411,6 +411,7 @@ mod tests {
         debt_type: DebtType,
     ) -> FunctionDebtItemOutput {
         FunctionDebtItemOutput {
+            finding_id: None,
             score,
             category: "Testing".to_string(),
             priority: Priority::from_score(score),

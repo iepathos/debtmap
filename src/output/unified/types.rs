@@ -149,6 +149,7 @@ mod tests {
         score: f64,
     ) -> UnifiedDebtItemOutput {
         UnifiedDebtItemOutput::Function(Box::new(FunctionDebtItemOutput {
+            finding_id: None,
             score,
             category: "TestCategory".to_string(),
             priority: Priority::from_score(score),
@@ -204,6 +205,7 @@ mod tests {
     /// Helper to create a file debt item for testing
     fn create_test_file_item(file: &str, score: f64) -> UnifiedDebtItemOutput {
         UnifiedDebtItemOutput::File(Box::new(FileDebtItemOutput {
+            finding_id: None,
             score,
             category: "Architecture".to_string(),
             priority: Priority::from_score(score),

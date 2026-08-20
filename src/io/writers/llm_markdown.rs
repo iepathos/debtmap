@@ -978,6 +978,7 @@ mod tests {
 
         // Create a function item with enhanced dependency data
         let item = FunctionDebtItemOutput {
+            finding_id: None,
             score: 85.5,
             category: "Complexity".to_string(),
             priority: Priority::High,
@@ -1110,6 +1111,7 @@ mod tests {
         let mut writer = LlmMarkdownWriter::new(&mut buffer);
 
         let item = FunctionDebtItemOutput {
+            finding_id: None,
             score: 100.0,
             category: "Complexity".to_string(),
             priority: Priority::Critical,
@@ -1210,6 +1212,7 @@ mod tests {
         let mut writer = LlmMarkdownWriter::new(&mut buffer);
 
         let item = FunctionDebtItemOutput {
+            finding_id: None,
             score: 75.0,
             category: "Complexity".to_string(),
             priority: Priority::High,
@@ -1421,6 +1424,7 @@ mod tests {
         use crate::priority::FunctionRole;
 
         FunctionDebtItemOutput {
+            finding_id: None,
             score: 80.0,
             category: "Architecture".to_string(),
             priority: Priority::High,
