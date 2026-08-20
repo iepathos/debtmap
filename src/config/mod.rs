@@ -89,7 +89,7 @@ pub use classification::{
 // Re-export language types for backward compatibility
 pub use languages::{
     EntropyConfig, GeneratedCodeMode, GoLanguageConfig, LanguageFeatures, LanguagesConfig,
-    SolidityLanguageConfig, SoliditySecurityConfig,
+    SolidityLanguageConfig, SoliditySecurityConfig, StandardLanguageConfig,
 };
 
 // Re-export display types for backward compatibility

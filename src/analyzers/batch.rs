@@ -207,7 +207,10 @@ pub fn analyze_single_file_effect(path: PathBuf) -> AnalysisEffect<FileAnalysisR
             return Ok(excluded_file_result(&path, &content));
         }
         analyze_file_content_with_config(&path, &content, false, generated_mode, &solidity_config)
-            .map(|result| filter_file_result(result, &policy))
+            .map(|result| {
+                filter_file_result(result, &policy)
+                    .unwrap_or_else(|| excluded_file_result(&path, &content))
+            })
             .map_err(|e| {
                 AnalysisError::analysis(format!("Analysis failed for '{}': {}", path_display, e))
             })
@@ -221,14 +224,14 @@ fn filter_file_results(
 ) -> Vec<FileAnalysisResult> {
     results
         .into_iter()
-        .map(|result| filter_file_result(result, policy))
+        .filter_map(|result| filter_file_result(result, policy))
         .collect()
 }
 
 fn filter_file_result(
     result: FileAnalysisResult,
     policy: &crate::config::AnalysisPolicy,
-) -> FileAnalysisResult {
+) -> Option<FileAnalysisResult> {
     let FileAnalysisResult {
         path,
         metrics,
@@ -236,15 +239,16 @@ fn filter_file_result(
         package_name,
         ..
     } = result;
-    let metrics = policy.filter_file_metrics(metrics);
+    let source = std::fs::read_to_string(&path).unwrap_or_default();
+    let metrics = policy.apply_file_metrics(metrics, &source)?;
     let debt_items = metrics.debt_items.clone();
-    FileAnalysisResult {
+    Some(FileAnalysisResult {
         path,
         metrics,
         debt_items,
         analysis_time,
         package_name,
-    }
+    })
 }
 
 fn excluded_file_result(path: &Path, content: &str) -> FileAnalysisResult {

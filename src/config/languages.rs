@@ -2,23 +2,24 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct LanguagesConfig {
+    #[serde(default)]
     pub enabled: Vec<String>,
 
     /// Rust-specific configuration
     #[serde(default)]
-    pub rust: Option<LanguageFeatures>,
+    pub rust: Option<StandardLanguageConfig>,
 
     /// Python-specific configuration
     #[serde(default)]
-    pub python: Option<LanguageFeatures>,
+    pub python: Option<StandardLanguageConfig>,
 
     /// JavaScript-specific configuration
     #[serde(default)]
-    pub javascript: Option<LanguageFeatures>,
+    pub javascript: Option<StandardLanguageConfig>,
 
     /// TypeScript-specific configuration
     #[serde(default)]
-    pub typescript: Option<LanguageFeatures>,
+    pub typescript: Option<StandardLanguageConfig>,
 
     /// Go-specific configuration
     #[serde(default)]
@@ -43,6 +44,29 @@ pub struct LanguageFeatures {
     /// Whether to detect duplication for this language
     #[serde(default = "default_detect_duplication")]
     pub detect_duplication: bool,
+}
+
+/// Feature and generated-code policy shared by standard language analyzers.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StandardLanguageConfig {
+    #[serde(flatten)]
+    pub features: LanguageFeatures,
+
+    #[serde(default = "default_analyze_generated_code")]
+    pub generated_code: GeneratedCodeMode,
+}
+
+impl Default for StandardLanguageConfig {
+    fn default() -> Self {
+        Self {
+            features: LanguageFeatures::default(),
+            generated_code: GeneratedCodeMode::Analyze,
+        }
+    }
+}
+
+fn default_analyze_generated_code() -> GeneratedCodeMode {
+    GeneratedCodeMode::Analyze
 }
 
 /// Go-specific language configuration.

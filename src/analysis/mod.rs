@@ -72,6 +72,8 @@ pub mod function_visitor;
 /// Detects iterator chains, method pipelines, and functional programming
 /// patterns. Analyzes purity and identifies terminal operations.
 pub mod functional_composition;
+/// Shared generated and vendor source classification.
+pub mod generated_code;
 /// Call graph metrics and pattern detection.
 ///
 /// Computes graph-theoretic metrics like betweenness centrality and

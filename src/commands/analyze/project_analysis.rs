@@ -260,7 +260,10 @@ fn parse_and_extract_metrics_hybrid(
     let mut all_metrics: Vec<_> = extracted_metrics
         .into_iter()
         .chain(legacy_outcomes.successes)
-        .map(|metrics| policy.filter_file_metrics(metrics))
+        .filter_map(|metrics| match std::fs::read_to_string(&metrics.path) {
+            Ok(source) => policy.apply_file_metrics(metrics, &source),
+            Err(_) => Some(policy.filter_file_metrics(metrics)),
+        })
         .collect();
     let failed = extraction_failures + legacy_failures;
 

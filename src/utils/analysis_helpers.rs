@@ -79,7 +79,10 @@ where
             )
         })
         .filter_map(|path| match io::read_file(path) {
-            Ok(content) => Some((path.clone(), content)),
+            Ok(content) if policy.allows_generated_findings(path, &content) => {
+                Some((path.clone(), content))
+            }
+            Ok(_) => None,
             Err(e) => {
                 log::debug!(
                     "Skipping file {} for duplication check: {}",

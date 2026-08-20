@@ -106,23 +106,21 @@ pub fn get_language_features(language: &crate::core::Language) -> LanguageFeatur
     let languages_config = config.languages.as_ref();
 
     match language {
-        Language::Rust => {
-            languages_config
-                .and_then(|lc| lc.rust.clone())
-                .unwrap_or(LanguageFeatures {
-                    detect_dead_code: false, // Explicitly disabled for Rust
-                    detect_complexity: true,
-                    detect_duplication: true,
-                })
-        }
+        Language::Rust => languages_config
+            .and_then(|lc| lc.rust.clone())
+            .map(|config| config.features)
+            .unwrap_or_default(),
         Language::Python => languages_config
             .and_then(|lc| lc.python.clone())
+            .map(|config| config.features)
             .unwrap_or_default(),
         Language::JavaScript => languages_config
             .and_then(|lc| lc.javascript.clone())
+            .map(|config| config.features)
             .unwrap_or_default(),
         Language::TypeScript => languages_config
             .and_then(|lc| lc.typescript.clone())
+            .map(|config| config.features)
             .unwrap_or_default(),
         Language::Go => languages_config
             .and_then(|lc| lc.go.clone())

@@ -68,9 +68,12 @@ fn parallel_options() -> ParallelUnifiedAnalysisOptions {
 fn rust_policy(detect_complexity: bool) -> AnalysisPolicy {
     AnalysisPolicy::from_config(&DebtmapConfig {
         languages: Some(LanguagesConfig {
-            rust: Some(LanguageFeatures {
-                detect_complexity,
-                ..LanguageFeatures::default()
+            rust: Some(debtmap::config::StandardLanguageConfig {
+                features: LanguageFeatures {
+                    detect_complexity,
+                    ..LanguageFeatures::default()
+                },
+                ..Default::default()
             }),
             ..LanguagesConfig::default()
         }),

@@ -1048,14 +1048,23 @@ fn add_unified_items(unified: &mut UnifiedAnalysis, items: Vec<UnifiedDebtItem>)
 }
 
 fn apply_analysis_policy(unified: &mut UnifiedAnalysis, policy: &AnalysisPolicy) {
+    let mut generated_allowed = std::collections::HashMap::new();
     unified.items = unified
         .items
         .iter()
         .filter(|item| {
-            policy.allows_debt_type(
-                crate::core::Language::from_path(&item.location.file),
-                &item.debt_type,
-            )
+            let language = crate::core::Language::from_path(&item.location.file);
+            let feature_allowed = policy.allows_debt_type(language, &item.debt_type);
+            let source_allowed = *generated_allowed
+                .entry(item.location.file.clone())
+                .or_insert_with(|| {
+                    std::fs::read_to_string(&item.location.file)
+                        .map(|source| {
+                            policy.allows_generated_findings(&item.location.file, &source)
+                        })
+                        .unwrap_or(true)
+                });
+            feature_allowed && source_allowed
         })
         .cloned()
         .collect();

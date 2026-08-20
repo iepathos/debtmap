@@ -114,6 +114,47 @@ impl AnalysisPolicy {
             ..metrics
         }
     }
+
+    pub fn apply_file_metrics(&self, metrics: FileMetrics, source: &str) -> Option<FileMetrics> {
+        let language = metrics.language;
+        let generated = crate::analysis::generated_code::is_generated_or_vendor(
+            &metrics.path,
+            language,
+            source,
+        );
+        self.apply_file_metrics_with_generated(metrics, generated)
+    }
+
+    pub fn apply_file_metrics_with_generated(
+        &self,
+        metrics: FileMetrics,
+        generated: bool,
+    ) -> Option<FileMetrics> {
+        let language = metrics.language;
+        let mode = self
+            .for_language(language)
+            .map(|policy| policy.generated_code)
+            .unwrap_or(GeneratedCodeMode::Analyze);
+        if generated && mode == GeneratedCodeMode::Exclude {
+            return None;
+        }
+        let mut metrics = self.filter_file_metrics(metrics);
+        if generated && mode == GeneratedCodeMode::SuppressDebt {
+            metrics.debt_items.clear();
+            metrics.duplications.clear();
+        }
+        Some(metrics)
+    }
+
+    pub fn allows_generated_findings(&self, path: &std::path::Path, source: &str) -> bool {
+        let language = Language::from_path(path);
+        let generated =
+            crate::analysis::generated_code::is_generated_or_vendor(path, language, source);
+        !generated
+            || self
+                .for_language(language)
+                .is_none_or(|policy| policy.generated_code == GeneratedCodeMode::Analyze)
+    }
 }
 
 fn feature_enabled(features: &LanguageFeatures, feature: AnalysisFeature) -> bool {
@@ -131,30 +172,22 @@ fn language_policy(
 ) -> EffectiveLanguagePolicy {
     let languages = config.languages.as_ref();
     let (features, generated_code) = match language {
-        Language::Rust => (
-            languages
-                .and_then(|value| value.rust.clone())
-                .unwrap_or_default(),
-            GeneratedCodeMode::Analyze,
-        ),
-        Language::Python => (
-            languages
-                .and_then(|value| value.python.clone())
-                .unwrap_or_default(),
-            GeneratedCodeMode::Analyze,
-        ),
-        Language::JavaScript => (
-            languages
-                .and_then(|value| value.javascript.clone())
-                .unwrap_or_default(),
-            GeneratedCodeMode::Analyze,
-        ),
-        Language::TypeScript => (
-            languages
-                .and_then(|value| value.typescript.clone())
-                .unwrap_or_default(),
-            GeneratedCodeMode::Analyze,
-        ),
+        Language::Rust => languages
+            .and_then(|value| value.rust.clone())
+            .map(|value| (value.features, value.generated_code))
+            .unwrap_or_default(),
+        Language::Python => languages
+            .and_then(|value| value.python.clone())
+            .map(|value| (value.features, value.generated_code))
+            .unwrap_or_default(),
+        Language::JavaScript => languages
+            .and_then(|value| value.javascript.clone())
+            .map(|value| (value.features, value.generated_code))
+            .unwrap_or_default(),
+        Language::TypeScript => languages
+            .and_then(|value| value.typescript.clone())
+            .map(|value| (value.features, value.generated_code))
+            .unwrap_or_default(),
         Language::Go => languages
             .and_then(|value| value.go.clone())
             .map(|value| (value.features, value.generated_code))
@@ -191,13 +224,20 @@ mod tests {
         }
     }
 
+    fn standard(features: LanguageFeatures) -> crate::config::StandardLanguageConfig {
+        crate::config::StandardLanguageConfig {
+            features,
+            ..Default::default()
+        }
+    }
+
     fn feature_matrix_policy() -> AnalysisPolicy {
         AnalysisPolicy::from_config(&DebtmapConfig {
             languages: Some(LanguagesConfig {
-                rust: Some(features(true, false, false)),
-                python: Some(features(false, true, false)),
-                javascript: Some(features(false, false, true)),
-                typescript: Some(features(true, true, false)),
+                rust: Some(standard(features(true, false, false))),
+                python: Some(standard(features(false, true, false))),
+                javascript: Some(standard(features(false, false, true))),
+                typescript: Some(standard(features(true, true, false))),
                 go: Some(GoLanguageConfig {
                     features: features(true, false, true),
                     ..GoLanguageConfig::default()
@@ -240,14 +280,14 @@ mod tests {
     fn javascript_and_typescript_have_independent_features() {
         let config = DebtmapConfig {
             languages: Some(LanguagesConfig {
-                javascript: Some(LanguageFeatures {
+                javascript: Some(standard(LanguageFeatures {
                     detect_complexity: false,
                     ..LanguageFeatures::default()
-                }),
-                typescript: Some(LanguageFeatures {
+                })),
+                typescript: Some(standard(LanguageFeatures {
                     detect_complexity: true,
                     ..LanguageFeatures::default()
-                }),
+                })),
                 ..LanguagesConfig::default()
             }),
             ..DebtmapConfig::default()
@@ -256,6 +296,113 @@ mod tests {
 
         assert!(!policy.allows(Language::JavaScript, AnalysisFeature::Complexity));
         assert!(policy.allows(Language::TypeScript, AnalysisFeature::Complexity));
+    }
+
+    #[test]
+    fn standard_language_generated_modes_round_trip_from_toml() {
+        let config: DebtmapConfig = toml::from_str(
+            r#"
+[languages.rust]
+generated_code = "exclude"
+
+[languages.python]
+generated_code = "suppress_debt"
+
+[languages.javascript]
+generated_code = "analyze"
+
+[languages.typescript]
+generated_code = "exclude"
+"#,
+        )
+        .unwrap();
+        let policy = AnalysisPolicy::from_config(&config);
+
+        let expected = [
+            (Language::Rust, GeneratedCodeMode::Exclude),
+            (Language::Python, GeneratedCodeMode::SuppressDebt),
+            (Language::JavaScript, GeneratedCodeMode::Analyze),
+            (Language::TypeScript, GeneratedCodeMode::Exclude),
+        ];
+        for (language, mode) in expected {
+            assert_eq!(policy.for_language(language).unwrap().generated_code, mode);
+        }
+        let serialized = toml::to_string(&config).unwrap();
+        let reparsed: DebtmapConfig = toml::from_str(&serialized).unwrap();
+        assert_eq!(
+            AnalysisPolicy::from_config(&reparsed).languages,
+            policy.languages
+        );
+    }
+
+    #[test]
+    fn generated_suppression_applies_to_all_six_languages() {
+        let config: DebtmapConfig = toml::from_str(
+            r#"
+[languages.rust]
+generated_code = "suppress_debt"
+[languages.python]
+generated_code = "suppress_debt"
+[languages.javascript]
+generated_code = "suppress_debt"
+[languages.typescript]
+generated_code = "suppress_debt"
+[languages.go]
+generated_code = "suppress_debt"
+[languages.solidity]
+vendor_code = "suppress_debt"
+"#,
+        )
+        .unwrap();
+        let policy = AnalysisPolicy::from_config(&config);
+        let fixtures = [
+            ("generated/model.rs", Language::Rust, "// generated"),
+            ("generated/model.py", Language::Python, "# generated"),
+            ("generated/model.js", Language::JavaScript, "// generated"),
+            ("generated/model.ts", Language::TypeScript, "// generated"),
+            (
+                "service.pb.go",
+                Language::Go,
+                "// Code generated by protoc. DO NOT EDIT.\npackage api",
+            ),
+            (
+                "Generated.sol",
+                Language::Solidity,
+                "// Generated. DO NOT EDIT\npragma solidity 0.8.20;",
+            ),
+        ];
+
+        for (path, language, source) in fixtures {
+            let filtered = policy
+                .apply_file_metrics(file_metrics(path, language), source)
+                .unwrap();
+            assert!(filtered.debt_items.is_empty(), "language: {language}");
+        }
+    }
+
+    fn file_metrics(path: &str, language: Language) -> FileMetrics {
+        let path = std::path::PathBuf::from(path);
+        FileMetrics {
+            path: path.clone(),
+            language,
+            complexity: Default::default(),
+            debt_items: vec![crate::core::DebtItem {
+                id: "todo".into(),
+                debt_type: DebtType::Todo { reason: None },
+                priority: crate::core::Priority::Low,
+                file: path,
+                line: 1,
+                column: None,
+                message: "todo".into(),
+                context: None,
+            }],
+            dependencies: Vec::new(),
+            duplications: Vec::new(),
+            total_lines: 1,
+            test_lines: 0,
+            module_scope: None,
+            classes: None,
+        }
     }
 
     #[test]

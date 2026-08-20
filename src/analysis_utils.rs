@@ -296,6 +296,8 @@ fn analyze_single_file_direct(
         .ok()?;
     let ext = file_path.extension()?.to_str()?;
     let language = Language::from_extension(ext);
+    let generated =
+        crate::analysis::generated_code::is_generated_or_vendor(file_path, language, &content);
 
     (language != Language::Unknown)
         .then(|| {
@@ -304,13 +306,14 @@ fn analyze_single_file_direct(
                 .unwrap_or(false);
             let analyzer = analyzers::get_analyzer_with_context(language, context_aware);
             analyzers::analyze_file(content, file_path.to_path_buf(), analyzer.as_ref())
-                .map(|metrics| policy.filter_file_metrics(metrics))
+                .map(|metrics| policy.apply_file_metrics_with_generated(metrics, generated))
         })?
         .map_err(|e| {
             eprintln!("Warning: Failed to analyze {}: {}", file_path.display(), e);
             e
         })
         .ok()
+        .flatten()
 }
 
 #[cfg(test)]
