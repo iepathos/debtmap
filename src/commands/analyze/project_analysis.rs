@@ -256,8 +256,12 @@ fn parse_and_extract_metrics_hybrid(
 
     // Combine metrics
     let legacy_failures = legacy_outcomes.failure_count();
-    let mut all_metrics = extracted_metrics;
-    all_metrics.extend(legacy_outcomes.successes);
+    let policy = crate::config::AnalysisPolicy::from_config(crate::config::get_config());
+    let mut all_metrics: Vec<_> = extracted_metrics
+        .into_iter()
+        .chain(legacy_outcomes.successes)
+        .map(|metrics| policy.filter_file_metrics(metrics))
+        .collect();
     let failed = extraction_failures + legacy_failures;
 
     // Sort metrics by path to ensure deterministic analysis results (spec 214 fix)

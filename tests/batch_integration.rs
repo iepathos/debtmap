@@ -7,8 +7,8 @@ use debtmap::analyzers::batch::{
     analyze_files_effect, analyze_single_file_effect, validate_and_analyze_files, validate_files,
 };
 use debtmap::config::{
-    BatchAnalysisConfig, DebtmapConfig, GeneratedCodeMode, GoLanguageConfig, LanguagesConfig,
-    ParallelConfig, SolidityLanguageConfig,
+    BatchAnalysisConfig, DebtmapConfig, GeneratedCodeMode, GoLanguageConfig, LanguageFeatures,
+    LanguagesConfig, ParallelConfig, SolidityLanguageConfig,
 };
 use debtmap::effects::{run_effect, run_validation};
 use std::fs;
@@ -553,6 +553,45 @@ func Generated(ok bool) int {
             }
         }
     }
+}
+
+#[test]
+fn single_and_batch_go_analysis_filter_disabled_complexity() {
+    let source = r#"package service
+
+func Complex(value int) int {
+    if value > 0 { return 1 }; if value > 1 { return 2 }
+    if value > 2 { return 3 }; if value > 3 { return 4 }
+    if value > 4 { return 5 }; if value > 5 { return 6 }
+    if value > 6 { return 7 }; if value > 7 { return 8 }
+    if value > 8 { return 9 }; if value > 9 { return 10 }
+    if value > 10 { return 11 }
+    return 0
+}
+"#;
+    let (_temp_dir, paths) = create_test_project(&[("service.go", source)]);
+    let config = DebtmapConfig {
+        languages: Some(LanguagesConfig {
+            go: Some(GoLanguageConfig {
+                features: LanguageFeatures {
+                    detect_complexity: false,
+                    ..LanguageFeatures::default()
+                },
+                generated_code: GeneratedCodeMode::Analyze,
+            }),
+            ..LanguagesConfig::default()
+        }),
+        ..DebtmapConfig::default()
+    };
+
+    let single = run_effect(analyze_single_file_effect(paths[0].clone()), config.clone())
+        .expect("single analysis");
+    let batch = run_effect(analyze_files_effect(paths), config).expect("batch analysis");
+
+    assert!(single.metrics.debt_items.is_empty());
+    assert!(single.debt_items.is_empty());
+    assert_eq!(single.debt_items, batch[0].debt_items);
+    assert_eq!(single.metrics.debt_items, batch[0].metrics.debt_items);
 }
 
 #[test]

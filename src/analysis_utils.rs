@@ -214,6 +214,7 @@ pub fn analyze_single_file_with_timeout(
     file_path: &Path,
     timeout_secs: Option<u64>,
 ) -> Option<FileMetrics> {
+    let policy = crate::config::AnalysisPolicy::from_config(crate::config::get_config());
     let timeout = timeout_secs
         .or_else(|| {
             std::env::var("DEBTMAP_FILE_TIMEOUT")
@@ -231,7 +232,7 @@ pub fn analyze_single_file_with_timeout(
 
     // Quick path for small timeout or debugging
     if effective_timeout == 0 || std::env::var("DEBTMAP_NO_TIMEOUT").is_ok() {
-        return analyze_single_file_direct(file_path);
+        return analyze_single_file_direct(file_path, &policy);
     }
 
     // Set up timeout mechanism
@@ -241,7 +242,7 @@ pub fn analyze_single_file_with_timeout(
     let handle = match thread::Builder::new()
         .stack_size(crate::cli::MAIN_STACK_SIZE)
         .spawn(move || {
-            let result = analyze_single_file_direct(&path_clone);
+            let result = analyze_single_file_direct(&path_clone, &policy);
             let _ = tx.send(result); // Ignore if main thread has timed out
         }) {
         Ok(handle) => handle,
@@ -279,7 +280,10 @@ pub fn analyze_single_file_with_timeout(
     }
 }
 
-fn analyze_single_file_direct(file_path: &Path) -> Option<FileMetrics> {
+fn analyze_single_file_direct(
+    file_path: &Path,
+    policy: &crate::config::AnalysisPolicy,
+) -> Option<FileMetrics> {
     let content = io::read_file(file_path)
         .map_err(|e| {
             eprintln!(
@@ -300,6 +304,7 @@ fn analyze_single_file_direct(file_path: &Path) -> Option<FileMetrics> {
                 .unwrap_or(false);
             let analyzer = analyzers::get_analyzer_with_context(language, context_aware);
             analyzers::analyze_file(content, file_path.to_path_buf(), analyzer.as_ref())
+                .map(|metrics| policy.filter_file_metrics(metrics))
         })?
         .map_err(|e| {
             eprintln!("Warning: Failed to analyze {}: {}", file_path.display(), e);

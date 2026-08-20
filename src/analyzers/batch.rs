@@ -173,6 +173,7 @@ pub fn analyze_files_effect(paths: Vec<PathBuf>) -> AnalysisEffect<Vec<FileAnaly
 
         let generated_mode = go_generated_code_mode(config);
         let solidity_config = solidity_config_from_debtmap(config);
+        let policy = crate::config::AnalysisPolicy::from_config(config);
 
         analyze_files_parallel_with_mode(
             &paths,
@@ -181,6 +182,7 @@ pub fn analyze_files_effect(paths: Vec<PathBuf>) -> AnalysisEffect<Vec<FileAnaly
             generated_mode,
             solidity_config,
         )
+        .map(|results| filter_file_results(results, &policy))
     })
     .boxed()
 }
@@ -198,17 +200,51 @@ pub fn analyze_single_file_effect(path: PathBuf) -> AnalysisEffect<FileAnalysisR
         let config = env.config();
         let generated_mode = go_generated_code_mode(config);
         let solidity_config = solidity_config_from_debtmap(config);
+        let policy = crate::config::AnalysisPolicy::from_config(config);
         if should_exclude_go_file(&path, &content, generated_mode)
             || should_exclude_solidity_file(&path, &content, &solidity_config)
         {
             return Ok(excluded_file_result(&path, &content));
         }
         analyze_file_content_with_config(&path, &content, false, generated_mode, &solidity_config)
+            .map(|result| filter_file_result(result, &policy))
             .map_err(|e| {
                 AnalysisError::analysis(format!("Analysis failed for '{}': {}", path_display, e))
             })
     })
     .boxed()
+}
+
+fn filter_file_results(
+    results: Vec<FileAnalysisResult>,
+    policy: &crate::config::AnalysisPolicy,
+) -> Vec<FileAnalysisResult> {
+    results
+        .into_iter()
+        .map(|result| filter_file_result(result, policy))
+        .collect()
+}
+
+fn filter_file_result(
+    result: FileAnalysisResult,
+    policy: &crate::config::AnalysisPolicy,
+) -> FileAnalysisResult {
+    let FileAnalysisResult {
+        path,
+        metrics,
+        analysis_time,
+        package_name,
+        ..
+    } = result;
+    let metrics = policy.filter_file_metrics(metrics);
+    let debt_items = metrics.debt_items.clone();
+    FileAnalysisResult {
+        path,
+        metrics,
+        debt_items,
+        analysis_time,
+        package_name,
+    }
 }
 
 fn excluded_file_result(path: &Path, content: &str) -> FileAnalysisResult {

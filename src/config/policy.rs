@@ -1,7 +1,7 @@
 //! Immutable, language-aware analysis policy.
 
 use super::{DebtmapConfig, GeneratedCodeMode, LanguageFeatures};
-use crate::core::Language;
+use crate::core::{FileMetrics, Language};
 use crate::priority::DebtType;
 use serde::{Deserialize, Serialize};
 
@@ -91,6 +91,27 @@ impl AnalysisPolicy {
             _ => self
                 .for_language(language)
                 .is_none_or(|policy| policy.enabled),
+        }
+    }
+
+    pub fn filter_file_metrics(&self, metrics: FileMetrics) -> FileMetrics {
+        let fallback_language = metrics.language;
+        let debt_items = metrics
+            .debt_items
+            .into_iter()
+            .filter(|item| {
+                let detected = Language::from_path(&item.file);
+                let language = if detected != Language::Unknown {
+                    detected
+                } else {
+                    fallback_language
+                };
+                self.allows_debt_type(language, &item.debt_type)
+            })
+            .collect();
+        FileMetrics {
+            debt_items,
+            ..metrics
         }
     }
 }
@@ -259,6 +280,66 @@ mod tests {
         };
 
         assert!(!policy.allows_debt_type(Language::Go, &debt));
+    }
+
+    #[test]
+    fn file_policy_removes_disabled_debt_and_preserves_other_findings() {
+        let policy = AnalysisPolicy::from_config(&DebtmapConfig {
+            languages: Some(LanguagesConfig {
+                go: Some(GoLanguageConfig {
+                    features: features(false, true, true),
+                    ..GoLanguageConfig::default()
+                }),
+                ..LanguagesConfig::default()
+            }),
+            ..DebtmapConfig::default()
+        });
+        let path = std::path::PathBuf::from("main.go");
+        let debt_items = vec![
+            crate::core::DebtItem {
+                id: "complexity".into(),
+                debt_type: DebtType::Complexity {
+                    cyclomatic: 20,
+                    cognitive: 20,
+                },
+                priority: crate::core::Priority::High,
+                file: path.clone(),
+                line: 1,
+                column: None,
+                message: "complex".into(),
+                context: None,
+            },
+            crate::core::DebtItem {
+                id: "todo".into(),
+                debt_type: DebtType::Todo { reason: None },
+                priority: crate::core::Priority::Low,
+                file: path.clone(),
+                line: 2,
+                column: None,
+                message: "todo".into(),
+                context: None,
+            },
+        ];
+        let metrics = FileMetrics {
+            path,
+            language: Language::Go,
+            complexity: Default::default(),
+            debt_items,
+            dependencies: Vec::new(),
+            duplications: Vec::new(),
+            total_lines: 2,
+            test_lines: 0,
+            module_scope: None,
+            classes: None,
+        };
+
+        let filtered = policy.filter_file_metrics(metrics);
+
+        assert_eq!(filtered.debt_items.len(), 1);
+        assert!(matches!(
+            filtered.debt_items[0].debt_type,
+            DebtType::Todo { .. }
+        ));
     }
 
     #[test]
