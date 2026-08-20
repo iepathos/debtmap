@@ -508,6 +508,70 @@ func hotspot(value int) int {
     );
 }
 
+#[test]
+fn solidity_multi_contract_calls_keep_qualified_dependency_identity() {
+    let fixture = TempDir::new().unwrap();
+    fs::write(
+        fixture.path().join("Combined.sol"),
+        r#"pragma solidity 0.8.20;
+
+contract Alpha {
+    function run(uint256 value) public pure returns (uint256) { return helper(value); }
+    function helper(uint256 value) internal pure returns (uint256) {
+        if (value > 0) return 1; if (value > 1) return 2;
+        if (value > 2) return 3; if (value > 3) return 4;
+        if (value > 4) return 5; if (value > 5) return 6;
+        if (value > 6) return 7; if (value > 7) return 8;
+        if (value > 8) return 9; if (value > 9) return 10;
+        if (value > 10) return 11; return 0;
+    }
+}
+
+contract Beta {
+    function run(uint256 value) public pure returns (uint256) { return helper(value); }
+    function helper(uint256 value) internal pure returns (uint256) {
+        if (value > 0) return 1; if (value > 1) return 2;
+        if (value > 2) return 3; if (value > 3) return 4;
+        if (value > 4) return 5; if (value > 5) return 6;
+        if (value > 6) return 7; if (value > 7) return 8;
+        if (value > 8) return 9; if (value > 9) return 10;
+        if (value > 10) return 11; return 0;
+    }
+}
+"#,
+    )
+    .unwrap();
+    let parallel = analyze(
+        fixture.path(),
+        &fixture.path().join("solidity-parallel.json"),
+        &["--jobs", "2", "--no-god-object"],
+    );
+    let sequential = analyze(
+        fixture.path(),
+        &fixture.path().join("solidity-sequential.json"),
+        &["--no-parallel", "--no-god-object"],
+    );
+    assert_eq!(
+        canonical_report(parallel.clone(), fixture.path()),
+        canonical_report(sequential, fixture.path())
+    );
+    for function in ["Alpha.helper", "Beta.helper"] {
+        let item = parallel["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|item| item["location"]["function"] == function)
+            .unwrap_or_else(|| panic!("missing {function}"));
+        assert_eq!(item["dependencies"]["upstream_count"], 1);
+        assert!(
+            item["scoring_details"]["dependency_score"]
+                .as_f64()
+                .unwrap()
+                > 0.0
+        );
+    }
+}
+
 fn canonical_report(mut report: Value, root: &Path) -> Value {
     report["metadata"]["generated_at"] = Value::String("<time>".into());
     report["receipt"]["reference_time"] = Value::String("<time>".into());

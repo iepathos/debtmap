@@ -24,11 +24,8 @@ pub fn compute_call_edges(
         .iter()
         .filter(|snapshot| snapshot.language == Language::Solidity)
     {
-        let Some(caller_contract) = index.contract_for_file(&snapshot.path) else {
-            continue;
-        };
-
         for function in &snapshot.functions {
+            let (caller_contract, _) = split_qualified_name(function);
             let downstream: Vec<_> = index
                 .calls_for_function(&snapshot.path, function)
                 .iter()
@@ -51,7 +48,6 @@ struct SolidityCallIndex {
     contracts: HashMap<String, ContractRecord>,
     functions_by_contract_method: HashMap<(String, String), Vec<String>>,
     import_symbols: HashMap<PathBuf, HashMap<String, String>>,
-    file_contracts: HashMap<PathBuf, String>,
     function_calls: HashMap<(PathBuf, String), Vec<SolidityCallShape>>,
 }
 
@@ -105,10 +101,6 @@ impl SolidityCallIndex {
         self.import_symbols.insert(ast.path.clone(), imports);
         ingest_contracts(ast.tree.root_node(), ast, self);
         ingest_function_calls(ast.tree.root_node(), ast, None, self);
-    }
-
-    fn contract_for_file(&self, file: &Path) -> Option<String> {
-        self.file_contracts.get(file).cloned()
     }
 
     fn calls_for_function(&self, file: &Path, qualified_name: &str) -> Vec<SolidityCallShape> {
@@ -271,10 +263,6 @@ fn ingest_contracts(
     index: &mut SolidityCallIndex,
 ) {
     if let Some(record) = contract_record(node, ast) {
-        index
-            .file_contracts
-            .entry(ast.path.clone())
-            .or_insert_with(|| record.name.clone());
         index.contracts.insert(record.name.clone(), record);
     }
 
@@ -643,5 +631,32 @@ contract Caller {
         let caller = &snapshots[2];
         let edges = compute_call_edges(&snapshots);
         assert!(!edges.contains_key(&(caller.path.clone(), "Caller.dispatch".to_string())));
+    }
+
+    #[test]
+    fn test_each_contract_in_one_file_keeps_its_caller_identity() {
+        let (_temp, snapshots) = snapshot_fixture(&[(
+            "Combined.sol",
+            r#"pragma solidity 0.8.20;
+contract Alpha {
+    function run() public { helper(); }
+    function helper() internal {}
+}
+contract Beta {
+    function run() public { helper(); }
+    function helper() internal {}
+}"#,
+        )]);
+
+        let edges = compute_call_edges(&snapshots);
+
+        assert_eq!(
+            edges.get(&(snapshots[0].path.clone(), "Alpha.run".to_string())),
+            Some(&vec!["Alpha.helper".to_string()])
+        );
+        assert_eq!(
+            edges.get(&(snapshots[0].path.clone(), "Beta.run".to_string())),
+            Some(&vec!["Beta.helper".to_string()])
+        );
     }
 }
