@@ -5,7 +5,7 @@ mod blocks;
 #[cfg(test)]
 mod tests;
 
-use blocks::{exact_blocks, exact_blocks_not_in_pairs, fuzzy_block, sort_blocks};
+use blocks::{exact_blocks_not_in_pairs, fuzzy_block, sort_blocks};
 
 pub(super) struct SimilarityChunk {
     normalized: String,
@@ -32,11 +32,11 @@ pub(super) fn group_similar_chunks(
     min_lines: usize,
     threshold: f64,
 ) -> Vec<DuplicationBlock> {
-    let groups = group_exact_content(chunks);
     if threshold == 1.0 {
-        return exact_blocks(&groups, min_lines);
+        return exact_hash_blocks(chunks, min_lines);
     }
 
+    let groups = group_exact_content(chunks);
     let pairs = matching_pairs(&groups, threshold);
     let fuzzy_groups: BTreeSet<_> = pairs.iter().flat_map(|pair| [pair.0, pair.1]).collect();
     let mut blocks = exact_blocks_not_in_pairs(&groups, &fuzzy_groups, min_lines);
@@ -47,6 +47,51 @@ pub(super) fn group_similar_chunks(
     );
     sort_blocks(&mut blocks);
     blocks
+}
+
+fn exact_hash_blocks(chunks: Vec<SimilarityChunk>, min_lines: usize) -> Vec<DuplicationBlock> {
+    let buckets = chunks.into_iter().fold(
+        BTreeMap::<u64, Vec<SimilarityChunk>>::new(),
+        |mut buckets, chunk| {
+            let hash = xxhash_rust::xxh64::xxh64(chunk.normalized.as_bytes(), 0);
+            buckets.entry(hash).or_default().push(chunk);
+            buckets
+        },
+    );
+    let mut blocks: Vec<_> = buckets
+        .into_iter()
+        .filter(|(_, chunks)| chunks.len() > 1)
+        .flat_map(|(hash, chunks)| verified_exact_blocks(hash, chunks, min_lines))
+        .collect();
+    sort_blocks(&mut blocks);
+    blocks
+}
+
+fn verified_exact_blocks(
+    hash: u64,
+    chunks: Vec<SimilarityChunk>,
+    min_lines: usize,
+) -> Vec<DuplicationBlock> {
+    chunks
+        .into_iter()
+        .fold(
+            BTreeMap::<String, Vec<DuplicationLocation>>::new(),
+            |mut contents, chunk| {
+                contents
+                    .entry(chunk.normalized)
+                    .or_default()
+                    .push(chunk.location);
+                contents
+            },
+        )
+        .into_values()
+        .filter(|locations| locations.len() > 1)
+        .map(|locations| DuplicationBlock {
+            hash,
+            lines: min_lines,
+            locations,
+        })
+        .collect()
 }
 
 pub(super) fn calculate_similarity(left: &str, right: &str) -> f64 {

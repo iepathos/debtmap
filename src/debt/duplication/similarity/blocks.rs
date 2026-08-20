@@ -3,16 +3,6 @@ use crate::core::{DuplicationBlock, DuplicationLocation};
 use std::collections::BTreeSet;
 use xxhash_rust::xxh64::xxh64;
 
-pub(super) fn exact_blocks(groups: &[ContentGroup], min_lines: usize) -> Vec<DuplicationBlock> {
-    let mut blocks: Vec<_> = groups
-        .iter()
-        .filter(|group| group.locations.len() > 1)
-        .map(|group| exact_block(group, min_lines))
-        .collect();
-    sort_blocks(&mut blocks);
-    blocks
-}
-
 pub(super) fn exact_blocks_not_in_pairs(
     groups: &[ContentGroup],
     fuzzy_groups: &BTreeSet<usize>,
