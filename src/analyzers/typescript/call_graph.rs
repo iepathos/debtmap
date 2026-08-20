@@ -161,7 +161,7 @@ fn resolution_from_candidates(
 }
 
 /// Extract all functions with their call information
-fn extract_functions_with_calls(ast: &TypeScriptAst) -> Vec<FunctionWithCalls> {
+pub(crate) fn extract_functions_with_calls(ast: &TypeScriptAst) -> Vec<FunctionWithCalls> {
     let mut functions = Vec::new();
     let root = ast.tree.root_node();
 

@@ -336,8 +336,8 @@ pub fn process_typescript_files_for_call_graph(
     call_graph: &mut priority::CallGraph,
     js_ts_files: Option<&[PathBuf]>,
 ) -> Result<()> {
-    use crate::analyzers::typescript::call_graph::extract_call_graph;
     use crate::analyzers::typescript::parser::parse_source;
+    use crate::analyzers::typescript::project_call_graph::extract_project_call_graph;
     use crate::core::ast::JsLanguageVariant;
 
     // Discover or use provided files
@@ -359,6 +359,7 @@ pub fn process_typescript_files_for_call_graph(
 
     log::info!("Processing {} JS/TS files for call graph", files.len());
 
+    let mut asts = Vec::new();
     for file_path in &files {
         // Read file content
         let content = match io::read_file(file_path) {
@@ -385,10 +386,9 @@ pub fn process_typescript_files_for_call_graph(
             }
         };
 
-        // Extract call graph and merge
-        let file_call_graph = extract_call_graph(&ast);
-        call_graph.merge(file_call_graph);
+        asts.push(ast);
     }
+    call_graph.merge(extract_project_call_graph(&asts));
 
     log::info!(
         "Merged JS/TS call graph: {} total functions",
