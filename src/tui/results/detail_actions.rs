@@ -211,6 +211,7 @@ pub fn classify_detail_key(key: KeyEvent, _ctx: DetailActionContext) -> Option<D
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tui::results::detail_shortcuts::DETAIL_SHORTCUTS;
     use crossterm::event::KeyModifiers;
 
     /// Create a KeyEvent from a KeyCode.
@@ -391,6 +392,23 @@ mod tests {
             classify_detail_key(key(KeyCode::Char(']')), ctx),
             Some(DetailAction::NextGroupItem)
         );
+    }
+
+    #[test]
+    fn displayed_shortcuts_map_to_supported_detail_actions() {
+        let ctx = DetailActionContext::new(DetailPage::Overview);
+
+        for shortcut in DETAIL_SHORTCUTS {
+            for binding in shortcut.bindings {
+                let key = KeyEvent::new(binding.code, binding.modifiers);
+                assert_eq!(
+                    classify_detail_key(key, ctx),
+                    Some(binding.action),
+                    "displayed shortcut {} must remain supported",
+                    shortcut.keys
+                );
+            }
+        }
     }
 
     // ============================================================================

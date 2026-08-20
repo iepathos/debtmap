@@ -1,7 +1,7 @@
 //! Detail view rendering for selected debt item.
 
 use super::detail_pages;
-use super::{app::ResultsApp, detail_page::DetailPage};
+use super::{app::ResultsApp, detail_page::DetailPage, detail_shortcuts::DETAIL_SHORTCUTS};
 use crate::tui::theme::Theme;
 use ratatui::{
     Frame,
@@ -137,10 +137,13 @@ fn render_header(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
     // Apply horizontal margin per DESIGN.md
     let header_area = apply_horizontal_margin(area);
 
-    let header = Paragraph::new(vec![Line::from(vec![Span::styled(
-        position,
-        Style::default().fg(theme.accent()),
-    )])])
+    let header = Paragraph::new(vec![
+        Line::from(Span::styled(position, Style::default().fg(theme.accent()))),
+        Line::from(Span::styled(
+            format!("debtmap v{}", env!("CARGO_PKG_VERSION")),
+            Style::default().fg(theme.muted),
+        )),
+    ])
     .block(Block::default().borders(Borders::BOTTOM));
 
     frame.render_widget(header, header_area);
@@ -151,19 +154,7 @@ fn render_header(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
 /// Uses a minimal footer with essential hints only.
 /// Full keybindings are available via `?` help overlay.
 fn render_footer(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme) {
-    // Condensed shortcuts - essential actions only, `?` for full help
-    let shortcuts = Line::from(vec![
-        Span::styled("q/Esc", Style::default().fg(theme.accent())),
-        Span::raw(":Back  "),
-        Span::styled("←/→", Style::default().fg(theme.accent())),
-        Span::raw(":Pages  "),
-        Span::styled("j/k", Style::default().fg(theme.accent())),
-        Span::raw(":Locations  "),
-        Span::styled("[ / ]", Style::default().fg(theme.accent())),
-        Span::raw(":Findings  "),
-        Span::styled("?", Style::default().fg(theme.accent())),
-        Span::raw(":Help"),
-    ]);
+    let shortcuts = detail_footer_shortcuts(theme);
 
     // If there's a status message, show it on first line, shortcuts on second
     let lines = if let Some(status) = app.status_message() {
@@ -190,4 +181,18 @@ fn render_footer(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
     let footer = Paragraph::new(lines).block(Block::default().borders(Borders::TOP));
 
     frame.render_widget(footer, footer_area);
+}
+
+fn detail_footer_shortcuts(theme: &Theme) -> Line<'static> {
+    let spans = DETAIL_SHORTCUTS
+        .iter()
+        .filter_map(|shortcut| shortcut.footer)
+        .flat_map(|(keys, description)| {
+            [
+                Span::styled(keys, Style::default().fg(theme.accent())),
+                Span::raw(format!(":{description}  ")),
+            ]
+        })
+        .collect::<Vec<_>>();
+    Line::from(spans)
 }

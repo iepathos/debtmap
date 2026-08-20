@@ -70,12 +70,14 @@ fn execute_list_action(app: &mut ResultsApp, action: ListAction) -> Result<bool>
             let count = app.item_count();
             app.list_mut().set_selected_index(0, count);
             app.list_mut().set_scroll_offset(0);
+            app.nav_mut().reset_detail_group_item();
         }
 
         ListAction::JumpToBottom => {
             let last = app.item_count().saturating_sub(1);
             let count = app.item_count();
             app.list_mut().set_selected_index(last, count);
+            app.nav_mut().reset_detail_group_item();
             adjust_scroll(app);
         }
 

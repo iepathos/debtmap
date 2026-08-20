@@ -330,22 +330,26 @@ impl ResultsApp {
     pub fn apply_search(&mut self) {
         self.query.apply_search(&self.analysis);
         self.list.reset();
+        self.nav.reset_detail_group_item();
     }
 
     /// Set sort criteria (coordinates query with analysis).
     pub fn set_sort_by(&mut self, criteria: super::sort::SortCriteria) {
         self.query.set_sort_by(criteria, &self.analysis);
+        self.nav.reset_detail_group_item();
     }
 
     /// Add filter and reset list (coordinates query with analysis).
     pub fn add_filter(&mut self, filter: super::filter::Filter) {
         self.query.add_filter(filter, &self.analysis);
         self.list.reset();
+        self.nav.reset_detail_group_item();
     }
 
     /// Clear filters (coordinates query with analysis).
     pub fn clear_filters(&mut self) {
         self.query.clear_filters(&self.analysis);
+        self.nav.reset_detail_group_item();
     }
 }
 

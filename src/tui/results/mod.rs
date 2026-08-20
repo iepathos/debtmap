@@ -24,6 +24,7 @@ pub mod app;
 pub mod detail_actions;
 pub mod detail_page;
 pub mod detail_pages;
+pub mod detail_shortcuts;
 pub mod detail_view;
 pub mod filter;
 pub mod grouping;
@@ -39,6 +40,9 @@ pub mod query_state;
 pub mod search;
 pub mod sort;
 pub mod view_mode;
+
+#[cfg(test)]
+mod render_tests;
 
 use anyhow::Result;
 use crossterm::{

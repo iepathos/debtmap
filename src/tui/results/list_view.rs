@@ -195,7 +195,7 @@ fn render_header(frame: &mut Frame, app: &ResultsApp, area: Rect, theme: &Theme)
 
     let header_text = vec![
         Line::from(vec![
-            Span::raw("debtmap results"),
+            Span::raw(format!("debtmap v{} results", env!("CARGO_PKG_VERSION"))),
             Span::raw("  "),
             Span::styled(
                 count_display.to_string(),
