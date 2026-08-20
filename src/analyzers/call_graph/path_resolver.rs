@@ -81,6 +81,7 @@ impl PathResolver {
         // Sort all Vec<FunctionId> in the index for perfectly stable lookups (Spec 214)
         for funcs in index.values_mut() {
             funcs.sort();
+            funcs.dedup();
         }
 
         self.function_index = index;
@@ -192,15 +193,11 @@ impl PathResolver {
         if let Some(simple_name) = normalized_name.split("::").last()
             && let Some(candidates) = self.function_index.get(simple_name)
         {
-            for func in candidates {
-                let normalized_func_name = CallResolver::strip_generic_params(&func.name);
-                if normalized_func_name == normalized_name {
-                    return Some(func.clone());
-                }
-                if normalized_func_name.ends_with(&normalized_name) {
-                    return Some(func.clone());
-                }
-            }
+            let matches = candidates.iter().filter(|func| {
+                let candidate = CallResolver::strip_generic_params(&func.name);
+                candidate == normalized_name || candidate.ends_with(&normalized_name)
+            });
+            return unique_function(matches);
         }
 
         None
@@ -210,14 +207,11 @@ impl PathResolver {
     fn resolve_through_imports(&self, caller_file: &Path, callee_name: &str) -> Option<FunctionId> {
         let imported_paths = self.import_map.resolve_import(caller_file, callee_name)?;
 
-        // Try each imported path
-        for import_path in &imported_paths {
-            if let Some(func) = self.find_function_by_path(import_path) {
-                return Some(func);
-            }
-        }
-
-        None
+        let candidates: Vec<_> = imported_paths
+            .iter()
+            .filter_map(|path| self.find_function_by_path(path))
+            .collect();
+        unique_function(candidates.iter())
     }
 
     /// Resolve a qualified path like module::function
@@ -320,16 +314,16 @@ impl PathResolver {
         // Use file + name key for O(1) lookup
         let file_key = format!("{:?}:{}", file, name);
         if let Some(funcs) = self.function_index.get(&file_key) {
-            return funcs.first().cloned();
+            return unique_function(funcs.iter());
         }
 
         // Fallback: search by name in the index and filter by file
         if let Some(candidates) = self.function_index.get(name) {
-            for func in candidates {
-                if func.file == file && Self::matches_name(&func.name, name) {
-                    return Some(func.clone());
-                }
-            }
+            return unique_function(
+                candidates
+                    .iter()
+                    .filter(|func| func.file == file && Self::matches_name(&func.name, name)),
+            );
         }
 
         None
@@ -339,19 +333,18 @@ impl PathResolver {
     fn find_function_by_path(&self, path: &str) -> Option<FunctionId> {
         // Try exact match first - O(1) lookup
         if let Some(funcs) = self.function_index.get(path) {
-            return funcs.first().cloned();
+            return unique_function(funcs.iter());
         }
 
         // Try matching by simple name and filtering
         if let Some(base_name) = path.split("::").last()
             && let Some(candidates) = self.function_index.get(base_name)
         {
-            // Filter candidates that match the full path
-            for func in candidates {
-                if func.name == path || func.name.ends_with(&format!("::{}", path)) {
-                    return Some(func.clone());
-                }
-            }
+            return unique_function(
+                candidates.iter().filter(|func| {
+                    func.name == path || func.name.ends_with(&format!("::{}", path))
+                }),
+            );
         }
 
         None
@@ -383,6 +376,12 @@ impl PathResolver {
     pub fn module_tree(&self) -> &ModuleTree {
         &self.module_tree
     }
+}
+
+fn unique_function<'a>(candidates: impl Iterator<Item = &'a FunctionId>) -> Option<FunctionId> {
+    let mut candidates = candidates;
+    let first = candidates.next()?.clone();
+    candidates.next().is_none().then_some(first)
 }
 
 /// Builder for PathResolver

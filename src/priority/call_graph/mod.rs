@@ -20,8 +20,9 @@ mod types;
 #[cfg(test)]
 pub(crate) use types::FunctionNode;
 pub use types::{
-    CallGraph, CallType, ExactFunctionKey, FunctionCall, FunctionId, FuzzyFunctionKey,
-    MatchStrategy, SimpleFunctionKey,
+    CallEdgeEvidence, CallEdgeProvenance, CallGraph, CallSite, CallType, CanonicalSymbolKey,
+    ExactFunctionKey, FunctionCall, FunctionId, FuzzyFunctionKey, MatchStrategy, ResolutionOutcome,
+    SimpleFunctionKey,
 };
 
 // Re-export commonly used functions from CallGraph

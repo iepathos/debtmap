@@ -441,7 +441,7 @@ pub enum DependencyKind {
     Inheritance,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Copy)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Copy)]
 pub enum Language {
     Rust,
     Python,

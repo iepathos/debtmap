@@ -31,13 +31,34 @@ pub use import_map::ImportMap;
 pub use macro_expansion::{MacroExpander, MacroExpansionStats, MacroHandlingConfig};
 pub use module_tree::ModuleTree;
 pub use path_resolver::{PathResolver, PathResolverBuilder};
+
+fn resolution_confidence(call_site: &call_resolution::CallSiteType) -> u8 {
+    match call_site {
+        call_resolution::CallSiteType::Static => 100,
+        call_resolution::CallSiteType::Instance {
+            receiver_type: Some(_),
+        }
+        | call_resolution::CallSiteType::TraitMethod {
+            receiver_type: Some(_),
+            ..
+        } => 95,
+        call_resolution::CallSiteType::Indirect => 75,
+        call_resolution::CallSiteType::Instance {
+            receiver_type: None,
+        }
+        | call_resolution::CallSiteType::TraitMethod {
+            receiver_type: None,
+            ..
+        } => 60,
+    }
+}
 pub use trait_handling::TraitHandler;
 pub use validation::{CallGraphValidator, ValidationReport};
 
 use crate::analyzers::function_registry::FunctionSignatureRegistry;
 use crate::analyzers::type_registry::GlobalTypeRegistry;
 use crate::analyzers::type_tracker::{ScopeKind, TypeTracker};
-use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
+use crate::priority::call_graph::{CallGraph, CallType, FunctionId};
 use std::path::PathBuf;
 use std::sync::Arc;
 use syn::visit::Visit;
@@ -157,19 +178,36 @@ impl CallGraphExtractor {
             let resolver = CallResolver::new(&self.call_graph, &self.current_file);
 
             for unresolved in &self.unresolved_calls {
-                if let Some(callee) = resolver.resolve_call(unresolved) {
-                    resolved_calls.push(FunctionCall {
-                        caller: unresolved.caller.clone(),
-                        callee,
-                        call_type: unresolved.call_type.clone(),
-                    });
+                if let call_resolution::ResolutionOutcome::Resolved(callee) =
+                    resolver.resolve_call_outcome(unresolved)
+                {
+                    resolved_calls.push((unresolved.clone(), callee));
                 }
             }
         }
 
         // Add resolved calls to the graph
-        for call in resolved_calls {
-            self.call_graph.add_call(call);
+        for (unresolved, callee) in resolved_calls {
+            let provenance = match &unresolved.call_site_type {
+                call_resolution::CallSiteType::Static => {
+                    crate::priority::call_graph::CallEdgeProvenance::AstDirect
+                }
+                _ => crate::priority::call_graph::CallEdgeProvenance::TypeResolution,
+            };
+            self.call_graph.add_resolution(
+                unresolved.caller.clone(),
+                unresolved.call_type,
+                crate::priority::call_graph::ResolutionOutcome::Resolved {
+                    target: callee,
+                    provenance,
+                    confidence: resolution_confidence(&unresolved.call_site_type),
+                    call_site: Some(crate::priority::call_graph::CallSite {
+                        file: self.current_file.clone(),
+                        line: unresolved.caller.line,
+                        column: None,
+                    }),
+                },
+            );
         }
     }
 

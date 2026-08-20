@@ -1,11 +1,20 @@
 //! Basic graph operations for adding and querying nodes and edges
 
-use super::types::{CallGraph, CallType, FunctionCall, FunctionId, FunctionNode};
+use super::types::{
+    CallEdgeEvidence, CallEdgeProvenance, CallGraph, CallType, FunctionCall, FunctionId,
+    FunctionNode, ResolutionOutcome,
+};
 use crate::collections::{HashMap, HashSet, Vector};
 use std::path::PathBuf;
 
 impl CallGraph {
     pub fn merge(&mut self, other: CallGraph) {
+        let evidence: std::collections::HashMap<_, _> = other
+            .edge_evidence
+            .iter()
+            .cloned()
+            .map(|evidence| (evidence.call.clone(), evidence))
+            .collect();
         // Merge nodes (use add_function to maintain indexes)
         // Sort nodes for deterministic merging order (Spec 214 fix)
         let mut sorted_nodes: Vec<_> = other.nodes.into_iter().collect();
@@ -23,7 +32,11 @@ impl CallGraph {
 
         // Merge edges
         for call in other.edges {
-            self.add_call(call);
+            if let Some(evidence) = evidence.get(&call) {
+                self.add_call_with_evidence(evidence.clone());
+            } else {
+                self.add_call(call);
+            }
         }
     }
 
@@ -73,10 +86,22 @@ impl CallGraph {
     }
 
     pub fn add_call(&mut self, call: FunctionCall) {
+        self.add_call_with_evidence(CallEdgeEvidence {
+            call,
+            provenance: CallEdgeProvenance::Legacy,
+            confidence: 0,
+            call_site: None,
+        });
+    }
+
+    pub fn add_call_with_evidence(&mut self, mut evidence: CallEdgeEvidence) {
+        evidence.confidence = evidence.confidence.min(100);
+        let call = evidence.call.clone();
         let caller = call.caller.clone();
         let callee = call.callee.clone();
 
         self.edges.push(call);
+        self.edge_evidence.push(evidence);
 
         self.callee_index
             .entry(caller.clone())
@@ -84,6 +109,42 @@ impl CallGraph {
             .insert(callee.clone());
 
         self.caller_index.entry(callee).or_default().insert(caller);
+    }
+
+    /// Add an edge only for a uniquely resolved target already present in the graph.
+    pub fn add_resolution(
+        &mut self,
+        caller: FunctionId,
+        call_type: CallType,
+        outcome: ResolutionOutcome,
+    ) -> bool {
+        let ResolutionOutcome::Resolved {
+            target,
+            provenance,
+            confidence,
+            call_site,
+        } = outcome
+        else {
+            return false;
+        };
+        if !self.nodes.contains_key(&caller) || !self.nodes.contains_key(&target) {
+            return false;
+        }
+        self.add_call_with_evidence(CallEdgeEvidence {
+            call: FunctionCall {
+                caller,
+                callee: target,
+                call_type,
+            },
+            provenance,
+            confidence,
+            call_site,
+        });
+        true
+    }
+
+    pub fn edge_evidence(&self) -> impl Iterator<Item = &CallEdgeEvidence> {
+        self.edge_evidence.iter()
     }
 
     pub fn add_call_parts(&mut self, caller: FunctionId, callee: FunctionId, call_type: CallType) {
@@ -641,6 +702,60 @@ impl CallGraph {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod evidence_tests {
+    use super::*;
+
+    fn id(name: &str) -> FunctionId {
+        FunctionId::new(PathBuf::from("src/lib.rs"), name.into(), 1)
+    }
+
+    #[test]
+    fn ambiguous_resolution_does_not_create_an_edge() {
+        let caller = id("caller");
+        let first = id("first");
+        let second = id("second");
+        let mut graph = CallGraph::new();
+        for function in [&caller, &first, &second] {
+            graph.add_function(function.clone(), false, false, 1, 1);
+        }
+
+        let added = graph.add_resolution(
+            caller.clone(),
+            CallType::Direct,
+            ResolutionOutcome::Ambiguous {
+                candidates: vec![first, second],
+            },
+        );
+
+        assert!(!added);
+        assert!(graph.get_callees_exact(&caller).is_empty());
+    }
+
+    #[test]
+    fn resolved_edge_retains_provenance_and_confidence() {
+        let caller = id("caller");
+        let callee = id("callee");
+        let mut graph = CallGraph::new();
+        graph.add_function(caller.clone(), false, false, 1, 1);
+        graph.add_function(callee.clone(), false, false, 1, 1);
+
+        assert!(graph.add_resolution(
+            caller,
+            CallType::Direct,
+            ResolutionOutcome::Resolved {
+                target: callee,
+                provenance: CallEdgeProvenance::ImportResolution,
+                confidence: 95,
+                call_site: None,
+            },
+        ));
+        let evidence = graph.edge_evidence().next().unwrap();
+        assert_eq!(evidence.provenance, CallEdgeProvenance::ImportResolution);
+        assert_eq!(evidence.confidence, 95);
     }
 }
 

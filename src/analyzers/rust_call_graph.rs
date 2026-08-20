@@ -111,12 +111,20 @@ pub fn extract_call_graph_multi_file(files: &[(syn::File, PathBuf)]) -> CallGrap
         for (idx, unresolved) in all_unresolved_calls.iter().enumerate() {
             match resolver.resolve_call_outcome(unresolved) {
                 crate::analyzers::call_graph::ResolutionOutcome::Resolved(callee) => {
-                    resolved_calls.push(crate::priority::call_graph::FunctionCall {
-                        caller: unresolved.caller.clone(),
-                        callee,
-                        call_type: unresolved.call_type.clone(),
+                    resolved_calls.push(crate::priority::call_graph::CallEdgeEvidence {
+                        call: crate::priority::call_graph::FunctionCall {
+                            caller: unresolved.caller.clone(),
+                            callee,
+                            call_type: unresolved.call_type.clone(),
+                        },
+                        provenance: crate::priority::call_graph::CallEdgeProvenance::TypeResolution,
+                        confidence: 90,
+                        call_site: None,
                     });
                     call_resolver_hits += 1;
+                }
+                crate::analyzers::call_graph::ResolutionOutcome::Ambiguous(_) => {
+                    unresolved_count += 1;
                 }
                 crate::analyzers::call_graph::ResolutionOutcome::IgnoredLibraryCall => {}
                 crate::analyzers::call_graph::ResolutionOutcome::Unresolved => {
@@ -125,10 +133,16 @@ pub fn extract_call_graph_multi_file(files: &[(syn::File, PathBuf)]) -> CallGrap
                     if let Some(callee) =
                         path_resolver.resolve_call(&unresolved.caller.file, &unresolved.callee_name)
                     {
-                        resolved_calls.push(crate::priority::call_graph::FunctionCall {
-                            caller: unresolved.caller.clone(),
-                            callee,
-                            call_type: unresolved.call_type.clone(),
+                        resolved_calls.push(crate::priority::call_graph::CallEdgeEvidence {
+                            call: crate::priority::call_graph::FunctionCall {
+                                caller: unresolved.caller.clone(),
+                                callee,
+                                call_type: unresolved.call_type.clone(),
+                            },
+                            provenance:
+                                crate::priority::call_graph::CallEdgeProvenance::ImportResolution,
+                            confidence: 95,
+                            call_site: None,
                         });
                         path_resolver_hits += 1;
                     } else {
@@ -173,8 +187,8 @@ pub fn extract_call_graph_multi_file(files: &[(syn::File, PathBuf)]) -> CallGrap
     );
 
     // Add all resolved calls
-    for call in resolved_calls {
-        combined_graph.add_call(call);
+    for evidence in resolved_calls {
+        combined_graph.add_call_with_evidence(evidence);
     }
 
     // Phase 3: Final cross-file resolution for any remaining unresolved calls

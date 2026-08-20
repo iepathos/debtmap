@@ -51,6 +51,7 @@ pub struct UnresolvedCall {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ResolutionOutcome {
     Resolved(FunctionId),
+    Ambiguous(Vec<FunctionId>),
     IgnoredLibraryCall,
     Unresolved,
 }
@@ -105,7 +106,9 @@ impl<'a> CallResolver<'a> {
     pub fn resolve_call(&self, call: &UnresolvedCall) -> Option<FunctionId> {
         match self.resolve_call_outcome(call) {
             ResolutionOutcome::Resolved(func_id) => Some(func_id),
-            ResolutionOutcome::IgnoredLibraryCall | ResolutionOutcome::Unresolved => None,
+            ResolutionOutcome::Ambiguous(_)
+            | ResolutionOutcome::IgnoredLibraryCall
+            | ResolutionOutcome::Unresolved => None,
         }
     }
 
@@ -270,8 +273,6 @@ impl<'a> CallResolver<'a> {
 
         // Apply resolution strategies
         Self::select_best_candidate(matching_candidates, self.current_file, call.same_file_hint)
-            .map(ResolutionOutcome::Resolved)
-            .unwrap_or(ResolutionOutcome::Unresolved)
     }
 
     /// Pure function to resolve a function call against a list of candidates
@@ -296,7 +297,10 @@ impl<'a> CallResolver<'a> {
         }
 
         // Apply resolution strategies in order of preference
-        Self::select_best_candidate(candidates, current_file, same_file_hint)
+        match Self::select_best_candidate(candidates, current_file, same_file_hint) {
+            ResolutionOutcome::Resolved(candidate) => Some(candidate),
+            _ => None,
+        }
     }
 
     /// Normalize path prefixes in function names
@@ -361,9 +365,9 @@ impl<'a> CallResolver<'a> {
         candidates: Vec<FunctionId>,
         current_file: &PathBuf,
         same_file_hint: bool,
-    ) -> Option<FunctionId> {
-        if candidates.len() == 1 {
-            return candidates.into_iter().next();
+    ) -> ResolutionOutcome {
+        if let [candidate] = candidates.as_slice() {
+            return ResolutionOutcome::Resolved(candidate.clone());
         }
 
         // If there are multiple candidates and no same-file hint, check for true ambiguity
@@ -383,7 +387,7 @@ impl<'a> CallResolver<'a> {
                 // If all have the same exact name and are in different files, it's ambiguous
                 if unique_files.len() == candidates.len() {
                     // All candidates are in different files with same exact name - this is ambiguous
-                    return None;
+                    return ResolutionOutcome::Ambiguous(candidates);
                 }
             }
         }
@@ -394,8 +398,11 @@ impl<'a> CallResolver<'a> {
             .pipe(Self::apply_qualification_preference)
             .pipe(Self::apply_generic_preference);
 
-        // Return the best candidate after applying preferences
-        result.into_iter().next()
+        match result.as_slice() {
+            [candidate] => ResolutionOutcome::Resolved(candidate.clone()),
+            [] => ResolutionOutcome::Unresolved,
+            _ => ResolutionOutcome::Ambiguous(result),
+        }
     }
 
     /// Apply same-file preference filter
