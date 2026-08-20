@@ -198,6 +198,7 @@ fn build_call_graph_stage(
     let (framework_exclusions, function_pointer_used_functions) =
         build_rust_call_graph(&mut call_graph, &options)?;
     process_js_ts_call_graph(results, options.project_path, &mut call_graph);
+    super::go_call_resolution::add_resolved_calls(&mut call_graph, &results.complexity.metrics);
 
     let elapsed = start.elapsed();
     report_stage_complete(1, format!("{} functions", call_graph.node_count()));

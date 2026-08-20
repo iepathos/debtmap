@@ -437,6 +437,77 @@ fn python_import_aliases_contribute_to_shared_dependency_scoring() {
     );
 }
 
+#[test]
+fn go_same_package_calls_contribute_to_shared_dependency_scoring() {
+    let fixture = TempDir::new().unwrap();
+    fs::write(
+        fixture.path().join("analysis.go"),
+        r#"package sample
+
+func alphaEntry(value int) int { return hotspot(value) }
+func betaEntry(value int) int { return hotspot(value + 1) }
+func helper(value int) int { return value * 2 }
+func alternate(value int) int { return value - 1 }
+
+func hotspot(value int) int {
+    if value > 0 {
+        if value > 1 {
+            if value > 2 {
+                if value > 3 {
+                    if value > 4 {
+                        if value > 5 {
+                            if value > 6 {
+                                if value > 7 {
+                                    if value > 8 {
+                                        if value > 9 {
+                                            if value > 10 { return helper(value) }
+                                            return alternate(value)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return 0
+}
+"#,
+    )
+    .unwrap();
+    let parallel = analyze(
+        fixture.path(),
+        &fixture.path().join("go-parallel.json"),
+        &["--jobs", "2", "--no-god-object"],
+    );
+    let sequential = analyze(
+        fixture.path(),
+        &fixture.path().join("go-sequential.json"),
+        &["--no-parallel", "--no-god-object"],
+    );
+    assert_eq!(
+        canonical_report(parallel.clone(), fixture.path()),
+        canonical_report(sequential, fixture.path())
+    );
+    let hotspot = parallel["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["location"]["function"] == "hotspot")
+        .unwrap();
+
+    assert_eq!(hotspot["dependencies"]["upstream_count"], 2);
+    assert_eq!(hotspot["dependencies"]["downstream_count"], 2);
+    assert!(
+        hotspot["scoring_details"]["dependency_score"]
+            .as_f64()
+            .unwrap()
+            > 0.0
+    );
+}
+
 fn canonical_report(mut report: Value, root: &Path) -> Value {
     report["metadata"]["generated_at"] = Value::String("<time>".into());
     report["receipt"]["reference_time"] = Value::String("<time>".into());

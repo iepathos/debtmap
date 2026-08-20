@@ -15,6 +15,7 @@
 
 pub mod call_graph;
 pub mod effect_pipeline;
+mod go_call_resolution;
 pub mod parallel_call_graph;
 pub mod parallel_unified_analysis;
 mod python_call_resolution;
