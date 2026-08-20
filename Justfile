@@ -500,38 +500,17 @@ release:
 
 # === ADVANCED ===
 
-# Profile the application
-profile:
+# Record reproducible built-in phase timings using the debug binary.
+profile path=".":
     #!/usr/bin/env bash
     set -euo pipefail
-
-    profiler=""
-    if command -v perf >/dev/null 2>&1; then
-        profiler="perf"
-    elif [[ "$(uname -s)" == "Darwin" ]]; then
-        if command -v samply >/dev/null 2>&1; then
-            profiler="samply"
-        else
-            echo "No supported profiler found for macOS."
-            echo "Install samply with: cargo install samply"
-            echo "Then rerun: just profile"
-            exit 127
-        fi
-    else
-        echo "No supported profiler found."
-        echo "Install Linux perf or, on macOS, install samply with: cargo install samply"
-        exit 127
-    fi
-
-    cargo build --release
-
-    binary="./target/release/$(basename "$PWD")"
-    if [[ "$profiler" == "perf" ]]; then
-        perf record --call-graph=dwarf "$binary"
-        perf report
-    elif [[ "$profiler" == "samply" ]]; then
-        samply record "$binary"
-    fi
+    output="target/profiling/debtmap-profile.json"
+    mkdir -p "$(dirname "$output")"
+    cargo build
+    ./target/debug/debtmap analyze "{{path}}" \
+        --profile --profile-output "$output" \
+        --quiet --no-tui --no-context-aware
+    echo "Debug profiling report: $output"
 
 # Expand macros for debugging
 expand:

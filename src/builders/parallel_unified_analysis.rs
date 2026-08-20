@@ -14,6 +14,7 @@ use crate::{
     },
     progress::ProgressManager,
     risk::lcov::LcovData,
+    time_span,
 };
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
@@ -684,7 +685,10 @@ impl ParallelUnifiedAnalysisBuilder {
     ) -> Vec<UnifiedDebtItem> {
         let start = Instant::now();
         let prepare_start = Instant::now();
-        self.prepare_file_facts(metrics);
+        {
+            time_span!("prepare_scoring", parent: "debt_scoring");
+            self.prepare_file_facts(metrics);
+        }
         self.timings.prepare_scoring = prepare_start.elapsed();
 
         // Subtask 1: score functions through the shared scheduling kernel.
@@ -717,7 +721,10 @@ impl ParallelUnifiedAnalysisBuilder {
             ScoringExecution::Sequential
         };
         let scoring_start = Instant::now();
-        let items = score_metrics_with_policy(metrics, &input, execution, &self.analysis_policy);
+        let items = {
+            time_span!("score_functions", parent: "debt_scoring");
+            score_metrics_with_policy(metrics, &input, execution, &self.analysis_policy)
+        };
         self.timings.score_functions = scoring_start.elapsed();
 
         self.timings.function_analysis = start.elapsed();
@@ -742,6 +749,7 @@ impl ParallelUnifiedAnalysisBuilder {
         coverage_data: Option<&LcovData>,
         no_god_object: bool,
     ) -> Vec<(FileDebtItem, Vec<FunctionMetrics>)> {
+        time_span!("analyze_files", parent: "debt_scoring");
         let start = Instant::now();
         self.prepare_file_facts(metrics);
 
@@ -873,18 +881,27 @@ impl ParallelUnifiedAnalysisBuilder {
 
         add_unified_items(&mut unified, items);
         let finalize_start = Instant::now();
-        self.add_finalized_file_items(&mut unified, file_data, coverage_data);
-        apply_analysis_policy(&mut unified, &self.analysis_policy);
+        {
+            time_span!("finalize_files", parent: "debt_scoring");
+            self.add_finalized_file_items(&mut unified, file_data, coverage_data);
+            apply_analysis_policy(&mut unified, &self.analysis_policy);
+        }
         self.timings.finalize_files = finalize_start.elapsed();
 
         agg_progress.set_message("Sorting by priority and calculating impact");
         let sorting_start = Instant::now();
-        unified.sort_by_priority();
+        {
+            time_span!("sort_items", parent: "debt_scoring");
+            unified.sort_by_priority();
+        }
         self.timings.sorting = sorting_start.elapsed();
         let impact_start = Instant::now();
-        unified.calculate_total_impact();
+        {
+            time_span!("calculate_impact", parent: "debt_scoring");
+            unified.calculate_total_impact();
+            apply_coverage_summary(&mut unified, coverage_data);
+        }
         self.timings.calculate_impact = impact_start.elapsed();
-        apply_coverage_summary(&mut unified, coverage_data);
         complete_finalization_subtask(total_file_items);
         finish_aggregation_progress(&agg_progress, &unified);
 

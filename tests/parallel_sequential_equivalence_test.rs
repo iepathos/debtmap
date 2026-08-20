@@ -92,6 +92,41 @@ fn clear_analysis_environment(command: &mut Command) {
     }
 }
 
+fn profile_analysis(root: &Path, profile_output: &Path) -> Value {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_debtmap"));
+    command.current_dir(root).args([
+        "analyze",
+        root.to_str().unwrap(),
+        "--profile",
+        "--profile-output",
+        profile_output.to_str().unwrap(),
+        "--quiet",
+        "--no-tui",
+        "--no-context-aware",
+        "--no-god-object",
+    ]);
+    clear_analysis_environment(&mut command);
+    let result = command.output().unwrap();
+    assert!(
+        result.status.success(),
+        "analysis failed: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    serde_json::from_str(&fs::read_to_string(profile_output).unwrap()).unwrap()
+}
+
+fn phase_named<'a>(phases: &'a [Value], name: &str) -> Option<&'a Value> {
+    phases.iter().find_map(|phase| {
+        let children = phase["children"]
+            .as_array()
+            .map(Vec::as_slice)
+            .unwrap_or_default();
+        (phase["name"] == name)
+            .then_some(phase)
+            .or_else(|| phase_named(children, name))
+    })
+}
+
 fn canonical_function_items(report: &Value, root: &Path) -> Vec<Value> {
     let mut items: Vec<_> = report["items"]
         .as_array()
@@ -186,6 +221,31 @@ fn parallel_and_sequential_function_items_have_identical_scores() {
         canonical_report(parallel, fixture.path()),
         canonical_report(sequential, fixture.path())
     );
+}
+
+#[test]
+fn profiling_report_exposes_debt_scoring_subphases() {
+    let fixture = TempDir::new().unwrap();
+    fs::write(fixture.path().join("analysis.rs"), FIXTURE).unwrap();
+    let report = profile_analysis(fixture.path(), &fixture.path().join("profile.json"));
+    let phases = report["phases"].as_array().unwrap();
+    let debt_scoring = phase_named(phases, "debt_scoring").unwrap();
+    let children = debt_scoring["children"].as_array().unwrap();
+    let child_names: Vec<_> = children
+        .iter()
+        .filter_map(|child| child["name"].as_str())
+        .collect();
+
+    for expected in [
+        "prepare_scoring",
+        "score_functions",
+        "analyze_files",
+        "finalize_files",
+        "sort_items",
+        "calculate_impact",
+    ] {
+        assert!(child_names.contains(&expected), "missing {expected}");
+    }
 }
 
 fn canonical_report(mut report: Value, root: &Path) -> Value {
