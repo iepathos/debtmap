@@ -485,19 +485,24 @@ pub fn build_call_graph_from_extracted(
             if final_graph.get_function_info(&function_id).is_some() {
                 continue;
             }
-            let roles = crate::analysis::role_policy::classify_roles(
-                &crate::analysis::role_policy::evidence_for_facts(
-                    crate::analysis::role_policy::RoleFacts {
-                        path,
-                        language: crate::core::Language::from_path(path),
-                        name: &func.qualified_name,
-                        is_test: func.is_test,
-                        in_test_module: func.in_test_module,
-                        visibility: func.visibility.as_deref(),
-                    },
-                ),
+            let facts = crate::analysis::role_policy::evidence_for_facts(
+                crate::analysis::role_policy::RoleFacts {
+                    path,
+                    language: crate::core::Language::from_path(path),
+                    name: &func.qualified_name,
+                    is_test: func.is_test,
+                    in_test_module: func.in_test_module,
+                    visibility: func.visibility.as_deref(),
+                },
             );
-            final_graph.add_function_with_roles(function_id, roles, func.cyclomatic, func.length);
+            let evidence =
+                crate::analysis::role_policy::merge_evidence(&facts, &func.role_evidence);
+            final_graph.add_function_with_evidence(
+                function_id,
+                evidence,
+                func.cyclomatic,
+                func.length,
+            );
         }
     }
 

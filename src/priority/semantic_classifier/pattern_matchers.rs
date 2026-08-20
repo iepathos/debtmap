@@ -51,10 +51,6 @@ pub(crate) fn matches_accessor_name(
     false
 }
 
-pub(crate) fn is_entry_point_by_name(name: &str) -> bool {
-    crate::analysis::role_policy::is_entry_name(name, crate::core::Language::Unknown)
-}
-
 pub(crate) fn is_orchestrator_by_name(name: &str) -> bool {
     let name_lower = name.to_lowercase();
 

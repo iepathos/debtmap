@@ -705,6 +705,7 @@ mod tests {
             visibility: Some("pub".to_string()),
             is_trait_method: false,
             in_test_module: false,
+            role_evidence: Default::default(),
         }
     }
 

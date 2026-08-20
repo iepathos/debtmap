@@ -24,6 +24,12 @@ pub fn is_dead_code(
         return false;
     }
 
+    if call_graph.get_roles(func_id).is_some_and(|roles| {
+        roles.is_test || roles.is_entry_point || roles.is_framework_managed || roles.is_public_api
+    }) {
+        return false;
+    }
+
     // Check if function is definitely used through function pointers
     if let Some(fp_used) = function_pointer_used_functions
         && fp_used.contains(func_id)
@@ -702,6 +708,26 @@ mod tests {
             error_swallowing_patterns: None,
             entropy_analysis: None,
         }
+    }
+
+    #[test]
+    fn framework_role_prevents_dead_code_classification() {
+        let func = create_test_function("callback", None);
+        let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
+        let mut graph = CallGraph::new();
+        graph.add_function_with_evidence(
+            func_id.clone(),
+            crate::analysis::role_policy::RoleEvidence {
+                signals: vec![crate::analysis::role_policy::RoleSignal::Framework {
+                    name: "router".into(),
+                    kind: "callback".into(),
+                }],
+            },
+            func.cyclomatic,
+            func.length,
+        );
+
+        assert!(!is_dead_code(&func, &graph, &func_id, None));
     }
 
     #[test]

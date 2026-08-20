@@ -140,6 +140,9 @@ pub struct ExtractedFunctionData {
     pub is_trait_method: bool,
     /// Is this inside a #[cfg(test)] module
     pub in_test_module: bool,
+    /// Language-adapter evidence for orthogonal code roles.
+    #[serde(default)]
+    pub role_evidence: crate::analysis::role_policy::RoleEvidence,
 }
 
 /// Pre-computed purity analysis results.
@@ -486,6 +489,7 @@ impl ExtractedFunctionData {
             visibility: None,
             is_trait_method: false,
             in_test_module: false,
+            role_evidence: Default::default(),
         }
     }
 }
@@ -513,6 +517,7 @@ impl Default for ExtractedFunctionData {
             visibility: None,
             is_trait_method: false,
             in_test_module: false,
+            role_evidence: Default::default(),
         }
     }
 }
@@ -716,6 +721,7 @@ mod tests {
                 visibility: Some("pub".to_string()),
                 is_trait_method: false,
                 in_test_module: false,
+                role_evidence: Default::default(),
             }],
             structs: Vec::new(),
             impls: Vec::new(),

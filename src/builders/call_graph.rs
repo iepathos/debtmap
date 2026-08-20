@@ -25,14 +25,14 @@ pub fn build_initial_call_graph(metrics: &[FunctionMetrics]) -> priority::CallGr
     let mut call_graph = priority::CallGraph::new();
 
     for metric in metrics {
-        let roles = crate::analysis::role_policy::roles_for_metric(metric);
+        let evidence = crate::analysis::role_policy::evidence_for_metric(metric);
         let func_id = priority::call_graph::FunctionId::new(
             metric.file.clone(),
             metric.name.clone(),
             metric.line,
         );
 
-        call_graph.add_function_with_roles(func_id, roles, metric.cyclomatic, metric.length);
+        call_graph.add_function_with_evidence(func_id, evidence, metric.cyclomatic, metric.length);
     }
 
     call_graph

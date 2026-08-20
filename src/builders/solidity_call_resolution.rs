@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 pub(super) fn add_resolved_calls(graph: &mut CallGraph, metrics: &[FunctionMetrics]) {
+    add_framework_evidence(graph, metrics);
     let functions = production_functions(metrics);
     let edges = compute_call_edges(&snapshots(&functions));
     let targets = target_index(&functions);
@@ -30,6 +31,24 @@ pub(super) fn add_resolved_calls(graph: &mut CallGraph, metrics: &[FunctionMetri
                 ),
             );
         }
+    }
+}
+
+fn add_framework_evidence(graph: &mut CallGraph, metrics: &[FunctionMetrics]) {
+    let mut sources = HashMap::new();
+    for metric in metrics
+        .iter()
+        .filter(|metric| Language::from_path(&metric.file) == Language::Solidity)
+    {
+        let source = sources
+            .entry(metric.file.clone())
+            .or_insert_with(|| std::fs::read_to_string(&metric.file).unwrap_or_default());
+        let evidence = crate::analysis::role_policy::framework_evidence_for_source(
+            Language::Solidity,
+            source,
+            &metric.name,
+        );
+        graph.add_role_evidence(&function_id(metric), evidence);
     }
 }
 
@@ -241,6 +260,26 @@ mod tests {
             graph.edge_evidence().next().unwrap().provenance,
             CallEdgeProvenance::ImportResolution
         );
+    }
+
+    #[test]
+    fn foundry_hook_is_framework_managed_test_evidence() {
+        let project = tempdir().unwrap();
+        let file = project.path().join("Vault.t.sol");
+        fs::write(
+            &file,
+            "import 'forge-std/Test.sol'; contract VaultTest { function setUp() public {} }",
+        )
+        .unwrap();
+        let hook = metric(&file, "VaultTest.setUp", 1);
+        let metrics = vec![hook.clone()];
+        let mut graph = crate::builders::call_graph::build_initial_call_graph(&metrics);
+
+        add_resolved_calls(&mut graph, &metrics);
+
+        let roles = graph.get_roles(&function_id(&hook)).unwrap();
+        assert!(roles.is_test);
+        assert!(roles.is_framework_managed);
     }
 
     fn metric(file: &Path, name: &str, line: usize) -> FunctionMetrics {

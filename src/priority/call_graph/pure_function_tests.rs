@@ -30,6 +30,7 @@ mod tests {
         nodes.insert(
             func1.clone(),
             FunctionNode {
+                role_evidence: Default::default(),
                 roles: Default::default(),
                 id: func1.clone(),
                 is_entry_point: false,
@@ -42,6 +43,7 @@ mod tests {
         nodes.insert(
             func2.clone(),
             FunctionNode {
+                role_evidence: Default::default(),
                 roles: Default::default(),
                 id: func2.clone(),
                 is_entry_point: false,
@@ -115,6 +117,7 @@ mod tests {
         nodes.insert(
             func1.clone(),
             FunctionNode {
+                role_evidence: Default::default(),
                 roles: Default::default(),
                 id: func1.clone(),
                 is_entry_point: false,
@@ -126,6 +129,7 @@ mod tests {
         nodes.insert(
             func2.clone(),
             FunctionNode {
+                role_evidence: Default::default(),
                 roles: Default::default(),
                 id: func2.clone(),
                 is_entry_point: false,
@@ -137,6 +141,7 @@ mod tests {
         nodes.insert(
             func3.clone(),
             FunctionNode {
+                role_evidence: Default::default(),
                 roles: Default::default(),
                 id: func3.clone(),
                 is_entry_point: false,
@@ -177,6 +182,7 @@ mod tests {
     #[test]
     fn test_is_production_entry_point() {
         let node_entry = FunctionNode {
+            role_evidence: Default::default(),
             roles: Default::default(),
             id: FunctionId::new(PathBuf::from("test.rs"), "entry".to_string(), 10),
             is_entry_point: true,
@@ -186,6 +192,7 @@ mod tests {
         };
 
         let node_test = FunctionNode {
+            role_evidence: Default::default(),
             roles: Default::default(),
             id: FunctionId::new(PathBuf::from("test.rs"), "test".to_string(), 20),
             is_entry_point: false,
@@ -195,6 +202,7 @@ mod tests {
         };
 
         let node_regular = FunctionNode {
+            role_evidence: Default::default(),
             roles: Default::default(),
             id: FunctionId::new(PathBuf::from("test.rs"), "regular".to_string(), 30),
             is_entry_point: false,

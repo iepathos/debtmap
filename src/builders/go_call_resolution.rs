@@ -16,6 +16,7 @@ struct SymbolIndex {
 }
 
 pub(super) fn add_resolved_calls(graph: &mut CallGraph, metrics: &[FunctionMetrics]) {
+    add_framework_evidence(graph, metrics);
     let index = symbol_index(metrics);
     let mut callers: Vec<_> = metrics
         .iter()
@@ -25,6 +26,24 @@ pub(super) fn add_resolved_calls(graph: &mut CallGraph, metrics: &[FunctionMetri
 
     for caller in callers {
         add_caller_edges(graph, caller, &index);
+    }
+}
+
+fn add_framework_evidence(graph: &mut CallGraph, metrics: &[FunctionMetrics]) {
+    let mut sources = HashMap::new();
+    for metric in metrics
+        .iter()
+        .filter(|metric| Language::from_path(&metric.file) == Language::Go)
+    {
+        let source = sources
+            .entry(metric.file.clone())
+            .or_insert_with(|| std::fs::read_to_string(&metric.file).unwrap_or_default());
+        let evidence = crate::analysis::role_policy::framework_evidence_for_source(
+            Language::Go,
+            source,
+            &metric.name,
+        );
+        graph.add_role_evidence(&function_id(metric), evidence);
     }
 }
 
@@ -219,6 +238,29 @@ mod tests {
         let evidence = graph.edge_evidence().next().unwrap();
         assert_eq!(evidence.provenance, CallEdgeProvenance::ImportResolution);
         assert_eq!(evidence.confidence, 100);
+    }
+
+    #[test]
+    fn http_registration_marks_handler_as_framework_managed() {
+        let project = tempdir().unwrap();
+        let file = project.path().join("server.go");
+        fs::write(
+            &file,
+            "package main\nfunc health() {}\nfunc main() { http.HandleFunc(\"/health\", health) }\n",
+        )
+        .unwrap();
+        let handler = metric(file.to_str().unwrap(), "health", 2);
+        let metrics = vec![handler.clone()];
+        let mut graph = crate::builders::call_graph::build_initial_call_graph(&metrics);
+
+        add_resolved_calls(&mut graph, &metrics);
+
+        assert!(
+            graph
+                .get_roles(&function_id(&handler))
+                .unwrap()
+                .is_framework_managed
+        );
     }
 
     fn metric(file: &str, name: &str, line: usize) -> FunctionMetrics {

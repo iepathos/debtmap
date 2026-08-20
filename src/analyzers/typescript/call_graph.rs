@@ -54,7 +54,7 @@ pub fn extract_call_graph(ast: &TypeScriptAst) -> CallGraph {
     // First pass: add all functions to the call graph
     for func in &functions {
         let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
-        call_graph.add_function(func_id, func.is_exported, func.is_test, 1, 10);
+        call_graph.add_function_with_evidence(func_id, function_role_evidence(func), 1, 10);
     }
 
     // Second pass: add call relationships
@@ -75,6 +75,19 @@ pub fn extract_call_graph(ast: &TypeScriptAst) -> CallGraph {
     }
 
     call_graph
+}
+
+pub(crate) fn function_role_evidence(
+    function: &FunctionWithCalls,
+) -> crate::analysis::role_policy::RoleEvidence {
+    crate::analysis::role_policy::evidence_for_facts(crate::analysis::role_policy::RoleFacts {
+        path: &function.file,
+        language: crate::core::Language::from_path(&function.file),
+        name: &function.name,
+        is_test: function.is_test,
+        in_test_module: false,
+        visibility: function.is_exported.then_some("export"),
+    })
 }
 
 fn resolve_call(

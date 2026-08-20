@@ -352,6 +352,7 @@ impl UnifiedFileExtractor {
             visibility,
             is_trait_method: false,
             in_test_module,
+            role_evidence: Default::default(),
         }
     }
 
@@ -416,6 +417,7 @@ impl UnifiedFileExtractor {
             visibility,
             is_trait_method: is_trait_impl,
             in_test_module,
+            role_evidence: Default::default(),
         }
     }
 

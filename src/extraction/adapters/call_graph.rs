@@ -41,13 +41,19 @@ pub fn build_call_graph(extracted: &HashMap<PathBuf, ExtractedFileData>) -> Call
             // Use qualified_name for method disambiguation (e.g., "Type::method")
             let func_id = FunctionId::new(path.clone(), func.qualified_name.clone(), func.line);
 
-            graph.add_function(
-                func_id,
-                is_entry_point(&func.name),
-                func.is_test,
-                func.cyclomatic,
-                func.length,
+            let evidence = crate::analysis::role_policy::evidence_for_facts(
+                crate::analysis::role_policy::RoleFacts {
+                    path,
+                    language: crate::core::Language::from_path(path),
+                    name: &func.qualified_name,
+                    is_test: func.is_test,
+                    in_test_module: func.in_test_module,
+                    visibility: func.visibility.as_deref(),
+                },
             );
+            let evidence =
+                crate::analysis::role_policy::merge_evidence(&evidence, &func.role_evidence);
+            graph.add_function_with_evidence(func_id, evidence, func.cyclomatic, func.length);
         }
     }
 
@@ -70,17 +76,6 @@ pub fn build_call_graph(extracted: &HashMap<PathBuf, ExtractedFileData>) -> Call
     }
 
     graph
-}
-
-/// Check if a function name indicates an entry point.
-///
-/// Entry points include main functions and common handler patterns.
-fn is_entry_point(name: &str) -> bool {
-    name == "main"
-        || name.starts_with("handle_")
-        || name.starts_with("run_")
-        || name.starts_with("start_")
-        || name.starts_with("process_")
 }
 
 /// Convert extracted CallType to call graph CallType.
@@ -238,6 +233,7 @@ mod tests {
             visibility: None,
             is_trait_method: false,
             in_test_module: false,
+            role_evidence: Default::default(),
         }
     }
 
@@ -292,13 +288,18 @@ mod tests {
 
     #[test]
     fn test_is_entry_point() {
-        assert!(is_entry_point("main"));
-        assert!(is_entry_point("handle_request"));
-        assert!(is_entry_point("run_server"));
-        assert!(is_entry_point("start_worker"));
-        assert!(is_entry_point("process_item"));
-        assert!(!is_entry_point("helper"));
-        assert!(!is_entry_point("calculate"));
+        for name in ["main", "handle_request", "run_server"] {
+            assert!(crate::analysis::role_policy::is_entry_name(
+                name,
+                crate::core::Language::Rust
+            ));
+        }
+        for name in ["start_worker", "process_item", "helper", "calculate"] {
+            assert!(!crate::analysis::role_policy::is_entry_name(
+                name,
+                crate::core::Language::Rust
+            ));
+        }
     }
 
     #[test]

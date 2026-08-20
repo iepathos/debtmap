@@ -10,7 +10,7 @@ use classifiers::{
     is_constructor_enhanced, is_debug_function, is_enum_converter_enhanced, is_io_wrapper,
     is_orchestrator, is_pattern_matching_function,
 };
-use pattern_matchers::{is_entry_point_by_name, matches_accessor_name};
+use pattern_matchers::matches_accessor_name;
 use serde::{Deserialize, Serialize};
 
 #[cfg(test)]
@@ -123,7 +123,15 @@ fn classify_by_rules(
 
 // Pure function to check if a function is an entry point
 fn is_entry_point(func_id: &FunctionId, call_graph: &CallGraph) -> bool {
-    call_graph.is_entry_point(func_id) || is_entry_point_by_name(&func_id.name)
+    call_graph
+        .get_roles(func_id)
+        .map(|roles| roles.is_entry_point)
+        .unwrap_or_else(|| {
+            crate::analysis::role_policy::is_entry_name(
+                &func_id.name,
+                crate::core::Language::from_path(&func_id.file),
+            )
+        })
 }
 
 /// Check if a function is impure based on purity analysis (BUG-001 fix).

@@ -95,8 +95,96 @@ pub fn classify_roles(evidence: &RoleEvidence) -> CodeRoles {
     }
 }
 
+pub fn evidence_from_roles(roles: CodeRoles) -> RoleEvidence {
+    let mut signals = Vec::new();
+    if roles.is_test {
+        signals.push(RoleSignal::TestSyntax);
+    }
+    if roles.is_entry_point {
+        signals.push(RoleSignal::EntrySyntax);
+    }
+    if roles.is_framework_managed {
+        signals.push(RoleSignal::Framework {
+            name: "configured".into(),
+            kind: "managed".into(),
+        });
+    }
+    if roles.is_public_api {
+        signals.push(RoleSignal::PublicExport);
+    }
+    RoleEvidence { signals }
+}
+
+pub fn merge_evidence(left: &RoleEvidence, right: &RoleEvidence) -> RoleEvidence {
+    let mut signals = left
+        .signals
+        .iter()
+        .chain(&right.signals)
+        .cloned()
+        .collect::<Vec<_>>();
+    signals.sort_by_key(role_signal_key);
+    signals.dedup();
+    RoleEvidence { signals }
+}
+
+fn role_signal_key(signal: &RoleSignal) -> String {
+    match signal {
+        RoleSignal::TestSyntax => "test:syntax".into(),
+        RoleSignal::TestPath => "test:path".into(),
+        RoleSignal::EntrySyntax => "entry:syntax".into(),
+        RoleSignal::EntryConvention => "entry:convention".into(),
+        RoleSignal::Framework { name, kind } => format!("framework:{name}:{kind}"),
+        RoleSignal::PublicExport => "public:export".into(),
+        RoleSignal::Configured { role } => format!("configured:{role}"),
+    }
+}
+
 pub fn roles_for_metric(metric: &FunctionMetrics) -> CodeRoles {
     classify_roles(&evidence_for_metric(metric))
+}
+
+pub fn framework_evidence_for_source(
+    language: Language,
+    source: &str,
+    function_name: &str,
+) -> RoleEvidence {
+    let framework = match language {
+        Language::JavaScript | Language::TypeScript => {
+            js_framework_registration(source, function_name)
+        }
+        Language::Go => go_framework_registration(source, function_name),
+        Language::Solidity => solidity_framework_registration(source, function_name),
+        _ => None,
+    };
+    framework
+        .map(|(name, kind)| RoleEvidence {
+            signals: vec![RoleSignal::Framework { name, kind }],
+        })
+        .unwrap_or_default()
+}
+
+fn js_framework_registration(source: &str, name: &str) -> Option<(String, String)> {
+    source.lines().find_map(|line| {
+        let is_route = [".get(", ".post(", ".put(", ".delete(", ".use("]
+            .iter()
+            .any(|pattern| line.contains(pattern));
+        (is_route && line.contains(name)).then(|| ("js-router".into(), "registration".into()))
+    })
+}
+
+fn go_framework_registration(source: &str, name: &str) -> Option<(String, String)> {
+    source.lines().find_map(|line| {
+        let is_handler = line.contains("HandleFunc(") || line.contains(".Handle(");
+        (is_handler && line.contains(name)).then(|| ("net/http".into(), "handler".into()))
+    })
+}
+
+fn solidity_framework_registration(source: &str, name: &str) -> Option<(String, String)> {
+    let method = name.rsplit('.').next().unwrap_or(name);
+    let is_hook =
+        method == "setUp" || method.starts_with("test") || method.starts_with("invariant");
+    (is_hook && (source.contains("forge-std/Test.sol") || source.contains("hardhat/console.sol")))
+        .then(|| ("solidity-test-framework".into(), "test-hook".into()))
 }
 
 pub fn estimate_test_lines(
@@ -239,5 +327,63 @@ mod tests {
                 Language::from_path(Path::new(path))
             ));
         }
+    }
+
+    #[test]
+    fn merging_evidence_is_deterministic_and_lossless() {
+        let left = RoleEvidence {
+            signals: vec![RoleSignal::PublicExport, RoleSignal::TestPath],
+        };
+        let right = RoleEvidence {
+            signals: vec![RoleSignal::TestPath, RoleSignal::EntrySyntax],
+        };
+
+        let merged = merge_evidence(&left, &right);
+
+        assert_eq!(merged.signals.len(), 3);
+        assert_eq!(
+            classify_roles(&merged),
+            CodeRoles {
+                is_test: true,
+                is_entry_point: true,
+                is_framework_managed: false,
+                is_public_api: true,
+            }
+        );
+    }
+
+    #[test]
+    fn language_framework_registration_is_explicit() {
+        let fixtures = [
+            (
+                Language::TypeScript,
+                "router.get('/users', listUsers);",
+                "listUsers",
+            ),
+            (
+                Language::Go,
+                "http.HandleFunc(\"/health\", health);",
+                "health",
+            ),
+            (
+                Language::Solidity,
+                "import 'forge-std/Test.sol'; function setUp() public {}",
+                "Suite.setUp",
+            ),
+        ];
+        for (language, source, name) in fixtures {
+            assert!(
+                classify_roles(&framework_evidence_for_source(language, source, name))
+                    .is_framework_managed
+            );
+        }
+        assert!(
+            !classify_roles(&framework_evidence_for_source(
+                Language::Go,
+                "func health() {}",
+                "health"
+            ))
+            .is_framework_managed
+        );
     }
 }

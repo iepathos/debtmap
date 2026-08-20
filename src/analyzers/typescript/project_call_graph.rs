@@ -2,6 +2,7 @@
 
 use super::call_graph::{
     CallShape, ExtractedCall, FunctionWithCalls, extract_functions_with_calls,
+    function_role_evidence,
 };
 use super::module_links::{
     ImportBinding, ImportName, ReExport, extract_imports, extract_reexports,
@@ -40,19 +41,21 @@ fn module_from_ast(ast: &TypeScriptAst) -> Module<'_> {
 }
 
 fn graph_with_functions(modules: &[Module<'_>]) -> CallGraph {
-    modules.iter().flat_map(|module| &module.functions).fold(
-        CallGraph::new(),
-        |mut graph, function| {
-            graph.add_function(
-                function_id(function),
-                function.is_exported,
-                function.is_test,
-                1,
-                10,
+    modules.iter().fold(CallGraph::new(), |mut graph, module| {
+        for function in &module.functions {
+            let framework = crate::analysis::role_policy::framework_evidence_for_source(
+                crate::core::Language::from_path(&function.file),
+                &module.ast.source,
+                &function.name,
             );
-            graph
-        },
-    )
+            let evidence = crate::analysis::role_policy::merge_evidence(
+                &function_role_evidence(function),
+                &framework,
+            );
+            graph.add_function_with_evidence(function_id(function), evidence, 1, 10);
+        }
+        graph
+    })
 }
 
 fn add_module_edges(graph: &mut CallGraph, module: &Module<'_>, modules: &[Module<'_>]) {
@@ -308,6 +311,38 @@ mod tests {
         assert_eq!(evidence.provenance, CallEdgeProvenance::AstDirect);
         assert_eq!(evidence.confidence, 100);
         assert_eq!(evidence.call_site.as_ref().unwrap().line, 1);
+    }
+
+    #[test]
+    fn exported_function_is_public_api_not_entry_point() {
+        let asts = vec![ast("src/api.ts", "export function fetchUser() {}")];
+
+        let graph = extract_project_call_graph(&asts);
+        let function = find(&graph, "fetchUser");
+        let roles = graph.get_roles(function).unwrap();
+
+        assert!(roles.is_public_api);
+        assert!(!roles.is_entry_point);
+        assert!(
+            graph
+                .get_role_evidence(function)
+                .unwrap()
+                .signals
+                .contains(&crate::analysis::role_policy::RoleSignal::PublicExport)
+        );
+    }
+
+    #[test]
+    fn router_registration_marks_framework_managed_function() {
+        let asts = vec![ast(
+            "src/routes.ts",
+            "function listUsers() {} router.get('/users', listUsers);",
+        )];
+
+        let graph = extract_project_call_graph(&asts);
+        let roles = graph.get_roles(find(&graph, "listUsers")).unwrap();
+
+        assert!(roles.is_framework_managed);
     }
 
     #[test]

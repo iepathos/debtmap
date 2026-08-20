@@ -254,6 +254,7 @@ mod tests {
             visibility: None,
             is_trait_method: false,
             in_test_module: false,
+            role_evidence: Default::default(),
         }
     }
 

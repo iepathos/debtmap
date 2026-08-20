@@ -173,7 +173,29 @@ impl<'a> PythonExtractor<'a> {
                 self.path,
                 crate::core::Language::Python,
             ),
+            role_evidence: self.python_role_evidence(node),
         })
+    }
+
+    fn python_role_evidence(&self, node: Node) -> crate::analysis::role_policy::RoleEvidence {
+        let Some(parent) = node
+            .parent()
+            .filter(|parent| parent.kind() == "decorated_definition")
+        else {
+            return Default::default();
+        };
+        let text = self.node_text(parent);
+        let framework = ["pytest.fixture", ".route", "click.command", "celery.task"]
+            .iter()
+            .find(|pattern| text.contains(*pattern));
+        framework
+            .map(|name| crate::analysis::role_policy::RoleEvidence {
+                signals: vec![crate::analysis::role_policy::RoleSignal::Framework {
+                    name: (*name).to_string(),
+                    kind: "decorator".into(),
+                }],
+            })
+            .unwrap_or_default()
     }
 
     fn is_async_function_node(node: Node) -> bool {
@@ -718,4 +740,28 @@ fn add_nested_callable_summary(node: Node, summary: &mut crate::complexity::Nest
     summary.cognitive += cognitive;
     summary.max_nesting = summary.max_nesting.max(nesting);
     collect_nested_callables(node, summary);
+}
+
+#[cfg(test)]
+mod role_tests {
+    use super::*;
+
+    #[test]
+    fn pytest_fixture_decorator_emits_framework_evidence() {
+        let source = "import pytest\n@pytest.fixture\ndef database():\n    return object()\n";
+        let path = Path::new("tests/conftest.py");
+        let ast = crate::analyzers::python::parser::parse_source(source, path).unwrap();
+
+        let extracted = PythonExtractor::extract(&ast).unwrap();
+        let function = extracted
+            .functions
+            .iter()
+            .find(|function| function.name == "database")
+            .unwrap();
+
+        assert!(
+            crate::analysis::role_policy::classify_roles(&function.role_evidence)
+                .is_framework_managed
+        );
+    }
 }

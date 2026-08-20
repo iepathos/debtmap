@@ -197,6 +197,7 @@ fn build_call_graph_stage(
     let start = std::time::Instant::now();
     let (framework_exclusions, function_pointer_used_functions) =
         build_rust_call_graph(&mut call_graph, &options)?;
+    add_framework_role_evidence(&mut call_graph, &framework_exclusions);
     process_js_ts_call_graph(results, options.project_path, &mut call_graph);
     super::go_call_resolution::add_resolved_calls(&mut call_graph, &results.complexity.metrics);
     super::solidity_call_resolution::add_resolved_calls(
@@ -213,6 +214,20 @@ fn build_call_graph_stage(
         function_pointer_used_functions,
         elapsed,
     })
+}
+
+fn add_framework_role_evidence(call_graph: &mut CallGraph, functions: &HashSet<FunctionId>) {
+    for function in functions {
+        call_graph.add_role_evidence(
+            function,
+            crate::analysis::role_policy::RoleEvidence {
+                signals: vec![crate::analysis::role_policy::RoleSignal::Framework {
+                    name: "rust-framework".into(),
+                    kind: "registered-callback".into(),
+                }],
+            },
+        );
+    }
 }
 
 fn build_rust_call_graph(

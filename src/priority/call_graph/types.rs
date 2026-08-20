@@ -301,6 +301,8 @@ impl<'de> Deserialize<'de> for CallGraph {
 pub struct FunctionNode {
     pub id: FunctionId,
     #[serde(default)]
+    pub role_evidence: crate::analysis::role_policy::RoleEvidence,
+    #[serde(default)]
     pub roles: crate::analysis::role_policy::CodeRoles,
     pub is_entry_point: bool,
     pub is_test: bool,

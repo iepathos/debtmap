@@ -21,13 +21,7 @@ impl CallGraph {
         sorted_nodes.sort_by(|a, b| a.0.cmp(&b.0));
 
         for (id, node) in sorted_nodes {
-            self.add_function(
-                id,
-                node.is_entry_point,
-                node.is_test,
-                node.complexity,
-                node._lines,
-            );
+            self.add_function_with_evidence(id, node.role_evidence, node.complexity, node._lines);
         }
 
         // Merge edges
@@ -63,8 +57,32 @@ impl CallGraph {
         complexity: u32,
         lines: usize,
     ) {
+        self.add_function_with_evidence(
+            id,
+            crate::analysis::role_policy::evidence_from_roles(roles),
+            complexity,
+            lines,
+        );
+    }
+
+    pub fn add_function_with_evidence(
+        &mut self,
+        id: FunctionId,
+        evidence: crate::analysis::role_policy::RoleEvidence,
+        complexity: u32,
+        lines: usize,
+    ) {
+        let evidence = self
+            .nodes
+            .get(&id)
+            .map(|node| {
+                crate::analysis::role_policy::merge_evidence(&node.role_evidence, &evidence)
+            })
+            .unwrap_or(evidence);
+        let roles = crate::analysis::role_policy::classify_roles(&evidence);
         let node = FunctionNode {
             id: id.clone(),
+            role_evidence: evidence,
             roles,
             is_entry_point: roles.is_entry_point,
             is_test: roles.is_test,
@@ -83,6 +101,21 @@ impl CallGraph {
         // Populate name index (name only)
         let normalized_name = FunctionId::normalize_name(&id.name);
         self.name_index.entry(normalized_name).or_default().push(id);
+    }
+
+    pub fn add_role_evidence(
+        &mut self,
+        id: &FunctionId,
+        evidence: crate::analysis::role_policy::RoleEvidence,
+    ) {
+        let Some(node) = self.nodes.get_mut(id) else {
+            return;
+        };
+        node.role_evidence =
+            crate::analysis::role_policy::merge_evidence(&node.role_evidence, &evidence);
+        node.roles = crate::analysis::role_policy::classify_roles(&node.role_evidence);
+        node.is_entry_point = node.roles.is_entry_point;
+        node.is_test = node.roles.is_test;
     }
 
     pub fn add_call(&mut self, call: FunctionCall) {
@@ -242,6 +275,20 @@ impl CallGraph {
                 node._lines,
             )
         })
+    }
+
+    pub fn get_roles(
+        &self,
+        func_id: &FunctionId,
+    ) -> Option<crate::analysis::role_policy::CodeRoles> {
+        self.nodes.get(func_id).map(|node| node.roles)
+    }
+
+    pub fn get_role_evidence(
+        &self,
+        func_id: &FunctionId,
+    ) -> Option<&crate::analysis::role_policy::RoleEvidence> {
+        self.nodes.get(func_id).map(|node| &node.role_evidence)
     }
 
     /// Mark a function as being reachable through trait dispatch
