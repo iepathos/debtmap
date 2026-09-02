@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-a9bcb42c.js";
+            window.path_to_searchindex_js = "searchindex-742af30f.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-41409472.js"></script>
@@ -265,23 +265,10 @@ debtmap analyze .
 <li>Pattern repetition score</li>
 <li>Effective complexity (adjusted for boilerplate)</li>
 </ul>
-<h3 id="page-3-recommendations"><a class="header" href="#page-3-recommendations">Page 3: Recommendations</a></h3>
-<p>Provides actionable refactoring guidance:</p>
-<p><strong>Refactoring Strategy:</strong></p>
+<h3 id="page-3-context"><a class="header" href="#page-3-context">Page 3: Context</a></h3>
+<p>Shows the source range and available context needed to investigate the finding. Debtmap does not
+invent refactoring steps for function findings.</p>
 <ul>
-<li>Recommended approach (Extract Method, Decompose, etc.)</li>
-<li>Estimated effort (hours)</li>
-<li>Expected benefit/improvement</li>
-</ul>
-<p><strong>Step-by-Step Actions:</strong></p>
-<ol>
-<li>Specific refactoring steps</li>
-<li>Pattern recommendations</li>
-<li>Testing strategies</li>
-</ol>
-<p><strong>Code Examples:</strong></p>
-<ul>
-<li>Before/after snippets (when applicable)</li>
 <li>Suggested function signatures</li>
 <li>Pattern implementations</li>
 </ul>
@@ -380,7 +367,7 @@ Impurity Reasons:
 </ul>
 <p><strong>Page Indicator:</strong>
 The bottom of the screen shows which page you’re viewing:</p>
-<pre><code>[1/5] Overview   [2/5] Metrics   [3/5] Recommendations   [4/5] Context   [5/5] Data Flow
+<pre><code>[1] Overview  [2] Score  [3] Context  [4] Dependencies  [5-8] Optional evidence pages
 </code></pre>
 <h2 id="filtering-and-sorting"><a class="header" href="#filtering-and-sorting">Filtering and Sorting</a></h2>
 <p>Filter results before launching the TUI with <code>analyze</code> options:</p>
@@ -415,7 +402,7 @@ debtmap analyze . --tail 50
 <p><strong>Focus on Top Items:</strong> Start with the highest-priority items (top 5-10) for maximum impact.</p>
 </li>
 <li>
-<p><strong>Review Recommendations:</strong> Always check Page 3 (Recommendations) for specific refactoring steps before making changes.</p>
+<p><strong>Review Context:</strong> Check Page 3 for the relevant source range before making changes.</p>
 </li>
 <li>
 <p><strong>Check Context:</strong> Use Page 4 (Context) to understand the function’s role before refactoring to avoid breaking critical paths.</p>

@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-a9bcb42c.js";
+            window.path_to_searchindex_js = "searchindex-742af30f.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-41409472.js"></script>
@@ -530,7 +530,7 @@ x86-64/Apple Silicon, and Windows x86-64.</li>
 <ul>
 <li>Rust toolchain (rustc and cargo)</li>
 <li>Supported platforms: Linux, macOS, Windows</li>
-<li>Rust edition 2021 or later</li>
+<li>Rust 1.89 or later (the project uses Rust edition 2024)</li>
 </ul>
 </li>
 </ul>
@@ -612,11 +612,11 @@ debtmap analyze . --format terminal
 </code></pre>
 <p><strong>What happens during analysis:</strong></p>
 <ol>
-<li><strong>File Discovery</strong> - Debtmap scans your project for supported source files (Rust <code>.rs</code>, Python <code>.py</code>, JavaScript <code>.js</code>/<code>.jsx</code>, TypeScript <code>.ts</code>/<code>.tsx</code>, Go <code>.go</code>)</li>
-<li><strong>Parsing</strong> - Each file is parsed into an Abstract Syntax Tree (AST) using <code>syn</code> for Rust and tree-sitter for Python, JavaScript, TypeScript, and Go</li>
+<li><strong>File Discovery</strong> - Debtmap scans your project for supported source files (Rust <code>.rs</code>, Python <code>.py</code>, JavaScript <code>.js</code>/<code>.jsx</code>, TypeScript <code>.ts</code>/<code>.tsx</code>, Go <code>.go</code>, Solidity <code>.sol</code>)</li>
+<li><strong>Parsing</strong> - Each file is parsed into an Abstract Syntax Tree (AST) using <code>syn</code> for Rust and tree-sitter for Python, JavaScript, TypeScript, Go, and Solidity</li>
 <li><strong>Metric Extraction</strong> - Complexity, coverage gaps, and coupling are measured</li>
 <li><strong>Prioritization</strong> - Results are ranked by severity (CRITICAL, HIGH, MEDIUM, LOW, MINIMAL)</li>
-<li><strong>Context Generation</strong> - File ranges are suggested for each debt item</li>
+<li><strong>Context Generation</strong> - File ranges are attached to findings; coverage and git history are included only when explicitly supplied or enabled and successfully loaded</li>
 <li><strong>Output</strong> - Results are displayed in your chosen format</li>
 </ol>
 <p><strong>Expected timing</strong>: Analyzing a 10,000 LOC project typically takes 2-5 seconds.</p>
@@ -901,8 +901,8 @@ patterns = ["**/target/**", "**/tests/**"]
 <p>For programmatic access and CI/CD integration:</p>
 <pre><code class="language-bash">debtmap analyze . --format json --output debt.json
 </code></pre>
-<p>The canonical structure is defined by the <a href="https://github.com/iepathos/debtmap/blob/master/schemas/debtmap-output-v3.schema.json">unified JSON v3 schema</a>.
-Use the checked <a href="https://github.com/iepathos/debtmap/blob/master/tests/fixtures/output/unified-v3-items.json">v3 items fixture</a>
+<p>The canonical structure is defined by the <a href="https://github.com/iepathos/debtmap/blob/master/schemas/debtmap-output-v4.schema.json">unified JSON v4 schema</a>.
+Use the checked <a href="https://github.com/iepathos/debtmap/blob/master/tests/fixtures/output/unified-v4-minimal.json">v4 fixture</a>
 as a parser and prompt example.</p>
 <h3 id="terminal"><a class="header" href="#terminal">Terminal</a></h3>
 <p>For human exploration (not recommended for AI piping):</p>
@@ -9988,7 +9988,7 @@ debtmap analyze . -o analysis.txt
 <li>✗ Red: Failing, critical, high complexity</li>
 <li>📊 Blue: Information, metrics</li>
 <li>🔧 Orange: Technical debt items</li>
-<li>🎯 Cyan: Recommendations</li>
+<li>🎯 Cyan: Priority findings</li>
 </ul>
 <p><strong>Complexity Classification:</strong></p>
 <ul>
@@ -10145,8 +10145,7 @@ Risk Distribution:
 ───────────────────────────────────────────
 1. src/core/parser.rs:142 parse_complex_ast()
    Risk: 85.0 | Complexity: 15 | Coverage: 0%
-   Recommendation: Add 5 unit tests (est: 2-3 hours)
-   Impact: -40 risk reduction
+   Evidence: Complexity 15 with no loaded coverage
 
 💡 RECOMMENDATIONS (by ROI)
 ───────────────────────────────────────────
@@ -10184,25 +10183,26 @@ relationships, and git-derived aggregates. Review or redact reports before uploa
 external dashboards, artifacts, or webhooks.</p>
 </blockquote>
 <h3 id="json-schema-structure"><a class="header" href="#json-schema-structure">JSON Schema Structure</a></h3>
-<p>Debtmap emits the versioned unified JSON v3 contract. The authoritative schema and consumer guide
+<p>Debtmap emits the versioned unified JSON v4 contract. The authoritative schema and consumer guide
 are checked into the repository:</p>
 <ul>
-<li><a href="https://github.com/iepathos/debtmap/blob/master/schemas/debtmap-output-v3.schema.json"><code>schemas/debtmap-output-v3.schema.json</code></a></li>
-<li><a href="https://github.com/iepathos/debtmap/blob/master/docs/json-output-v3.md"><code>docs/json-output-v3.md</code></a></li>
+<li><a href="https://github.com/iepathos/debtmap/blob/master/schemas/debtmap-output-v4.schema.json"><code>schemas/debtmap-output-v4.schema.json</code></a></li>
+<li><a href="https://github.com/iepathos/debtmap/blob/master/docs/json-output-v4.md"><code>docs/json-output-v4.md</code></a></li>
 </ul>
 <p>The top-level envelope is:</p>
 <pre><code class="language-json">{
-  "format_version": "3.0",
+  "format_version": "4.0",
   "metadata": { ... },
+  "receipt": { ... },
   "summary": { ... },
   "items": [ ... ]
 }
 </code></pre>
 <p>Consumers must reject unsupported <code>format_version</code> values. Items use a <code>type</code> discriminator of
 <code>File</code> or <code>Function</code>, lowercase priority values, and nested <code>location</code> and <code>metrics</code> objects.</p>
-<h3 id="legacy-pre-v3-example-historical"><a class="header" href="#legacy-pre-v3-example-historical">Legacy pre-v3 example (historical)</a></h3>
+<h3 id="legacy-pre-v4-example-historical"><a class="header" href="#legacy-pre-v4-example-historical">Legacy pre-v4 example (historical)</a></h3>
 <p>The example below describes the removed pre-v3 output and is retained temporarily only to explain
-older reports. Do not use these paths for new integrations; use the v3 schema and guide linked
+older reports. Do not use these paths for new integrations; use the v4 schema and guide linked
 above.</p>
 <p>Here’s a complete annotated JSON output example:</p>
 <pre><code class="language-json">{
@@ -10476,7 +10476,7 @@ debtmap analyze . --format markdown -o docs/DEBT_REPORT.md
 <li><strong>Complexity Analysis</strong> - Detailed complexity breakdown by file</li>
 <li><strong>Technical Debt</strong> - Categorized debt items with priorities</li>
 <li><strong>Dependencies</strong> - Module dependencies and circular references</li>
-<li><strong>Recommendations</strong> - Prioritized action items</li>
+<li><strong>Findings and Guidance</strong> - Ranked evidence plus guidance only where an analyzer computed it</li>
 </ol>
 <h3 id="example-markdown-output"><a class="header" href="#example-markdown-output">Example Markdown Output</a></h3>
 <pre><code class="language-markdown"># Debtmap Analysis Report
@@ -10510,13 +10510,12 @@ debtmap analyze . --format markdown -o docs/DEBT_REPORT.md
 | detect_data_clumps | src/debt/smells.rs:196 | 15 | 20 | Medium |
 | analyze_dependencies | src/core/deps.rs:89 | 14 | 18 | Medium |
 
-### Refactoring Recommendations
+### Priority Findings
 
 **src/analyzers/rust.rs:245** - `parse_function()`
 - **Complexity:** Cyclomatic: 18, Cognitive: 24
-- **Action:** Extract 3-5 pure functions using decompose-then-transform strategy
-- **Patterns:** Decompose into logical units, then apply functional patterns
-- **Benefit:** Improved testability and maintainability
+- **Evidence:** Cyclomatic 18, cognitive 24
+- **Context:** Inspect the reported range before choosing a refactoring
 
 ## Technical Debt
 
@@ -10536,17 +10535,15 @@ debtmap analyze . --format markdown -o docs/DEBT_REPORT.md
 
 - `risk::scoring` → `core::metrics` → `risk::scoring`
 
-## Recommendations
+## Findings
 
-1. **Refactor parse_function** (High Priority)
-   - Reduce complexity from 18 to &lt;10
-   - Extract helper functions
-   - Estimated effort: 4-6 hours
+1. **parse_function** (High Priority)
+   - Cyclomatic complexity: 18
+   - Reported source range: `src/analyzers/rust.rs:245`
 
-2. **Add tests for scoring module** (High Priority)
-   - Current coverage: 35%
-   - Target coverage: 80%
-   - Estimated effort: 2-3 hours
+2. **scoring module coverage gap** (High Priority)
+   - Loaded coverage: 35%
+   - Review the uncovered range before choosing tests
 
 ## Data Flow Analysis
 
@@ -11437,23 +11434,10 @@ debtmap analyze .
 <li>Pattern repetition score</li>
 <li>Effective complexity (adjusted for boilerplate)</li>
 </ul>
-<h3 id="page-3-recommendations"><a class="header" href="#page-3-recommendations">Page 3: Recommendations</a></h3>
-<p>Provides actionable refactoring guidance:</p>
-<p><strong>Refactoring Strategy:</strong></p>
+<h3 id="page-3-context"><a class="header" href="#page-3-context">Page 3: Context</a></h3>
+<p>Shows the source range and available context needed to investigate the finding. Debtmap does not
+invent refactoring steps for function findings.</p>
 <ul>
-<li>Recommended approach (Extract Method, Decompose, etc.)</li>
-<li>Estimated effort (hours)</li>
-<li>Expected benefit/improvement</li>
-</ul>
-<p><strong>Step-by-Step Actions:</strong></p>
-<ol>
-<li>Specific refactoring steps</li>
-<li>Pattern recommendations</li>
-<li>Testing strategies</li>
-</ol>
-<p><strong>Code Examples:</strong></p>
-<ul>
-<li>Before/after snippets (when applicable)</li>
 <li>Suggested function signatures</li>
 <li>Pattern implementations</li>
 </ul>
@@ -11552,7 +11536,7 @@ Impurity Reasons:
 </ul>
 <p><strong>Page Indicator:</strong>
 The bottom of the screen shows which page you’re viewing:</p>
-<pre><code>[1/5] Overview   [2/5] Metrics   [3/5] Recommendations   [4/5] Context   [5/5] Data Flow
+<pre><code>[1] Overview  [2] Score  [3] Context  [4] Dependencies  [5-8] Optional evidence pages
 </code></pre>
 <h2 id="filtering-and-sorting"><a class="header" href="#filtering-and-sorting">Filtering and Sorting</a></h2>
 <p>Filter results before launching the TUI with <code>analyze</code> options:</p>
@@ -11587,7 +11571,7 @@ debtmap analyze . --tail 50
 <p><strong>Focus on Top Items:</strong> Start with the highest-priority items (top 5-10) for maximum impact.</p>
 </li>
 <li>
-<p><strong>Review Recommendations:</strong> Always check Page 3 (Recommendations) for specific refactoring steps before making changes.</p>
+<p><strong>Review Context:</strong> Check Page 3 for the relevant source range before making changes.</p>
 </li>
 <li>
 <p><strong>Check Context:</strong> Use Page 4 (Context) to understand the function’s role before refactoring to avoid breaking critical paths.</p>
@@ -27810,18 +27794,17 @@ debtmap compare \
 </code></pre>
 <p>Example output:</p>
 <pre><code>════════════════════════════════════════════
-    PRIORITY TECHNICAL DEBT FIXES
+    PRIORITY TECHNICAL DEBT FINDINGS
 ════════════════════════════════════════════
 
-🎯 TOP 3 RECOMMENDATIONS (by unified priority)
+🎯 TOP 3 FINDINGS (by unified priority)
 
 #1 SCORE: 8.9 [CRITICAL]
 ├─ TEST GAP: ./src/analyzers/rust.rs:38 parse_function()
-├─ ACTION: Add 6 unit tests for full coverage
-├─ IMPACT: Full test coverage, -3.7 risk
+├─ IMPACT: High complexity with no loaded line coverage
 ├─ COMPLEXITY: cyclomatic=6, cognitive=8, nesting=2, lines=32
 ├─ DEPENDENCIES: 0 upstream, 11 downstream
-└─ WHY: Business logic with 0% coverage, manageable complexity
+└─ ROLE: Business logic
 
 📊 TOTAL DEBT SCORE: 4907
 📈 OVERALL COVERAGE: 67.12%
@@ -27843,8 +27826,8 @@ debtmap analyze . --format json | jq '.items | sort_by(-.score) | .[0:5] | .[].l
 # Extract all test gap items
 debtmap analyze . --format json | jq '[.items[] | select(.debt_type | has("TestingGap"))]'
 </code></pre>
-<p>The complete structure is defined by the <a href="https://github.com/iepathos/debtmap/blob/master/schemas/debtmap-output-v3.schema.json">unified JSON v3 schema</a>.
-Use the checked <a href="https://github.com/iepathos/debtmap/blob/master/tests/fixtures/output/unified-v3-items.json">v3 items fixture</a>
+<p>The complete structure is defined by the <a href="https://github.com/iepathos/debtmap/blob/master/schemas/debtmap-output-v4.schema.json">unified JSON v4 schema</a>.
+Use the checked <a href="https://github.com/iepathos/debtmap/blob/master/tests/fixtures/output/unified-v4-minimal.json">v4 fixture</a>
 as a copyable example.</p>
 <h3 id="markdown-report"><a class="header" href="#markdown-report">Markdown Report</a></h3>
 <pre><code class="language-bash"># Standard markdown report

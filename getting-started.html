@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-a9bcb42c.js";
+            window.path_to_searchindex_js = "searchindex-742af30f.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-41409472.js"></script>
@@ -189,7 +189,7 @@ x86-64/Apple Silicon, and Windows x86-64.</li>
 <ul>
 <li>Rust toolchain (rustc and cargo)</li>
 <li>Supported platforms: Linux, macOS, Windows</li>
-<li>Rust edition 2021 or later</li>
+<li>Rust 1.89 or later (the project uses Rust edition 2024)</li>
 </ul>
 </li>
 </ul>
@@ -271,11 +271,11 @@ debtmap analyze . --format terminal
 </code></pre>
 <p><strong>What happens during analysis:</strong></p>
 <ol>
-<li><strong>File Discovery</strong> - Debtmap scans your project for supported source files (Rust <code>.rs</code>, Python <code>.py</code>, JavaScript <code>.js</code>/<code>.jsx</code>, TypeScript <code>.ts</code>/<code>.tsx</code>, Go <code>.go</code>)</li>
-<li><strong>Parsing</strong> - Each file is parsed into an Abstract Syntax Tree (AST) using <code>syn</code> for Rust and tree-sitter for Python, JavaScript, TypeScript, and Go</li>
+<li><strong>File Discovery</strong> - Debtmap scans your project for supported source files (Rust <code>.rs</code>, Python <code>.py</code>, JavaScript <code>.js</code>/<code>.jsx</code>, TypeScript <code>.ts</code>/<code>.tsx</code>, Go <code>.go</code>, Solidity <code>.sol</code>)</li>
+<li><strong>Parsing</strong> - Each file is parsed into an Abstract Syntax Tree (AST) using <code>syn</code> for Rust and tree-sitter for Python, JavaScript, TypeScript, Go, and Solidity</li>
 <li><strong>Metric Extraction</strong> - Complexity, coverage gaps, and coupling are measured</li>
 <li><strong>Prioritization</strong> - Results are ranked by severity (CRITICAL, HIGH, MEDIUM, LOW, MINIMAL)</li>
-<li><strong>Context Generation</strong> - File ranges are suggested for each debt item</li>
+<li><strong>Context Generation</strong> - File ranges are attached to findings; coverage and git history are included only when explicitly supplied or enabled and successfully loaded</li>
 <li><strong>Output</strong> - Results are displayed in your chosen format</li>
 </ol>
 <p><strong>Expected timing</strong>: Analyzing a 10,000 LOC project typically takes 2-5 seconds.</p>
