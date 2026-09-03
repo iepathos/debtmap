@@ -17,7 +17,6 @@ fn architecture_references_existing_repository_paths() {
                 || value.starts_with("tests/")
                 || value.starts_with("schemas/")
                 || value.starts_with("benches/")
-                || *value == "IMPLEMENTATION_PLAN.md"
         });
 
     for path in paths {

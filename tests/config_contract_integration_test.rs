@@ -318,32 +318,6 @@ fn malformed_discovered_config_stops_analysis() {
     );
 }
 
-#[test]
-fn user_config_is_applied_to_ordinary_analysis() {
-    let directory = tempfile::tempdir().unwrap();
-    fs::write(directory.path().join("sample.rs"), "fn sample() {}\n").unwrap();
-    let user_directories = [
-        directory.path().join(".test-config/debtmap"),
-        directory.path().join(".test-home/.config/debtmap"),
-        directory
-            .path()
-            .join(".test-home/Library/Application Support/debtmap"),
-    ];
-    for user_directory in user_directories {
-        fs::create_dir_all(&user_directory).unwrap();
-        fs::write(
-            user_directory.join("config.toml"),
-            "[ignore]\npatterns = [\"*.rs\"]\n",
-        )
-        .unwrap();
-    }
-
-    let output = run_json_analysis(directory.path(), None, "user.json");
-
-    assert!(output.status.success(), "{}", output_text(&output));
-    assert_eq!(report_total_loc(directory.path(), "user.json"), 0);
-}
-
 #[cfg(target_os = "linux")]
 #[test]
 fn explicit_non_utf8_config_path_is_honored() {

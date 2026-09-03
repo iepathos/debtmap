@@ -69,8 +69,8 @@ jobs:
     name: Check latest dependencies
     runs-on: ubuntu-latest
     env:
-      # Allow testing with newer deps that may require newer Rust
-      CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS: allow
+      # Select the newest dependency versions compatible with the declared MSRV.
+      CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS: fallback
       CARGO_PROFILE_DEV_DEBUG: line-tables-only
 
     steps:

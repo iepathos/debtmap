@@ -170,6 +170,31 @@ impl TracedConfig {
     }
 }
 
+#[derive(Debug, Default)]
+struct ConfigEnvironment {
+    custom_config_path: Option<PathBuf>,
+    complexity_threshold: Option<u32>,
+    coverage_weight: Option<f64>,
+    complexity_weight: Option<f64>,
+    dependency_weight: Option<f64>,
+}
+
+impl ConfigEnvironment {
+    fn from_process() -> Self {
+        Self {
+            custom_config_path: env::var_os("DEBTMAP_CONFIG").map(PathBuf::from),
+            complexity_threshold: parse_env_value("DEBTMAP_COMPLEXITY_THRESHOLD"),
+            coverage_weight: parse_env_value("DEBTMAP_COVERAGE_WEIGHT"),
+            complexity_weight: parse_env_value("DEBTMAP_COMPLEXITY_WEIGHT"),
+            dependency_weight: parse_env_value("DEBTMAP_DEPENDENCY_WEIGHT"),
+        }
+    }
+}
+
+fn parse_env_value<T: std::str::FromStr>(name: &str) -> Option<T> {
+    env::var(name).ok()?.parse().ok()
+}
+
 /// Load configuration from multiple sources with precedence.
 ///
 /// Sources are loaded in order of precedence (lowest to highest):
@@ -191,6 +216,18 @@ pub fn load_multi_source_config() -> Result<TracedConfig, Vec<AnalysisError>> {
 pub fn load_multi_source_config_from(
     start_dir: PathBuf,
 ) -> Result<TracedConfig, Vec<AnalysisError>> {
+    load_multi_source_config_with_inputs(
+        start_dir,
+        user_config_path(),
+        ConfigEnvironment::from_process(),
+    )
+}
+
+fn load_multi_source_config_with_inputs(
+    start_dir: PathBuf,
+    user_config_path: Option<PathBuf>,
+    environment: ConfigEnvironment,
+) -> Result<TracedConfig, Vec<AnalysisError>> {
     let mut errors = Vec::new();
     let mut sources = Vec::new();
     let mut field_sources = HashMap::new();
@@ -200,7 +237,7 @@ pub fn load_multi_source_config_from(
     sources.push(ConfigSource::Default);
 
     // 2. Load user config if it exists
-    if let Some(user_config_path) = user_config_path() {
+    if let Some(user_config_path) = user_config_path {
         match load_config_from_path(&user_config_path) {
             Ok(user_config) => {
                 let source = ConfigSource::UserConfig(user_config_path);
@@ -229,11 +266,10 @@ pub fn load_multi_source_config_from(
     }
 
     // 4. Load custom config if DEBTMAP_CONFIG is set
-    if let Some(custom_path) = env::var_os("DEBTMAP_CONFIG") {
-        let custom_path = PathBuf::from(custom_path);
-        match load_config_from_path(&custom_path) {
+    if let Some(custom_path) = environment.custom_config_path.as_ref() {
+        match load_config_from_path(custom_path) {
             Ok(custom_config) => {
-                let source = ConfigSource::CustomPath(custom_path);
+                let source = ConfigSource::CustomPath(custom_path.clone());
                 merge_config(&mut config, &custom_config, &source, &mut field_sources);
                 sources.push(source);
             }
@@ -242,7 +278,7 @@ pub fn load_multi_source_config_from(
     }
 
     // 5. Apply environment variable overrides
-    apply_env_overrides(&mut config, &mut field_sources, &mut sources);
+    apply_env_overrides(&mut config, &environment, &mut field_sources, &mut sources);
 
     // Return errors if any config files failed
     if !errors.is_empty() {
@@ -540,15 +576,14 @@ fn merge_config(
 /// - DEBTMAP_DEPENDENCY_WEIGHT: Override dependency weight
 fn apply_env_overrides(
     config: &mut DebtmapConfig,
+    environment: &ConfigEnvironment,
     field_sources: &mut HashMap<String, ConfigSource>,
     sources: &mut Vec<ConfigSource>,
 ) {
     let mut any_env_override = false;
 
     // DEBTMAP_COMPLEXITY_THRESHOLD
-    if let Ok(value) = env::var("DEBTMAP_COMPLEXITY_THRESHOLD")
-        && let Ok(threshold) = value.parse::<u32>()
-    {
+    if let Some(threshold) = environment.complexity_threshold {
         let thresholds = config
             .thresholds
             .get_or_insert_with(ThresholdsConfig::default);
@@ -561,9 +596,7 @@ fn apply_env_overrides(
     }
 
     // DEBTMAP_COVERAGE_WEIGHT
-    if let Ok(value) = env::var("DEBTMAP_COVERAGE_WEIGHT")
-        && let Ok(weight) = value.parse::<f64>()
-    {
+    if let Some(weight) = environment.coverage_weight {
         let scoring = config.scoring.get_or_insert_with(ScoringWeights::default);
         scoring.coverage = weight;
         field_sources.insert(
@@ -574,9 +607,7 @@ fn apply_env_overrides(
     }
 
     // DEBTMAP_COMPLEXITY_WEIGHT
-    if let Ok(value) = env::var("DEBTMAP_COMPLEXITY_WEIGHT")
-        && let Ok(weight) = value.parse::<f64>()
-    {
+    if let Some(weight) = environment.complexity_weight {
         let scoring = config.scoring.get_or_insert_with(ScoringWeights::default);
         scoring.complexity = weight;
         field_sources.insert(
@@ -587,9 +618,7 @@ fn apply_env_overrides(
     }
 
     // DEBTMAP_DEPENDENCY_WEIGHT
-    if let Ok(value) = env::var("DEBTMAP_DEPENDENCY_WEIGHT")
-        && let Ok(weight) = value.parse::<f64>()
-    {
+    if let Some(weight) = environment.dependency_weight {
         let scoring = config.scoring.get_or_insert_with(ScoringWeights::default);
         scoring.dependency = weight;
         field_sources.insert(
@@ -810,7 +839,11 @@ dependency = 0.15
         let temp_dir = TempDir::new().unwrap();
 
         // Should work with no config files (uses defaults)
-        let result = load_multi_source_config_from(temp_dir.path().to_path_buf());
+        let result = load_multi_source_config_with_inputs(
+            temp_dir.path().to_path_buf(),
+            None,
+            ConfigEnvironment::default(),
+        );
         assert!(result.is_ok());
 
         let traced = result.unwrap();
@@ -831,7 +864,11 @@ complexity = 30
         )
         .unwrap();
 
-        let result = load_multi_source_config_from(temp_dir.path().to_path_buf());
+        let result = load_multi_source_config_with_inputs(
+            temp_dir.path().to_path_buf(),
+            None,
+            ConfigEnvironment::default(),
+        );
         assert!(result.is_ok());
 
         let traced = result.unwrap();
@@ -843,29 +880,35 @@ complexity = 30
     }
 
     #[test]
+    fn explicit_user_config_path_is_loaded() {
+        let temp_dir = TempDir::new().unwrap();
+        let user_config = temp_dir.path().join("user-config.toml");
+        fs::write(&user_config, "[ignore]\npatterns = [\"*.rs\"]\n").unwrap();
+
+        let traced = load_multi_source_config_with_inputs(
+            temp_dir.path().to_path_buf(),
+            Some(user_config.clone()),
+            ConfigEnvironment::default(),
+        )
+        .unwrap();
+
+        assert_eq!(traced.config().get_ignore_patterns(), vec!["*.rs"]);
+        assert!(traced.has_source(&ConfigSource::UserConfig(user_config)));
+    }
+
+    #[test]
     fn test_env_overrides() {
-        // Save original env vars
-        let orig_threshold = env::var("DEBTMAP_COMPLEXITY_THRESHOLD").ok();
-
-        // Set env var
-        // TODO: Audit that the environment access only happens in single-threaded code.
-        unsafe { env::set_var("DEBTMAP_COMPLEXITY_THRESHOLD", "42") };
-
         let mut config = DebtmapConfig::default();
         let mut field_sources = HashMap::new();
         let mut sources = Vec::new();
+        let environment = ConfigEnvironment {
+            complexity_threshold: Some(42),
+            ..ConfigEnvironment::default()
+        };
 
-        apply_env_overrides(&mut config, &mut field_sources, &mut sources);
+        apply_env_overrides(&mut config, &environment, &mut field_sources, &mut sources);
 
         assert_eq!(config.thresholds.as_ref().unwrap().complexity, Some(42));
         assert!(field_sources.contains_key("thresholds.complexity"));
-
-        // Restore original env var
-        match orig_threshold {
-            // TODO: Audit that the environment access only happens in single-threaded code.
-            Some(v) => unsafe { env::set_var("DEBTMAP_COMPLEXITY_THRESHOLD", v) },
-            // TODO: Audit that the environment access only happens in single-threaded code.
-            None => unsafe { env::remove_var("DEBTMAP_COMPLEXITY_THRESHOLD") },
-        }
     }
 }

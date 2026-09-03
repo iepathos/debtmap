@@ -8,7 +8,7 @@ evidence it can establish, and unresolved relationships should remain absent rat
 guessed.
 
 This document describes the current production path. Planned work and migration status live in
-[`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md).
+the local `IMPLEMENTATION_PLAN.md` development artifact, which is intentionally not versioned.
 
 ## Production Analysis Path
 
