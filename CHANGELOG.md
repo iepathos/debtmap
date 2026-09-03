@@ -5,7 +5,66 @@ All notable changes to debtmap will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.22.0] - Unreleased
+## [Unreleased]
+
+## [0.23.0] - 2026-09-02
+
+### Added
+
+- **Comparable JSON v4 Analysis Receipts** - Machine-readable analysis now records the inputs and policy needed to judge whether reports are comparable
+  - Adds a required receipt containing source revision, reference time, normalized policy and fingerprint, optional evidence state, selection limits, execution settings, scope completeness, and warnings
+  - Publishes a checked v4 schema, canonical fixture, consumer guide, and round-trip contract tests while retaining v3 comparison input compatibility
+  - Classifies comparisons as compatible, incompatible, or unknown and withholds improvement claims when report inputs cannot be compared safely
+
+- **Stable Finding And Call-Graph Evidence** - Findings and dependency edges now carry canonical evidence across analysis modes
+  - Adds line-independent finding identifiers and canonicalizes set-like evidence for deterministic output
+  - Preserves cross-language role evidence and exposes debt-scoring subphase timings in profiling reports
+  - Audits unified and raw suppression decisions so excluded, generated, and policy-filtered debt remains explainable
+
+- **Cross-Language Call Resolution** - Expanded project-level call graphs for Python, Go, TypeScript, and Solidity
+  - Resolves Python calls and import aliases while preserving method identity
+  - Resolves Go same-package edges and explicit imports without conflating external packages
+  - Resolves TypeScript calls and re-exports with edge evidence
+  - Preserves Solidity contract identity and disambiguates imported targets
+
+### Changed
+
+- **Generated-Code And Language Policy** - Generated-code modes and configured language features are now enforced consistently across batch, single-file, sequential, parallel, and finalization paths
+  - Filters raw file-analysis debt under the same policy used by unified analysis
+  - Records suppression reasons without discarding the underlying analysis evidence
+
+- **Truthful Finding Output** - Reports present measured findings without fabricating refactoring advice, effort estimates, or unavailable historical trends
+  - Documentation now distinguishes optional coverage and Git context from always-available static analysis evidence
+  - Architecture and output documentation describe the supported six-language pipeline and JSON v4 contract
+
+- **Debug Development Workflow** - `just dev` and `just run` now forward arguments through debug builds, with optimized execution explicitly available as `just run-release`
+
+### Fixed
+
+- **Deterministic Scoring And Analysis Parity** - Sequential and parallel analysis share one scoring kernel and preserve canonical role-aware call-graph evidence
+  - Restores role-aware purity propagation and treats unresolved external callees conservatively
+  - Separates production and test evidence and fails closed when a pipeline preset is incomplete
+  - Applies configured duplication similarity thresholds consistently
+
+- **Grouped TUI Navigation** - Results explorer detail views can navigate every finding grouped at one location
+  - Keeps the active finding, score breakdown, contextual shortcuts, help overlay, and package version synchronized
+
+- **Rust-Next CI Stability** - Configuration tests can inject user-config paths without depending on the host profile directory
+  - Latest-dependency checks now select versions compatible with the declared Rust 1.89 minimum
+
+### Performance
+
+- **Duplication Detection Fast Path** - Restored exact matching for configurations that do not require fuzzy similarity analysis
+
+### Dependencies
+
+- Bumped `log` from 0.4.33 to 0.4.34
+- Bumped `premortem` from 0.6.4 to 0.6.5, consolidating the transitive `stillwater` dependency
+- Bumped `which` from 8.0.5 to 8.0.6
+- Bumped `taiki-e/install-action` from 2.85.5 to 2.87.0
+- Regenerated the Cargo lockfile for the 0.23.0 release
+
+## [0.22.0] - 2026-08-11
 
 ### Added
 
