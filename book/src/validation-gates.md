@@ -18,6 +18,7 @@ The `validate` command enforces quality gates in your development workflow, maki
 - [Migrating from Deprecated Thresholds](#migrating-from-deprecated-thresholds)
 - [Troubleshooting](#troubleshooting)
 - [Best Practices](#best-practices)
+  - [Pre-Commit Hook Integration](#pre-commit-hook-integration)
 
 ## Validate vs Analyze
 
@@ -869,7 +870,38 @@ min_coverage_percentage = 50.0
 
 ### Pre-Commit Hook Integration
 
-Add validation as a pre-commit hook:
+The recommended setup is [pre-commit](https://pre-commit.com/). Add Debtmap to `.pre-commit-config.yaml`:
+
+```yaml
+repos:
+  - repo: https://github.com/iepathos/debtmap
+    rev: v0.23.0  # pin a released tag
+    hooks:
+      - id: debtmap
+```
+
+This runs `debtmap validate .` and fails the commit when quality gates are exceeded. Thresholds come from `.debtmap.toml` (`debtmap init`) or from hook `args`.
+
+The `debtmap` hook compiles this repository at the pinned `rev` and requires a Rust toolchain. Use `debtmap-system` if `debtmap` is already installed on `PATH`:
+
+```yaml
+      - id: debtmap-system
+```
+
+Override arguments to pass extra flags (replacing the defaults):
+
+```yaml
+      - id: debtmap
+        args: [validate, ., -v, --max-debt-density, "30"]
+```
+
+Install the git hook after editing the config:
+
+```bash
+pre-commit install
+```
+
+Alternatively, use a raw git hook that calls an already-installed binary:
 
 ```bash
 # .git/hooks/pre-commit
