@@ -16,13 +16,16 @@ mod test_analysis;
 #[cfg(test)]
 mod tests;
 mod types;
+mod uncertainty;
+#[cfg(test)]
+mod uncertainty_tests;
 
 #[cfg(test)]
 pub(crate) use types::FunctionNode;
 pub use types::{
     CallEdgeEvidence, CallEdgeProvenance, CallGraph, CallSite, CallType, CanonicalSymbolKey,
     ExactFunctionKey, FunctionCall, FunctionId, FuzzyFunctionKey, MatchStrategy, ResolutionOutcome,
-    SimpleFunctionKey,
+    SimpleFunctionKey, UncertainCall, UncertaintyReason,
 };
 
 // Re-export commonly used functions from CallGraph

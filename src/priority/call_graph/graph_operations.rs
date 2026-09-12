@@ -9,28 +9,30 @@ use std::path::PathBuf;
 
 impl CallGraph {
     pub fn merge(&mut self, other: CallGraph) {
-        let evidence: std::collections::HashMap<_, _> = other
-            .edge_evidence
-            .iter()
-            .cloned()
-            .map(|evidence| (evidence.call.clone(), evidence))
-            .collect();
         // Merge nodes (use add_function to maintain indexes)
         // Sort nodes for deterministic merging order (Spec 214 fix)
         let mut sorted_nodes: Vec<_> = other.nodes.into_iter().collect();
         sorted_nodes.sort_by(|a, b| a.0.cmp(&b.0));
 
         for (id, node) in sorted_nodes {
-            self.add_function_with_evidence(id, node.role_evidence, node.complexity, node._lines);
+            self.add_function_with_evidence(
+                id,
+                node.effective_role_evidence(),
+                node.complexity,
+                node._lines,
+            );
         }
 
-        // Merge edges
+        for evidence in other.edge_evidence {
+            self.add_call_with_evidence(evidence);
+        }
         for call in other.edges {
-            if let Some(evidence) = evidence.get(&call) {
-                self.add_call_with_evidence(evidence.clone());
-            } else {
+            if !self.edge_set.contains(&call) {
                 self.add_call(call);
             }
+        }
+        for call in other.uncertain_calls {
+            self.record_uncertain_call(call);
         }
     }
 
@@ -76,7 +78,10 @@ impl CallGraph {
             .nodes
             .get(&id)
             .map(|node| {
-                crate::analysis::role_policy::merge_evidence(&node.role_evidence, &evidence)
+                crate::analysis::role_policy::merge_evidence(
+                    &node.effective_role_evidence(),
+                    &evidence,
+                )
             })
             .unwrap_or(evidence);
         let roles = crate::analysis::role_policy::classify_roles(&evidence);
@@ -89,7 +94,9 @@ impl CallGraph {
             complexity,
             _lines: lines,
         };
-        self.nodes.insert(id.clone(), node);
+        if self.nodes.insert(id.clone(), node).is_some() {
+            return;
+        }
 
         // Populate fuzzy index (name + file)
         let fuzzy_key = id.fuzzy_key();
@@ -133,8 +140,12 @@ impl CallGraph {
         let caller = call.caller.clone();
         let callee = call.callee.clone();
 
-        self.edges.push(call);
-        self.edge_evidence.push(evidence);
+        if self.edge_set.insert(call.clone()) {
+            self.edges.push(call);
+        }
+        if self.evidence_set.insert(evidence.clone()) {
+            self.edge_evidence.push(evidence);
+        }
 
         self.callee_index
             .entry(caller.clone())
@@ -299,10 +310,15 @@ impl CallGraph {
             self.add_function(func_id.clone(), false, false, 0, 0);
         }
 
-        // Mark it as an entry point to prevent dead code false positives
-        if let Some(node) = self.nodes.get_mut(&func_id) {
-            node.is_entry_point = true;
-        }
+        self.add_role_evidence(
+            &func_id,
+            crate::analysis::role_policy::evidence_from_roles(
+                crate::analysis::role_policy::CodeRoles {
+                    is_entry_point: true,
+                    ..Default::default()
+                },
+            ),
+        );
     }
 
     pub fn is_entry_point(&self, func_id: &FunctionId) -> bool {

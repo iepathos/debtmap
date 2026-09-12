@@ -491,7 +491,9 @@ impl RustCallGraph {
 
     /// Identify potential dead code with reduced false positives
     pub fn get_potential_dead_code(&self) -> HashSet<FunctionId> {
-        let live_functions = self.get_live_functions();
+        let live_functions = self
+            .base_graph
+            .get_possible_reachable_functions(self.collect_initial_live_functions());
         let all_functions = self.base_graph.find_all_functions();
 
         all_functions

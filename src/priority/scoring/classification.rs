@@ -20,7 +20,7 @@ pub fn is_dead_code(
     // FIRST: Check if function has incoming calls in the call graph
     // This includes event handlers bound via Bind() and other framework patterns
     let callers = call_graph.get_callers(func_id);
-    if !callers.is_empty() {
+    if !callers.is_empty() || !call_graph.get_possible_callers(func_id).is_empty() {
         return false;
     }
 
@@ -708,6 +708,35 @@ mod tests {
             error_swallowing_patterns: None,
             entropy_analysis: None,
         }
+    }
+
+    #[test]
+    fn possible_caller_prevents_dead_code_without_becoming_resolved() {
+        use crate::priority::call_graph::{CallSite, UncertainCall, UncertaintyReason};
+        let func = create_test_function("unused_work", None);
+        let target = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
+        let caller = FunctionId::new(func.file.clone(), "caller".into(), 1);
+        let mut graph = CallGraph::new();
+        graph.add_function(target.clone(), false, false, 1, 1);
+        graph.add_function(caller.clone(), false, false, 1, 1);
+        assert!(is_dead_code(&func, &graph, &target, None));
+        graph.record_uncertain_call(UncertainCall {
+            call_ordinal: None,
+            caller,
+            call_site: CallSite {
+                file: func.file.clone(),
+                line: 2,
+                column: None,
+            },
+            lexical_module: String::new(),
+            call_type: CallType::Direct,
+            query: "unused_work".into(),
+            receiver: None,
+            candidates: vec![target.clone()],
+            reason: UncertaintyReason::UnknownReceiver,
+        });
+        assert!(!is_dead_code(&func, &graph, &target, None));
+        assert!(graph.get_callers(&target).is_empty());
     }
 
     #[test]

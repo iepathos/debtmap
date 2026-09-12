@@ -184,7 +184,7 @@ pub struct FunctionCall {
     pub call_type: CallType,
 }
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CallEdgeProvenance {
     AstDirect,
@@ -195,14 +195,14 @@ pub enum CallEdgeProvenance {
     Legacy,
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct CallSite {
     pub file: PathBuf,
     pub line: usize,
     pub column: Option<usize>,
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct CallEdgeEvidence {
     pub call: FunctionCall,
     pub provenance: CallEdgeProvenance,
@@ -242,6 +242,34 @@ pub enum CallType {
     ObserverDispatch,
 }
 
+/// Why a call cannot justify an ordinary graph edge.
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UncertaintyReason {
+    UnknownReceiver,
+    AmbiguousDeclaration,
+    UnsupportedTypeOperation,
+    UnavailableDefinition,
+    AnalysisLimit,
+}
+
+/// A source call whose admissible targets remain possible rather than resolved.
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct UncertainCall {
+    pub caller: FunctionId,
+    pub call_site: CallSite,
+    /// Position in a caller's legacy call summary when a source column is unavailable.
+    /// This distinguishes repeated occurrences without inventing source coordinates.
+    #[serde(default)]
+    pub call_ordinal: Option<usize>,
+    pub lexical_module: String,
+    pub call_type: CallType,
+    pub query: String,
+    pub receiver: Option<String>,
+    pub candidates: Vec<FunctionId>,
+    pub reason: UncertaintyReason,
+}
+
 /// Main call graph structure containing nodes and edges
 #[derive(Debug, Clone, Serialize)]
 pub struct CallGraph {
@@ -250,6 +278,16 @@ pub struct CallGraph {
     pub(crate) edges: Vector<FunctionCall>,
     #[serde(default)]
     pub(crate) edge_evidence: Vector<CallEdgeEvidence>,
+    #[serde(default)]
+    pub(crate) uncertain_calls: Vector<UncertainCall>,
+    #[serde(skip)]
+    pub(crate) possible_caller_index: HashMap<FunctionId, HashSet<FunctionId>>,
+    #[serde(skip)]
+    pub(crate) possible_callee_index: HashMap<FunctionId, HashSet<FunctionId>>,
+    #[serde(skip)]
+    pub(crate) edge_set: HashSet<FunctionCall>,
+    #[serde(skip)]
+    pub(crate) evidence_set: HashSet<CallEdgeEvidence>,
     #[serde(with = "function_id_map")]
     pub(crate) caller_index: HashMap<FunctionId, HashSet<FunctionId>>,
     #[serde(with = "function_id_map")]
@@ -269,10 +307,8 @@ struct SerializedCallGraph {
     edges: Vector<FunctionCall>,
     #[serde(default)]
     edge_evidence: Vector<CallEdgeEvidence>,
-    #[serde(with = "function_id_map")]
-    caller_index: HashMap<FunctionId, HashSet<FunctionId>>,
-    #[serde(with = "function_id_map")]
-    callee_index: HashMap<FunctionId, HashSet<FunctionId>>,
+    #[serde(default)]
+    uncertain_calls: Vector<UncertainCall>,
 }
 
 impl<'de> Deserialize<'de> for CallGraph {
@@ -281,16 +317,24 @@ impl<'de> Deserialize<'de> for CallGraph {
         D: Deserializer<'de>,
     {
         let serialized = SerializedCallGraph::deserialize(deserializer)?;
-        let mut graph = Self {
-            nodes: serialized.nodes,
-            edges: serialized.edges,
-            edge_evidence: serialized.edge_evidence,
-            caller_index: serialized.caller_index,
-            callee_index: serialized.callee_index,
-            fuzzy_index: std::collections::HashMap::new(),
-            name_index: std::collections::HashMap::new(),
-        };
+        let mut graph = Self::new();
+        graph.nodes = serialized
+            .nodes
+            .into_iter()
+            .map(|(id, node)| (id, node.normalized()))
+            .collect();
         graph.rebuild_lookup_indexes();
+        for evidence in serialized.edge_evidence {
+            graph.add_call_with_evidence(evidence);
+        }
+        for call in serialized.edges {
+            if !graph.edge_set.contains(&call) {
+                graph.add_call(call);
+            }
+        }
+        for call in serialized.uncertain_calls {
+            graph.record_uncertain_call(call);
+        }
         Ok(graph)
     }
 }
@@ -308,6 +352,39 @@ pub struct FunctionNode {
     pub is_test: bool,
     pub complexity: u32,
     pub _lines: usize,
+}
+
+impl FunctionNode {
+    /// Preserve legacy role flags while keeping explicit evidence unchanged when sufficient.
+    pub(crate) fn effective_role_evidence(&self) -> crate::analysis::role_policy::RoleEvidence {
+        use crate::analysis::role_policy::{
+            CodeRoles, classify_roles, evidence_from_roles, merge_evidence,
+        };
+        let known = classify_roles(&self.role_evidence);
+        let missing = CodeRoles {
+            is_entry_point: (self.is_entry_point || self.roles.is_entry_point)
+                && !known.is_entry_point,
+            is_test: (self.is_test || self.roles.is_test) && !known.is_test,
+            is_framework_managed: self.roles.is_framework_managed && !known.is_framework_managed,
+            is_public_api: self.roles.is_public_api && !known.is_public_api,
+        };
+        if missing == CodeRoles::default() {
+            return self.role_evidence.clone();
+        }
+        merge_evidence(&self.role_evidence, &evidence_from_roles(missing))
+    }
+
+    fn normalized(self) -> Self {
+        let role_evidence = self.effective_role_evidence();
+        let roles = crate::analysis::role_policy::classify_roles(&role_evidence);
+        Self {
+            role_evidence,
+            roles,
+            is_entry_point: roles.is_entry_point,
+            is_test: roles.is_test,
+            ..self
+        }
+    }
 }
 
 // Custom serialization for HashMap with FunctionId keys
@@ -381,6 +458,11 @@ impl CallGraph {
             nodes: HashMap::new(),
             edges: Vector::new(),
             edge_evidence: Vector::new(),
+            uncertain_calls: Vector::new(),
+            possible_caller_index: HashMap::new(),
+            possible_callee_index: HashMap::new(),
+            edge_set: HashSet::new(),
+            evidence_set: HashSet::new(),
             caller_index: HashMap::new(),
             callee_index: HashMap::new(),
             fuzzy_index: std::collections::HashMap::new(),
