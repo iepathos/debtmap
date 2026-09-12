@@ -1,0 +1,216 @@
+[
+  {
+    "caller": "borrowed",
+    "resolved": [
+      "A::bar"
+    ]
+  },
+  {
+    "caller": "annotated",
+    "resolved": [
+      "A::bar"
+    ]
+  },
+  {
+    "caller": "alias",
+    "resolved": [
+      "A::bar"
+    ]
+  },
+  {
+    "caller": "referenced",
+    "resolved": [
+      "A::bar"
+    ]
+  },
+  {
+    "caller": "literal",
+    "resolved": [
+      "A::bar"
+    ]
+  },
+  {
+    "caller": "unit",
+    "resolved": [
+      "A::bar"
+    ]
+  },
+  {
+    "caller": "named_field",
+    "resolved": [
+      "A::bar"
+    ]
+  },
+  {
+    "caller": "tuple_field",
+    "resolved": [
+      "A::bar"
+    ]
+  },
+  {
+    "caller": "tuple_local",
+    "resolved": [
+      "A::bar"
+    ]
+  },
+  {
+    "caller": "A::self_call",
+    "resolved": [
+      "A::bar"
+    ]
+  },
+  {
+    "caller": "constructed",
+    "resolved": [
+      "A::bar",
+      "A::new"
+    ]
+  },
+  {
+    "caller": "factory",
+    "resolved": [
+      "A::bar",
+      "make"
+    ]
+  },
+  {
+    "caller": "returned",
+    "resolved": [
+      "A::again",
+      "A::bar"
+    ]
+  },
+  {
+    "caller": "awaited",
+    "resolved": [
+      "A::bar",
+      "make_async"
+    ]
+  },
+  {
+    "caller": "generic",
+    "resolved": [
+      "A::bar",
+      "Wrapper::get"
+    ]
+  },
+  {
+    "caller": "lifetime",
+    "resolved": [
+      "Interpreter::execute"
+    ]
+  },
+  {
+    "caller": "new_returns_other",
+    "resolved": [
+      "A::bar",
+      "B::new"
+    ]
+  },
+  {
+    "caller": "project_names",
+    "resolved": [
+      "A::any",
+      "A::bar",
+      "A::clone",
+      "A::get"
+    ]
+  },
+  {
+    "caller": "initializer",
+    "resolved": [
+      "A::again",
+      "A::bar"
+    ]
+  },
+  {
+    "caller": "unknown_shadow",
+    "resolved": [
+      "A::bar"
+    ],
+    "possible": {
+      "bar": [
+        "A::bar",
+        "B::bar"
+      ]
+    }
+  },
+  {
+    "caller": "assignment",
+    "resolved": [
+      "B::bar"
+    ]
+  },
+  {
+    "caller": "branch_invalidation",
+    "resolved": [],
+    "possible": {
+      "bar": [
+        "A::bar",
+        "B::bar"
+      ]
+    }
+  },
+  {
+    "caller": "loop_invalidation",
+    "resolved": [],
+    "possible": {
+      "bar": [
+        "A::bar",
+        "B::bar"
+      ]
+    }
+  },
+  {
+    "caller": "match_binding",
+    "resolved": [],
+    "possible": {
+      "bar": [
+        "A::bar",
+        "B::bar"
+      ]
+    }
+  },
+  {
+    "caller": "loop_binding",
+    "resolved": [],
+    "possible": {
+      "bar": [
+        "A::bar",
+        "B::bar"
+      ]
+    }
+  },
+  {
+    "caller": "conditional_binding",
+    "resolved": [],
+    "possible": {
+      "bar": [
+        "A::bar",
+        "B::bar"
+      ]
+    }
+  },
+  {
+    "caller": "destructured_binding",
+    "resolved": [],
+    "possible": {
+      "bar": [
+        "A::bar",
+        "B::bar"
+      ]
+    }
+  },
+  {
+    "caller": "unresolved_generic",
+    "resolved": [
+      "Wrapper::get"
+    ],
+    "possible": {
+      "bar": [
+        "A::bar",
+        "B::bar"
+      ]
+    }
+  }
+]

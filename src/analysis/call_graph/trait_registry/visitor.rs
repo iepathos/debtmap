@@ -15,6 +15,7 @@ use syn::{File, ImplItem, ItemImpl, ItemTrait, Path as SynPath, TraitItem, Type,
 pub struct TraitVisitorResult {
     pub trait_definitions: Vec<(String, Vector<TraitMethod>)>,
     pub trait_implementations: Vec<TraitImplementation>,
+    /// Legacy result field; calls are supplied by the shared workspace resolver.
     pub trait_method_calls: Vec<TraitMethodCall>,
     pub visit_trait_methods: HashSet<FunctionId>,
     pub visit_implementations: HashMap<String, Vector<TraitMethodImplementation>>,
@@ -23,7 +24,6 @@ pub struct TraitVisitorResult {
 /// Visitor for extracting trait information from AST
 pub struct TraitVisitor {
     file_path: PathBuf,
-    current_function: Option<FunctionId>,
     result: TraitVisitorResult,
 }
 
@@ -31,7 +31,6 @@ impl TraitVisitor {
     pub fn new(file_path: PathBuf) -> Self {
         Self {
             file_path,
-            current_function: None,
             result: TraitVisitorResult::default(),
         }
     }
@@ -195,23 +194,6 @@ impl TraitVisitor {
 
         self.result.trait_implementations.push(trait_impl);
     }
-
-    /// Record a potential trait method call
-    fn record_method_call(&mut self, method_name: String, line: usize) {
-        let Some(caller) = &self.current_function else {
-            return;
-        };
-
-        let trait_call = TraitMethodCall {
-            caller: caller.clone(),
-            trait_name: "Unknown".to_string(),
-            method_name,
-            receiver_type: None,
-            line,
-        };
-
-        self.result.trait_method_calls.push(trait_call);
-    }
 }
 
 impl<'ast> Visit<'ast> for TraitVisitor {
@@ -223,22 +205,6 @@ impl<'ast> Visit<'ast> for TraitVisitor {
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
         self.process_trait_impl(item);
         syn::visit::visit_item_impl(self, item);
-    }
-
-    fn visit_item_fn(&mut self, item: &'ast syn::ItemFn) {
-        let func_name = item.sig.ident.to_string();
-        let line = self.get_line_number(item.sig.ident.span());
-
-        self.current_function = Some(FunctionId::new(self.file_path.clone(), func_name, line));
-        syn::visit::visit_item_fn(self, item);
-        self.current_function = None;
-    }
-
-    fn visit_expr_method_call(&mut self, expr: &'ast syn::ExprMethodCall) {
-        let method_name = expr.method.to_string();
-        let line = self.get_line_number(expr.method.span());
-        self.record_method_call(method_name, line);
-        syn::visit::visit_expr_method_call(self, expr);
     }
 }
 

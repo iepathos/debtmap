@@ -142,10 +142,7 @@ impl RustCallGraphBuilder {
             // NOTE: detect_common_trait_patterns should be called ONCE after all files
             // are processed, not once per file. See finalize_trait_analysis() method.
 
-            self.resolve_trait_method_calls()?;
             self.mark_visit_trait_methods()?;
-            self.resolve_trait_object_calls()?;
-            self.resolve_generic_trait_bounds()?;
         }
         Ok(self)
     }
@@ -185,7 +182,6 @@ impl RustCallGraphBuilder {
             self.enhanced_graph
                 .cross_module_tracker
                 .analyze_workspace(workspace_files)?;
-            self.resolve_cross_module_calls()?;
         }
         Ok(self)
     }
@@ -198,11 +194,11 @@ impl RustCallGraphBuilder {
             .trait_registry
             .detect_common_trait_patterns(&mut self.enhanced_graph.base_graph);
 
-        // Resolve trait method calls after pattern detection
-        let _resolved_count = self
-            .enhanced_graph
+        // Ordinary method outcomes are already recorded by the shared workspace
+        // resolver. Trait metadata must not promote unknown receivers to edges.
+        self.enhanced_graph
             .trait_registry
-            .resolve_trait_method_calls(&mut self.enhanced_graph.base_graph);
+            .ingest_shared_uncertainty(&self.enhanced_graph.base_graph);
 
         Ok(())
     }
@@ -210,34 +206,6 @@ impl RustCallGraphBuilder {
     /// Complete the analysis and return the Rust-specific call graph
     pub fn build(self) -> RustCallGraph {
         self.enhanced_graph
-    }
-
-    /// Resolve trait method calls to their implementations
-    fn resolve_trait_method_calls(&mut self) -> Result<()> {
-        let trait_calls = self
-            .enhanced_graph
-            .trait_registry
-            .get_unresolved_trait_calls();
-
-        for trait_call in trait_calls {
-            // Use enhanced resolution for better accuracy
-            let resolved_impls = self
-                .enhanced_graph
-                .trait_registry
-                .resolve_trait_call(&trait_call);
-
-            for implementation in resolved_impls {
-                // Add call edges from trait call to each implementation
-                let call = FunctionCall {
-                    caller: trait_call.caller.clone(),
-                    callee: implementation,
-                    call_type: CallType::Delegate, // Trait dispatch is delegation
-                };
-                self.enhanced_graph.base_graph.add_call(call);
-            }
-        }
-
-        Ok(())
     }
 
     /// Resolve function pointer and closure calls
@@ -294,70 +262,6 @@ impl RustCallGraphBuilder {
             }
         }
 
-        Ok(())
-    }
-
-    /// Resolve cross-module function calls
-    fn resolve_cross_module_calls(&mut self) -> Result<()> {
-        let cross_module_calls = self
-            .enhanced_graph
-            .cross_module_tracker
-            .get_cross_module_calls();
-
-        for cross_call in cross_module_calls {
-            if let Some(target_function) = self
-                .enhanced_graph
-                .cross_module_tracker
-                .resolve_module_call(&cross_call.module_path, &cross_call.function_name)
-            {
-                let call = FunctionCall {
-                    caller: cross_call.caller.clone(),
-                    callee: target_function,
-                    call_type: CallType::Direct,
-                };
-                self.enhanced_graph.base_graph.add_call(call);
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Resolve trait object calls (dyn Trait)
-    fn resolve_trait_object_calls(&mut self) -> Result<()> {
-        // Get the enhanced tracker to check for trait objects
-        let tracker = self.enhanced_graph.trait_registry.get_enhanced_tracker();
-
-        // For each trait with implementations, check if it's used as a trait object
-        for (trait_name, _) in tracker.traits.iter() {
-            let trait_object = crate::analyzers::trait_implementation_tracker::TraitObject {
-                trait_name: trait_name.clone(),
-                additional_bounds: crate::collections::Vector::new(),
-                lifetime: None,
-            };
-
-            // Resolve all methods that could be called on this trait object
-            let implementations = tracker.resolve_trait_object_call(
-                &trait_object.trait_name,
-                "", // Will be filled by actual method names
-            );
-
-            for impl_func in implementations {
-                // Mark these functions as reachable through trait objects
-                // This helps reduce false positives in dead code detection
-                self.enhanced_graph
-                    .base_graph
-                    .mark_as_trait_dispatch(impl_func);
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Resolve generic trait bounds
-    fn resolve_generic_trait_bounds(&mut self) -> Result<()> {
-        // This would analyze generic functions with trait bounds
-        // and resolve them to concrete implementations
-        // For now, this is a placeholder for future enhancement
         Ok(())
     }
 

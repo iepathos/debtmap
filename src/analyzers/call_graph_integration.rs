@@ -283,6 +283,13 @@ mod tests {
         let file2 = syn::parse_str::<syn::File>(file2_code).expect("Failed to parse file2");
 
         let files = vec![
+            (
+                syn::parse_str(
+                    "mod commands { pub mod diagnose_coverage; } mod risk { pub mod lcov; }",
+                )
+                .expect("Failed to parse crate root"),
+                PathBuf::from("src/lib.rs"),
+            ),
             (file1, PathBuf::from("src/commands/diagnose_coverage.rs")),
             (file2, PathBuf::from("src/risk/lcov.rs")),
         ];
@@ -435,6 +442,13 @@ mod tests {
         let file2 = syn::parse_str::<syn::File>(file2_code).expect("Failed to parse file2");
 
         let files = vec![
+            (
+                syn::parse_str(
+                    "mod commands { pub mod diagnose_coverage; } mod risk { pub mod lcov; }",
+                )
+                .expect("Failed to parse crate root"),
+                PathBuf::from("src/lib.rs"),
+            ),
             (file1, PathBuf::from("src/commands/diagnose_coverage.rs")),
             (file2, PathBuf::from("src/risk/lcov.rs")),
         ];

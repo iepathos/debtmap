@@ -16,6 +16,8 @@
 
 pub mod patterns;
 pub mod resolution;
+#[cfg(test)]
+mod shared_uncertainty_tests;
 pub mod types;
 pub mod visitor;
 
@@ -27,7 +29,7 @@ pub use types::{
 use crate::analyzers::trait_implementation_tracker::TraitImplementationTracker;
 use crate::analyzers::trait_resolver::TraitResolver;
 use crate::collections::{HashMap, HashSet, Vector};
-use crate::priority::call_graph::FunctionId;
+use crate::priority::call_graph::{CallGraph, FunctionId, UncertainCall};
 use anyhow::Result;
 use std::path::Path;
 use std::sync::Arc;
@@ -47,6 +49,8 @@ pub struct TraitRegistry {
     trait_implementations: HashMap<String, Vector<TraitImplementation>>,
     /// Unresolved trait method calls
     unresolved_calls: Vector<TraitMethodCall>,
+    /// Authoritative source facts; never promoted by legacy trait matching.
+    shared_uncertain_calls: Vector<UncertainCall>,
     /// Type to trait mapping (for quick lookup)
     type_to_traits: HashMap<String, HashSet<String>>,
     /// Visit trait implementations (special handling for visitor pattern)
@@ -67,6 +71,7 @@ impl TraitRegistry {
             trait_definitions: HashMap::new(),
             trait_implementations: HashMap::new(),
             unresolved_calls: Vector::new(),
+            shared_uncertain_calls: Vector::new(),
             type_to_traits: HashMap::new(),
             visit_implementations: HashMap::new(),
             visit_trait_methods: HashSet::new(),
@@ -86,6 +91,10 @@ impl TraitRegistry {
 
     /// Merge visitor results into registry state
     fn merge_visitor_result(&mut self, result: visitor::TraitVisitorResult) {
+        debug_assert!(
+            result.trait_method_calls.is_empty(),
+            "Trait calls require shared workspace facts"
+        );
         // Add discovered traits
         for (trait_name, methods) in result.trait_definitions {
             self.trait_definitions.insert(trait_name, methods);
@@ -94,11 +103,6 @@ impl TraitRegistry {
         // Add trait implementations
         for trait_impl in result.trait_implementations {
             self.add_trait_implementation(trait_impl);
-        }
-
-        // Add unresolved calls
-        for call in result.trait_method_calls {
-            self.unresolved_calls.push(call);
         }
 
         // Add Visit trait methods
@@ -132,9 +136,47 @@ impl TraitRegistry {
 
     // Query methods
 
-    /// Get all unresolved trait method calls
+    /// Replace method uncertainty with facts from the complete workspace graph.
+    /// Repeated synchronization preserves one record per shared source call.
+    ///
+    /// ```
+    /// use debtmap::analysis::call_graph::TraitRegistry;
+    /// use debtmap::priority::call_graph::CallGraph;
+    /// let mut registry = TraitRegistry::new();
+    /// registry.ingest_shared_uncertainty(&CallGraph::new());
+    /// assert_eq!(registry.shared_uncertain_calls().count(), 0);
+    /// ```
+    pub fn ingest_shared_uncertainty(&mut self, graph: &CallGraph) {
+        self.shared_uncertain_calls = graph
+            .uncertain_calls()
+            .filter(|call| call.receiver.is_some())
+            .cloned()
+            .collect();
+    }
+
+    /// Shared source facts, including receiver constraints and admissible targets.
+    /// See [`Self::ingest_shared_uncertainty`] for a synchronization example.
+    pub fn shared_uncertain_calls(&self) -> impl Iterator<Item = &UncertainCall> {
+        self.shared_uncertain_calls.iter()
+    }
+
+    /// Compatibility view of unresolved calls. Use shared facts for full identity.
     pub fn get_unresolved_trait_calls(&self) -> Vector<TraitMethodCall> {
-        self.unresolved_calls.clone()
+        self.unresolved_calls
+            .iter()
+            .cloned()
+            .chain(
+                self.shared_uncertain_calls
+                    .iter()
+                    .map(|call| TraitMethodCall {
+                        caller: call.caller.clone(),
+                        trait_name: "Unknown".to_string(),
+                        method_name: call.query.clone(),
+                        receiver_type: None,
+                        line: call.call_site.line,
+                    }),
+            )
+            .collect()
     }
 
     /// Find implementations for a specific trait
@@ -221,7 +263,7 @@ impl TraitRegistry {
                 .values()
                 .map(|impls| impls.len())
                 .sum(),
-            total_unresolved_calls: self.unresolved_calls.len(),
+            total_unresolved_calls: self.unresolved_calls.len() + self.shared_uncertain_calls.len(),
         }
     }
 
@@ -229,6 +271,9 @@ impl TraitRegistry {
 
     /// Resolve a trait method call to possible implementations
     pub fn resolve_trait_call(&self, call: &TraitMethodCall) -> Vector<FunctionId> {
+        if let Some(candidates) = self.shared_candidates(call) {
+            return candidates;
+        }
         resolution::resolve_trait_call(
             call,
             &self.enhanced_tracker,
@@ -237,8 +282,30 @@ impl TraitRegistry {
         )
     }
 
-    /// Resolve trait method calls and add edges to call graph
-    /// Returns the number of trait method calls resolved
+    fn shared_candidates(&self, legacy: &TraitMethodCall) -> Option<Vector<FunctionId>> {
+        let matches: Vec<_> = self
+            .shared_uncertain_calls
+            .iter()
+            .filter(|call| {
+                call.caller == legacy.caller
+                    && call.call_site.line == legacy.line
+                    && call.query == legacy.method_name
+            })
+            .collect();
+        if matches.is_empty() {
+            return None;
+        }
+        let mut candidates: Vec<_> = matches
+            .iter()
+            .flat_map(|call| call.candidates.clone())
+            .collect();
+        candidates.sort();
+        candidates.dedup();
+        Some(candidates)
+    }
+
+    /// Resolve legacy explicitly supplied trait calls for compatibility.
+    /// Shared workspace uncertainty is never promoted to ordinary edges here.
     pub fn resolve_trait_method_calls(
         &self,
         call_graph: &mut crate::priority::call_graph::CallGraph,
@@ -276,7 +343,7 @@ impl TraitRegistry {
         &self,
         _call_graph: &crate::priority::call_graph::CallGraph,
     ) -> usize {
-        self.unresolved_calls.len()
+        self.unresolved_calls.len() + self.shared_uncertain_calls.len()
     }
 
     // Pattern detection methods - delegate to patterns module
