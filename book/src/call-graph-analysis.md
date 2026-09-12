@@ -14,13 +14,36 @@ Call graph analysis builds a comprehensive map of which functions call which oth
 
 ## Call Graph Construction
 
-Debtmap builds call graphs through a three-phase AST-based construction process:
+For Rust, Debtmap builds an immutable declaration index over all discovered
+source files before analyzing function bodies:
 
-1. **Extract functions and collect unresolved calls** - Parse each file to identify function definitions and call expressions
-2. **Resolve calls using CallResolver and PathResolver** - Match call expressions to function definitions within the same file
-3. **Final cross-file resolution** - Resolve remaining calls across module boundaries
+1. **Index declarations** — Record types, aliases, fields, imports, callable signatures,
+   receiver forms, and definition locations.
+2. **Collect source facts** — Track lexical bindings and propagate supported receiver
+   types through expressions.
+3. **Record outcomes** — Add an ordinary edge when declaration evidence justifies a
+   target; otherwise preserve the call and its admissible possible targets separately.
 
-This multi-phase approach ensures accurate resolution while handling complex scenarios like trait methods, macros, and module imports.
+The standard `analyze` command also uses this resolver when its graph is built from
+cached extraction data. Rust extraction retains a source snapshot so that the complete
+declaration index can be reconstructed before resolving bodies. Older cache records
+without source snapshots preserve uncertain method calls instead of recovering edges
+through name-only matching. Public JSON output does not expose the internal snapshot.
+Rust extraction, metrics, and cached graphs use the same module-qualified function
+names, including multiple inline modules on one source line. Current extraction
+records support Postcard round trips with present or absent source snapshots; this
+does not provide migration for older binary cache layouts.
+Keeping these snapshots costs source-sized storage and one additional parse per Rust
+file when constructing the workspace index; it avoids parsing separately for each
+function. Resolution totals are available in existing debug logs with
+`RUST_LOG=debtmap=debug`.
+
+Type identity includes its file, lexical module, and declaration location. Printed
+names are display values. A dotted call cannot select a free function or an
+associated function without a receiver. Known receiver constraints remain in force
+through import lookup and fallback handling: `Timeline` never matches `PyTimeline`
+merely because their names have a common suffix. A unique method name alone does
+not establish a resolved edge.
 
 ```rust
 // Example: Debtmap tracks these relationships
@@ -39,18 +62,113 @@ fn validate_input(input: &str) -> Result<()> {
 
 ### Resolution Mechanisms
 
-The call graph analyzer handles complex resolution scenarios:
+The bounded Rust resolver supports:
 
-- **Trait method resolution** - Resolves trait method calls to implementations using struct prefixes (e.g., `Processor::process`)
-- **Macro expansion tracking** - Classifies and tracks calls within macros (collection, formatting, assertion, and logging macros)
-- **Module path resolution** - Resolves fully-qualified paths across module boundaries
-- **Cross-file resolution** - Matches unresolved calls (marked with line 0) to actual function definitions
+- Parameters, `self`/`Self`, annotated and inferred locals, local aliases,
+  references, dereferences of known references, and parentheses.
+- Struct literals, declared unit structs, named and tuple fields, and known
+  function/method return chains. Local async declarations propagate their output
+  through `.await`.
+- Explicit module paths and imports, including aliases, when the discovered source
+  establishes one declaration identity. Module `#[path]` attributes normalize `.`
+  and `..` for lookup while preserving the discovered file's identity. Absolute
+  external paths such as `::std` do not select similarly named local modules.
+- Constants and statics use their declared value types. Enums and type aliases
+  do not establish unit-struct values merely by sharing a name.
+- Direct generic substitution from explicit arguments and known receiver arguments
+  into fields and return types. Lifetimes do not become part of a type name; const
+  arguments are retained without evaluation. A declared `new() -> Other` returns
+  `Other`, irrespective of its constructor-like name.
+- Inherent methods and concrete trait implementations whose owner, trait scope,
+  and requirements are established. Explicit trait qualification distinguishes
+  competing implementation bodies from trait declarations and retains the enclosing
+  impl's `Self` substitution.
 
-**Source**: Resolution mechanisms from src/analyzers/call_graph/trait_handling.rs, src/analyzers/call_graph/macro_expansion.rs, src/analyzers/call_graph/path_resolver.rs
+Bindings follow lexical scope. An initializer sees the previous binding; an
+unknown inner binding shadows an outer known binding. Unsupported pattern bindings
+introduce unknown facts. Assignments update inferred types or preserve explicit
+constraints with uncertainty; branch joins require agreement. Loops conservatively
+invalidate inferred facts they modify.
+Tuple annotations retain each component's declared owner when initializer facts
+are unavailable. A contradictory component remains constrained uncertainty without
+making unrelated owners possible or invalidating an agreeing sibling.
+
+Project declarations named `clone`, `get`, or `any` receive the same receiver
+checks as other methods. Their names alone do not establish library ownership.
+Existing supported macro argument scanning, function-pointer tracking, and framework
+registrations remain separate inputs to graph construction. Trait enhancement
+consumes shared call uncertainty and cannot recreate ordinary method edges through
+weaker name matching.
+
+### Possible Calls and Dead Code
+
+`CallGraph` retains uncertain calls with caller and call-site identity, lexical
+module, query, available receiver information, sorted deduplicated candidate
+identities, and a reason. Reasons distinguish unknown receivers, ambiguous
+identities, unsupported type operations, unavailable definitions, and analysis
+limits. Zero-candidate calls remain available for diagnostics. Repeated merges
+preserve distinct sites and do not duplicate identical records.
+Legacy extraction summaries without columns carry a separate occurrence ordinal,
+so repeated calls on one line remain distinct without fabricated source positions.
+Loading legacy graph records deduplicates edges and evidence and rebuilds indexes.
+Sequential and parallel conversions also retain legacy entry-point and test flags.
+
+Ordinary `get_callers` and `get_callees` queries return resolved relationships.
+Possible targets do not increase caller/dependency counts or propagate coverage,
+purity, or ordinary graph scores. Internal consumers can use `uncertain_calls`,
+`get_possible_callers`, `get_possible_callees`, and
+`get_transitive_possible_callees` to inspect uncertainty explicitly.
+
+The caller-based dead-code classifier withholds `DeadCode` when an admissible
+possible caller exists. Enhanced reachability analysis follows both resolved and
+possible relations from its existing live roots, protecting reachable descendants.
+An uncertain call in unreachable code does not become a new root. Definitely-live
+queries retain their existing resolved semantics. Zero-candidate calls cannot
+protect unrelated functions; missing project targets remain a limitation of
+syntax-based dead-code analysis.
+
+### Accuracy Limits
+
+This is a bounded source resolver, not Rust's type checker. Dynamic dispatch and
+unresolved generic trait receivers retain possible implementation targets.
+Trait paths with generic or associated arguments and reference-owned trait impls
+remain uncertain. Trait declarations without bodies are not graph nodes; default
+trait bodies are not instantiated for concrete impls that omit an override. Nested
+glob reexports are unsupported. An explicitly qualified or imported unavailable
+receiver excludes unrelated project methods; a bare unavailable receiver may retain
+a possible target found only by method name. Custom
+`Deref`, blanket-impl solving, associated-type projection, arbitrary coercions,
+general `?`/wrapper inference, and const-generic evaluation remain unsupported.
+Block-local item declarations and imports are not indexed as independent lexical
+module contexts; calls requiring those contexts remain uncertain. Generic arguments
+are not inferred from arbitrary argument constraints. Alias and substitution
+expansion stops at 32 levels; recursive aliases and other incomplete facts remain
+uncertain instead of triggering a name-only guess.
+
+Existing source discovery remains authoritative. The resolver does not invoke
+Cargo project builds or metadata, download dependencies, execute build scripts, or
+introduce general macro expansion. It does not use rust-analyzer. Ambiguous crate,
+module, or configuration contexts may remain unresolved; filenames alone do not
+establish cross-crate ownership.
+
+These internal graph changes do not add fields to public JSON v3 output. Internal
+serialized graphs in self-describing formats such as JSON preserve uncertainty and
+evidence; older JSON graphs load with empty uncertainty. The existing graph serializer
+does not support a postcard round trip, so binary-format compatibility is not claimed.
+Caller counts and debt rankings can change as incorrect edges are removed or supported
+calls are recovered.
+
+The labeled regression corpus is in `tests/data/rust_method_resolution/`. Its
+exact-edge precision and recall describe those fixtures only, not arbitrary Rust
+projects. `scripts/benchmark_rust_method_resolution.py` measures five warmed debug
+runs on staged inputs and verifies that all fixture files were analyzed. Timing
+outputs are local evaluation artifacts.
 
 ### Parallel Construction
 
-Call graph construction runs in parallel by default for improved performance. You can disable parallel processing with `--no-parallel` for debugging purposes, though this affects overall analysis performance, not just call graph construction.
+Sequential and parallel Rust builders use the same complete workspace resolution.
+Parallel conversion preserves resolved edge evidence, node role evidence, and
+uncertain calls. Call graph construction runs in parallel by default for improved performance. You can disable parallel processing with `--no-parallel` for debugging purposes, though this affects overall analysis performance, not just call graph construction.
 
 ## Configuration
 
