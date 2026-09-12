@@ -844,6 +844,47 @@ fn test_batched_function_preload_matches_direct_lookup() -> Result<()> {
 }
 
 #[test]
+fn test_preloaded_missing_function_does_not_reopen_git_repository() -> Result<()> {
+    let (_temp, repo_path) = setup_test_repo()?;
+    create_test_file(&repo_path, "test.rs", "fn existing() {}")?;
+    commit_with_message(&repo_path, "Initial commit")?;
+
+    let mut provider = GitHistoryProvider::new(repo_path.clone())?;
+    provider
+        .preload_function_histories(&[test_function_metric(PathBuf::from("test.rs"), "missing")])?;
+    let mut target = AnalysisTarget {
+        root_path: repo_path.clone(),
+        file_path: PathBuf::from("test.rs"),
+        function_name: "missing".to_string(),
+        line_range: (1, 1),
+        reference_time: chrono::Utc::now(),
+    };
+
+    // Make a repeated repository scan fail, while retaining the completed snapshot.
+    std::fs::rename(repo_path.join(".git"), repo_path.join("saved-git"))?;
+    for _ in 0..2 {
+        assert!(
+            provider
+                .lookup_function_history(Path::new("test.rs"), &target)?
+                .is_none()
+        );
+        assert!(
+            provider.gather(&target).is_ok(),
+            "File history remains available"
+        );
+    }
+
+    target.function_name = "existing".to_string();
+    assert!(
+        provider
+            .lookup_function_history(Path::new("test.rs"), &target)
+            .is_err(),
+        "Targets absent from preload must retain on-demand lookup"
+    );
+    Ok(())
+}
+
+#[test]
 fn test_function_level_with_modifications() -> Result<()> {
     let (_temp, repo_path) = setup_test_repo()?;
 

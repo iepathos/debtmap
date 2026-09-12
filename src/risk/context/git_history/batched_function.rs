@@ -11,7 +11,7 @@ use crate::time_span;
 use anyhow::Result;
 use dashmap::DashMap;
 use rayon::prelude::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
@@ -46,6 +46,8 @@ pub type ProgressCallback<'a> = &'a (dyn Fn(GitPreloadPhase, usize, usize) + Sen
 /// Preloaded function histories for O(1) lookup during scoring.
 pub struct BatchedFunctionGitHistory {
     histories: DashMap<FunctionHistoryKey, FunctionHistory>,
+    /// Completed searches, including functions with no introduction in history.
+    targets: HashSet<FunctionHistoryKey>,
 }
 
 /// Result of batched function git history preload.
@@ -139,9 +141,27 @@ impl BatchedFunctionGitHistory {
             start.elapsed()
         );
 
+        let targets = by_file
+            .iter()
+            .flat_map(|(file, functions)| {
+                functions.iter().map(|(name, _)| FunctionHistoryKey {
+                    file: file.clone(),
+                    name: name.clone(),
+                })
+            })
+            .collect();
+
         Ok(FunctionPreloadResult {
-            functions: Self { histories },
+            functions: Self { histories, targets },
             file_history,
+        })
+    }
+
+    /// Whether the completed preload searched this target, even without a result.
+    pub fn contains_target(&self, file: &Path, function_name: &str) -> bool {
+        self.targets.contains(&FunctionHistoryKey {
+            file: file.to_path_buf(),
+            name: function_name.to_string(),
         })
     }
 

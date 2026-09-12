@@ -421,9 +421,9 @@ impl GitHistoryProvider {
         target: &AnalysisTarget,
     ) -> Result<Option<function_level::FunctionHistory>> {
         if let Some(ref batched) = self.batched_functions
-            && let Some(history) = batched.get(relative_path, &target.function_name)
+            && batched.contains_target(relative_path, &target.function_name)
         {
-            return Ok(Some(history));
+            return Ok(batched.get(relative_path, &target.function_name));
         }
 
         let Some(ref repo) = self.git2_repo else {

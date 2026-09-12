@@ -38,6 +38,13 @@ file when constructing the workspace index; it avoids parsing separately for eac
 function. Resolution totals are available in existing debug logs with
 `RUST_LOG=debtmap=debug`.
 
+Git-history context retains qualified names as cache keys and searches the source
+declaration spelling, such as `fn run` for `Worker::run`. A completed history preload
+also remembers missing results, allowing cached file-history fallback without
+repeating the repository scan during scoring. This history search remains based on
+textual occurrences; it does not distinguish same-named historical declarations
+within one file.
+
 Type identity includes its file, lexical module, and declaration location. Printed
 names are display values. A dotted call cannot select a free function or an
 associated function without a receiver. Known receiver constraints remain in force
