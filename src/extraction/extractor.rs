@@ -87,7 +87,10 @@ impl UnifiedFileExtractor {
                     test_lines: 0,
                 };
 
-                let data = extractor.extract_from_ast(path, &ast);
+                let mut data = extractor.extract_from_ast(path, &ast);
+                if language == crate::core::Language::Rust {
+                    data.rust_source = Some(content.to_string());
+                }
 
                 // Reset SourceMap to prevent overflow
                 reset_span_locations();

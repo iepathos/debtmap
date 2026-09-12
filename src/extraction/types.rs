@@ -7,7 +7,7 @@
 //!
 //! # Design Principles
 //!
-//! - **Single Parse**: Each file is parsed exactly once
+//! - **Bounded Parsing**: Summaries are extracted once; Rust resolution parses its source snapshot once more
 //! - **Thread Safety**: All types are `Send + Sync` for parallel processing
 //! - **Serializable**: Types can be cached to disk for incremental analysis
 //! - **Complete**: All data needed by all analysis phases is captured
@@ -31,6 +31,11 @@ use std::path::PathBuf;
 pub struct ExtractedFileData {
     /// Path to the source file
     pub path: PathBuf,
+    /// Original Rust source for bounded workspace resolution across cached files.
+    /// Older JSON caches and other-language records have no snapshot.
+    /// Serialize the absent value too, preserving positional binary cache fields.
+    #[serde(default)]
+    pub rust_source: Option<String>,
     /// All functions extracted from the file
     pub functions: Vec<ExtractedFunctionData>,
     /// All structs for god object detection
@@ -114,7 +119,7 @@ pub struct ExtractedFunctionData {
     #[serde(default)]
     pub nested_callables: crate::complexity::NestedCallableSummary,
     /// Entropy-based complexity score (optional, calculated during extraction if enabled)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub entropy_score: Option<crate::complexity::entropy_core::EntropyScore>,
 
     // Pre-extracted analysis data
@@ -415,6 +420,7 @@ impl ExtractedFileData {
     pub fn empty(path: PathBuf) -> Self {
         Self {
             path,
+            rust_source: None,
             functions: Vec::new(),
             structs: Vec::new(),
             impls: Vec::new(),
@@ -646,6 +652,7 @@ mod tests {
     fn test_cloning_works() {
         let original = ExtractedFileData {
             path: PathBuf::from("test.rs"),
+            rust_source: None,
             functions: vec![ExtractedFunctionData::minimal("foo", 1)],
             structs: vec![ExtractedStructData {
                 name: "MyStruct".to_string(),
@@ -689,6 +696,7 @@ mod tests {
     fn test_serialization_roundtrip() {
         let data = ExtractedFileData {
             path: PathBuf::from("test.rs"),
+            rust_source: None,
             functions: vec![ExtractedFunctionData {
                 name: "test".to_string(),
                 qualified_name: "MyStruct::test".to_string(),
@@ -826,6 +834,7 @@ mod tests {
         // Create a representative file data structure
         let data = ExtractedFileData {
             path: PathBuf::from("src/some_module/file.rs"),
+            rust_source: None,
             functions: (0..10)
                 .map(|i| {
                     let mut func = ExtractedFunctionData::minimal(&format!("func_{}", i), i * 10);

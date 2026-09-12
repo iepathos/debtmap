@@ -261,6 +261,7 @@ mod tests {
     fn create_test_file() -> ExtractedFileData {
         ExtractedFileData {
             path: PathBuf::from("src/main.rs"),
+            rust_source: None,
             functions: vec![create_test_function("foo", 1)],
             structs: vec![],
             impls: vec![],

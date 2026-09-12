@@ -394,6 +394,7 @@ mod tests {
     fn create_test_file_data() -> ExtractedFileData {
         ExtractedFileData {
             path: PathBuf::from("src/test.rs"),
+            rust_source: None,
             functions: vec![
                 create_test_function("foo", 1, 5),
                 create_test_function("bar", 20, 3),
@@ -410,6 +411,7 @@ mod tests {
     fn create_python_test_file_data() -> ExtractedFileData {
         ExtractedFileData {
             path: PathBuf::from("src/test.py"),
+            rust_source: None,
             functions: vec![
                 create_test_function("foo", 1, 5),
                 create_test_function("bar", 20, 3),
