@@ -176,7 +176,12 @@ impl UnifiedFileExtractor {
                             let test_mod_lines = end_line.saturating_sub(start_line) + 1;
                             self.test_lines += test_mod_lines;
                         }
-                        self.extract_module_items(items, &mut data, is_test_mod);
+                        self.extract_module_items(
+                            items,
+                            &mut data,
+                            is_test_mod,
+                            &item_mod.ident.to_string(),
+                        );
                     }
                 }
                 _ => {}
@@ -248,12 +253,14 @@ impl UnifiedFileExtractor {
         items: &[syn::Item],
         data: &mut ExtractedFileData,
         in_test_module: bool,
+        module_path: &str,
     ) {
         for item in items {
             match item {
                 syn::Item::Fn(item_fn) => {
                     let func_data = self.extract_function(item_fn, None, in_test_module);
-                    data.functions.push(func_data);
+                    data.functions
+                        .push(qualify_function(func_data, module_path));
                 }
                 syn::Item::Struct(item_struct) => {
                     let struct_data = self.extract_struct(item_struct);
@@ -262,7 +269,11 @@ impl UnifiedFileExtractor {
                 syn::Item::Impl(item_impl) => {
                     let (impl_data, methods) = self.extract_impl(item_impl, in_test_module);
                     data.impls.push(impl_data);
-                    data.functions.extend(methods);
+                    data.functions.extend(
+                        methods
+                            .into_iter()
+                            .map(|method| qualify_function(method, module_path)),
+                    );
                 }
                 syn::Item::Mod(item_mod) => {
                     // Nested module - check for additional #[cfg(test)]
@@ -285,7 +296,8 @@ impl UnifiedFileExtractor {
                             let test_mod_lines = end_line.saturating_sub(start_line) + 1;
                             self.test_lines += test_mod_lines;
                         }
-                        self.extract_module_items(items, data, is_test_mod);
+                        let nested_path = format!("{module_path}::{}", item_mod.ident);
+                        self.extract_module_items(items, data, is_test_mod, &nested_path);
                     }
                 }
                 _ => {}
@@ -942,6 +954,13 @@ fn calculate_entropy_if_enabled(block: &syn::Block) -> Option<EntropyScore> {
         })
     } else {
         None
+    }
+}
+
+fn qualify_function(function: ExtractedFunctionData, module_path: &str) -> ExtractedFunctionData {
+    ExtractedFunctionData {
+        qualified_name: format!("{module_path}::{}", function.qualified_name),
+        ..function
     }
 }
 

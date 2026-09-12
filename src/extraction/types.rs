@@ -99,7 +99,7 @@ pub enum DetectedPattern {
 pub struct ExtractedFunctionData {
     /// Function name (without type prefix for methods)
     pub name: String,
-    /// Qualified name: "TypeName::method" or just "function"
+    /// Qualified name including inline modules and owner: "module::TypeName::method".
     pub qualified_name: String,
     /// Starting line number (1-indexed)
     pub line: usize,

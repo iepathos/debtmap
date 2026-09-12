@@ -458,8 +458,8 @@ use std::collections::HashMap;
 
 /// Build call graph from pre-extracted file data (spec 213).
 ///
-/// Uses extracted call information to build the call graph without re-parsing files.
-/// This prevents proc-macro2 SourceMap overflow on large codebases.
+/// Resolves Rust snapshots together against complete declarations. Other languages
+/// and legacy records use their available extracted call information.
 ///
 /// # Arguments
 ///
@@ -476,6 +476,8 @@ pub fn build_call_graph_from_extracted(
     use crate::priority::call_graph::CallType as GraphCallType;
 
     let sorted_extracted = extracted_files_sorted(extracted);
+    let (rust_graph, rust_snapshots) =
+        crate::analyzers::rust_resolution::cached::extract(extracted);
     let callee_index = CalleeResolutionIndex::from_sorted_extracted(&sorted_extracted);
     let mut final_graph = base_graph;
 
@@ -506,10 +508,18 @@ pub fn build_call_graph_from_extracted(
         }
     }
 
+    final_graph.merge(rust_graph);
     for (path, file_data) in sorted_extracted {
+        if rust_snapshots.contains(path) {
+            continue;
+        }
         for func in &file_data.functions {
             let caller = extracted_function_id(path, func);
-            for call in &func.calls {
+            for (ordinal, call) in func.calls.iter().enumerate() {
+                if rust_call_requires_source(path, call) {
+                    record_missing_rust_source(&mut final_graph, caller.clone(), call, ordinal);
+                    continue;
+                }
                 let outcome = resolve_callee_from_extracted(call, &caller, path, &callee_index);
                 final_graph.add_resolution(caller.clone(), GraphCallType::Direct, outcome);
             }
@@ -621,6 +631,12 @@ fn resolve_callee_from_extracted(
     use crate::extraction::CallType;
     use crate::priority::call_graph::ResolutionOutcome;
 
+    if rust_call_requires_source(caller_file, call) {
+        return ResolutionOutcome::Unresolved {
+            query: call.callee_name.clone(),
+        };
+    }
+
     match call.call_type {
         CallType::Direct | CallType::StaticMethod | CallType::TraitMethod => {
             resolve_direct_callee(call, caller_file, index)
@@ -653,6 +669,39 @@ fn resolve_callee_from_extracted(
             reason: "dynamic callable".to_string(),
         },
     }
+}
+
+fn rust_call_requires_source(path: &Path, call: &crate::extraction::CallSite) -> bool {
+    use crate::extraction::CallType;
+    Language::from_path(path) == Language::Rust
+        && matches!(
+            call.call_type,
+            CallType::Method | CallType::StaticMethod | CallType::TraitMethod
+        )
+}
+
+fn record_missing_rust_source(
+    graph: &mut CallGraph,
+    caller: FunctionId,
+    call: &crate::extraction::CallSite,
+    ordinal: usize,
+) {
+    use crate::priority::call_graph::{CallSite, CallType, UncertainCall, UncertaintyReason};
+    graph.record_uncertain_call(UncertainCall {
+        call_ordinal: Some(ordinal),
+        call_site: CallSite {
+            file: caller.file.clone(),
+            line: call.line,
+            column: None,
+        },
+        lexical_module: caller.module_path.clone(),
+        caller,
+        call_type: CallType::Direct,
+        query: call.callee_name.clone(),
+        receiver: None,
+        candidates: Vec::new(),
+        reason: UncertaintyReason::UnavailableDefinition,
+    });
 }
 
 fn resolve_python_method(
@@ -852,7 +901,7 @@ mod extracted_call_resolution_tests {
 
         assert!(matches!(
             outcome,
-            crate::priority::call_graph::ResolutionOutcome::Ambiguous { .. }
+            crate::priority::call_graph::ResolutionOutcome::Unresolved { .. }
         ));
         let (graph, _, _) = build_call_graph_from_extracted(CallGraph::new(), &extracted);
         let entry_id = FunctionId::new(first, "entry".to_string(), 1);
@@ -861,7 +910,7 @@ mod extracted_call_resolution_tests {
     }
 
     #[test]
-    fn common_library_methods_do_not_resolve_by_simple_method_name() {
+    fn missing_rust_context_does_not_promote_common_method_names() {
         let caller = PathBuf::from("src/builders/parallel_unified_analysis.rs");
         let support = PathBuf::from("src/support.rs");
         let extracted = extracted_files(vec![
@@ -890,15 +939,15 @@ mod extracted_call_resolution_tests {
             assert!(
                 matches!(
                     outcome,
-                    crate::priority::call_graph::ResolutionOutcome::Ignored { .. }
+                    crate::priority::call_graph::ResolutionOutcome::Unresolved { .. }
                 ),
-                "common library method {method} should be ignored, got {outcome:?}"
+                "method {method} without source context must remain unresolved, got {outcome:?}"
             );
         }
     }
 
     #[test]
-    fn build_call_graph_from_extracted_preserves_direct_and_method_edges() {
+    fn legacy_extracted_rust_preserves_direct_edges_and_method_uncertainty() {
         let caller = PathBuf::from("src/caller.rs");
         let helper = PathBuf::from("src/helper.rs");
         let mut entry = function("entry", "entry", 5);
@@ -939,12 +988,13 @@ mod extracted_call_resolution_tests {
         let callees = graph.get_callees_exact(&entry_id);
         let callee_names: Vec<_> = callees.iter().map(|id| id.name.as_str()).collect();
 
-        assert_eq!(callees.len(), 3);
+        assert_eq!(callees.len(), 1);
         assert!(callee_names.contains(&"local_helper"));
-        assert!(callee_names.contains(&"Helper::remote"));
-        assert!(callee_names.contains(&"Helper::run"));
+        assert!(!callee_names.contains(&"Helper::remote"));
+        assert!(!callee_names.contains(&"Helper::run"));
+        assert_eq!(graph.uncertain_calls().count(), 2);
         let evidence: Vec<_> = graph.edge_evidence().collect();
-        assert_eq!(evidence.len(), 3);
+        assert_eq!(evidence.len(), 1);
         assert!(evidence.iter().all(|edge| edge.confidence > 0));
         assert!(evidence.iter().all(|edge| edge.call_site.is_some()));
     }

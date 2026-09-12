@@ -69,7 +69,7 @@ pub fn to_function_metrics(file_path: &Path, extracted: &ExtractedFunctionData) 
 
 fn metric_function_name(file_path: &Path, extracted: &ExtractedFunctionData) -> String {
     match Language::from_path(file_path) {
-        Language::Python => extracted.qualified_name.clone(),
+        Language::Python | Language::Rust => extracted.qualified_name.clone(),
         _ => extracted.name.clone(),
     }
 }

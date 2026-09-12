@@ -3,6 +3,7 @@
 //! This module deliberately keeps possible targets outside resolved graph edges.
 mod bindings;
 mod body;
+pub(crate) mod cached;
 mod expressions;
 mod flow;
 pub(crate) mod index;
