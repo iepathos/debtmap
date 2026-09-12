@@ -146,6 +146,7 @@ mod tests {
         let file_metrics = create_test_file_metrics_with_singleton(singleton);
 
         let function = FunctionMetrics {
+            column: None,
             name: "Manager::process".to_string(),
             file: PathBuf::from("test.py"),
             line: 15,

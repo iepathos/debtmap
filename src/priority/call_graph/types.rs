@@ -22,6 +22,9 @@ pub struct FunctionId {
     pub file: PathBuf,
     pub name: String,
     pub line: usize,
+    /// Zero-based identifier column; absent for legacy and non-Rust definitions.
+    #[serde(default)]
+    pub column: Option<usize>,
     #[serde(default)]
     pub module_path: String,
 }
@@ -31,6 +34,7 @@ impl Ord for FunctionId {
         self.file
             .cmp(&other.file)
             .then_with(|| self.line.cmp(&other.line))
+            .then_with(|| self.column.cmp(&other.column))
             .then_with(|| self.name.cmp(&other.name))
             .then_with(|| self.module_path.cmp(&other.module_path))
     }
@@ -49,6 +53,7 @@ impl FunctionId {
             file,
             name,
             line,
+            column: None,
             module_path: String::new(),
         }
     }
@@ -59,8 +64,14 @@ impl FunctionId {
             file,
             name,
             line,
+            column: None,
             module_path,
         }
+    }
+
+    /// Attach the zero-based source identifier column to this definition.
+    pub fn with_column(self, column: Option<usize>) -> Self {
+        Self { column, ..self }
     }
 
     /// Get exact key (all fields) for exact matching
@@ -69,6 +80,7 @@ impl FunctionId {
             file: self.file.clone(),
             name: self.name.clone(),
             line: self.line,
+            column: self.column,
             module_path: self.module_path.clone(),
         }
     }
@@ -160,6 +172,7 @@ pub struct ExactFunctionKey {
     pub file: PathBuf,
     pub name: String,
     pub line: usize,
+    pub column: Option<usize>,
     pub module_path: String,
 }
 

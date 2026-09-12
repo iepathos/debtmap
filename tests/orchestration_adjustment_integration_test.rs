@@ -24,6 +24,7 @@ fn test_orchestrator_receives_reduction() {
     // Add callees
     for i in 0..3 {
         let callee = FunctionId {
+            column: None,
             file: PathBuf::from("test.rs"),
             name: format!("task_{}", i),
             line: 10 + i * 10,
@@ -189,6 +190,7 @@ fn create_test_func(
     length: usize,
 ) -> debtmap::core::FunctionMetrics {
     debtmap::core::FunctionMetrics {
+        column: None,
         file: PathBuf::from("test.rs"),
         name: name.to_string(),
         line: 1,
@@ -229,6 +231,7 @@ fn create_test_call_graph(callee_count: usize, func_name: &str, func_line: usize
     // Add callees
     for i in 0..callee_count {
         let callee = FunctionId {
+            column: None,
             file: PathBuf::from("test.rs"),
             name: format!("callee_{}", i),
             line: 100 + i * 10,

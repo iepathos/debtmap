@@ -389,6 +389,7 @@ mod tests {
                 i * 10,
             );
             let callee = FunctionId {
+                column: None,
                 file: PathBuf::from("unknown.rs"),
                 name: format!("function_{}", i + 1),
                 line: 0, // Unresolved
@@ -657,6 +658,7 @@ mod tests {
                 (i % 10) * 10,
             );
             let callee = FunctionId {
+                column: None,
                 file: PathBuf::from("unknown.rs"),
                 name: format!("function_{}_{}", (i + 1) % 100, (i + 1) % 10),
                 line: 0,

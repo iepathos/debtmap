@@ -138,7 +138,8 @@ pub fn create_unified_debt_item_enhanced(
     _enhanced_call_graph: Option<()>, // Placeholder for future enhanced call graph
     coverage: Option<&LcovData>,
 ) -> Option<UnifiedDebtItem> {
-    let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
+    let func_id =
+        FunctionId::new(func.file.clone(), func.name.clone(), func.line).with_column(func.column);
 
     // Security factor removed per spec 64
     // Organization factor removed per spec 58 - redundant with complexity factor
@@ -307,7 +308,7 @@ pub fn create_unified_debt_item_with_aggregator(
 
 // Pure function: Extract function ID creation
 pub(crate) fn create_function_id(func: &FunctionMetrics) -> FunctionId {
-    FunctionId::new(func.file.clone(), func.name.clone(), func.line)
+    FunctionId::new(func.file.clone(), func.name.clone(), func.line).with_column(func.column)
 }
 
 /// Pre-computed values shared across all debt types for a single function (spec 205).
@@ -768,7 +769,8 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
     file_line_counts: &FileLineCountCache,
 ) -> Vec<UnifiedDebtItem> {
-    let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
+    let func_id =
+        FunctionId::new(func.file.clone(), func.name.clone(), func.line).with_column(func.column);
 
     // Compute function role ONCE upfront for reuse
     let function_role = classify_function_role(func, &func_id, call_graph);

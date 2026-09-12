@@ -221,6 +221,7 @@ mod tests {
     #[test]
     fn test_detect_data_clumps_single_function() {
         let functions = vec![FunctionMetrics {
+            column: None,
             name: "large_function".to_string(),
             file: PathBuf::from("src/lib.rs"),
             line: 10,
@@ -261,6 +262,7 @@ mod tests {
     fn test_detect_data_clumps_different_files() {
         let functions = vec![
             FunctionMetrics {
+                column: None,
                 name: "function_a".to_string(),
                 file: PathBuf::from("src/module_a.rs"),
                 line: 10,
@@ -290,6 +292,7 @@ mod tests {
                 entropy_analysis: None,
             },
             FunctionMetrics {
+                column: None,
                 name: "function_b".to_string(),
                 file: PathBuf::from("src/module_b.rs"),
                 line: 20,
@@ -331,6 +334,7 @@ mod tests {
     fn test_detect_data_clumps_same_file_large_functions() {
         let functions = vec![
             FunctionMetrics {
+                column: None,
                 name: "process_user_data".to_string(),
                 file: PathBuf::from("src/user_handler.rs"),
                 line: 10,
@@ -360,6 +364,7 @@ mod tests {
                 entropy_analysis: None,
             },
             FunctionMetrics {
+                column: None,
                 name: "validate_user_data".to_string(),
                 file: PathBuf::from("src/user_handler.rs"),
                 line: 60,
@@ -409,6 +414,7 @@ mod tests {
     fn test_detect_data_clumps_multiple_clumps() {
         let functions = vec![
             FunctionMetrics {
+                column: None,
                 name: "func_a".to_string(),
                 file: PathBuf::from("src/module.rs"),
                 line: 10,
@@ -438,6 +444,7 @@ mod tests {
                 entropy_analysis: None,
             },
             FunctionMetrics {
+                column: None,
                 name: "func_b".to_string(),
                 file: PathBuf::from("src/module.rs"),
                 line: 50,
@@ -467,6 +474,7 @@ mod tests {
                 entropy_analysis: None,
             },
             FunctionMetrics {
+                column: None,
                 name: "func_c".to_string(),
                 file: PathBuf::from("src/module.rs"),
                 line: 90,
@@ -496,6 +504,7 @@ mod tests {
                 entropy_analysis: None,
             },
             FunctionMetrics {
+                column: None,
                 name: "small_func".to_string(),
                 file: PathBuf::from("src/module.rs"),
                 line: 130,
@@ -545,6 +554,7 @@ mod tests {
     #[test]
     fn test_detect_long_parameter_list() {
         let func = FunctionMetrics {
+            column: None,
             name: "test_func".to_string(),
             file: PathBuf::from("src/test.rs"),
             line: 10,
@@ -627,6 +637,7 @@ mod tests {
     #[test]
     fn test_detect_long_method() {
         let func = FunctionMetrics {
+            column: None,
             name: "long_func".to_string(),
             file: PathBuf::from("src/test.rs"),
             line: 10,
@@ -681,6 +692,7 @@ mod tests {
     #[test]
     fn test_detect_deep_nesting() {
         let func = FunctionMetrics {
+            column: None,
             name: "nested_func".to_string(),
             file: PathBuf::from("src/test.rs"),
             line: 10,
@@ -743,6 +755,7 @@ mod tests {
     #[test]
     fn test_analyze_function_smells() {
         let func = FunctionMetrics {
+            column: None,
             name: "complex_func".to_string(),
             file: PathBuf::from("src/test.rs"),
             line: 10,
@@ -784,6 +797,7 @@ mod tests {
 
         // Test function with no smells
         let clean_func = FunctionMetrics {
+            column: None,
             name: "clean_func".to_string(),
             file: PathBuf::from("src/test.rs"),
             line: 10,

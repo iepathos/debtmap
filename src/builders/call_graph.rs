@@ -30,7 +30,8 @@ pub fn build_initial_call_graph(metrics: &[FunctionMetrics]) -> priority::CallGr
             metric.file.clone(),
             metric.name.clone(),
             metric.line,
-        );
+        )
+        .with_column(metric.column);
 
         call_graph.add_function_with_evidence(func_id, evidence, metric.cyclomatic, metric.length);
     }

@@ -214,6 +214,7 @@ mod tests {
 
         let metrics: Vec<FunctionMetrics> = (0..10)
             .map(|i| FunctionMetrics {
+                column: None,
                 file: PathBuf::from(format!("test_{}.rs", i)),
                 name: format!("test_function_{}", i),
                 line: i * 10,

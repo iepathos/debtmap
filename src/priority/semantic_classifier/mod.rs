@@ -242,6 +242,7 @@ mod tests {
         lines: usize,
     ) -> FunctionMetrics {
         FunctionMetrics {
+            column: None,
             file: PathBuf::from("test.rs"),
             name: name.to_string(),
             line: 1,

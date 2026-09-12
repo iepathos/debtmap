@@ -206,7 +206,8 @@ pub fn analyze_purity<Env: ProgressReporter>(
     let final_metrics: Vec<_> = enriched_metrics
         .iter()
         .map(|metric| {
-            let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line);
+            let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line)
+                .with_column(metric.column);
 
             if let Some(result) = propagator.get_result(&func_id) {
                 let mut updated = metric.clone();

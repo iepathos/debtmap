@@ -63,6 +63,7 @@ fn test_threshold_filtering() {
     let thresholds = ComplexityThresholds::from_preset(ThresholdPreset::Strict);
 
     let simple_func = FunctionMetrics {
+        column: None,
         name: "simple".to_string(),
         file: PathBuf::from("test.rs"),
         line: 1,
@@ -93,6 +94,7 @@ fn test_threshold_filtering() {
     };
 
     let complex_func = FunctionMetrics {
+        column: None,
         name: "complex".to_string(),
         file: PathBuf::from("test.rs"),
         line: 20,
@@ -130,6 +132,7 @@ fn test_threshold_filtering() {
 
     // Test functions get higher threshold
     let test_func = FunctionMetrics {
+        column: None,
         name: "test_something".to_string(),
         file: PathBuf::from("test.rs"),
         line: 1,
@@ -203,6 +206,7 @@ fn test_if_else_chain_detection() {
 #[test]
 fn test_enhanced_message_generation() {
     let metrics = FunctionMetrics {
+        column: None,
         name: "complex_handler".to_string(),
         file: PathBuf::from("handler.rs"),
         line: 42,
@@ -388,6 +392,7 @@ fn test_false_positive_reduction() {
 
     for (name, cyclo, cog, lines) in trivial_functions {
         let func = FunctionMetrics {
+            column: None,
             name: name.to_string(),
             file: PathBuf::from("test.rs"),
             line: 1,

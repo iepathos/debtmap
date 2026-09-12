@@ -155,6 +155,7 @@ mod tests {
         }];
 
         let metrics = vec![FunctionMetrics {
+            column: None,
             name: "test_func".to_string(),
             file: PathBuf::from("test.rs"),
             line: 10,
@@ -344,6 +345,7 @@ mod tests {
     #[test]
     fn test_get_recommendation_acceptable() {
         let func = FunctionMetrics {
+            column: None,
             name: "simple_func".to_string(),
             file: PathBuf::from("test.rs"),
             line: 1,
@@ -378,6 +380,7 @@ mod tests {
     #[test]
     fn test_get_recommendation_consider_simplifying() {
         let func = FunctionMetrics {
+            column: None,
             name: "moderate_func".to_string(),
             file: PathBuf::from("test.rs"),
             line: 1,
@@ -412,6 +415,7 @@ mod tests {
     #[test]
     fn test_get_recommendation_refactor_recommended() {
         let func = FunctionMetrics {
+            column: None,
             name: "complex_func".to_string(),
             file: PathBuf::from("test.rs"),
             line: 1,
@@ -446,6 +450,7 @@ mod tests {
     #[test]
     fn test_get_recommendation_urgent_refactoring() {
         let func = FunctionMetrics {
+            column: None,
             name: "very_complex_func".to_string(),
             file: PathBuf::from("test.rs"),
             line: 1,
@@ -484,6 +489,7 @@ mod tests {
         // Add functions with varying complexity
         for i in 1..=10 {
             metrics.push(FunctionMetrics {
+                column: None,
                 name: format!("func_{}", i),
                 file: PathBuf::from("test.rs"),
                 line: i * 10,
@@ -534,6 +540,7 @@ mod tests {
     fn test_get_top_complex_functions_fewer_than_requested() {
         let metrics = vec![
             FunctionMetrics {
+                column: None,
                 name: "func_1".to_string(),
                 file: PathBuf::from("test.rs"),
                 line: 1,
@@ -563,6 +570,7 @@ mod tests {
                 entropy_analysis: None,
             },
             FunctionMetrics {
+                column: None,
                 name: "func_2".to_string(),
                 file: PathBuf::from("test.rs"),
                 line: 10,

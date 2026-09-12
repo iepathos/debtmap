@@ -21,7 +21,8 @@ pub fn populate_call_graph_data(
         .iter()
         .enumerate()
         .map(|(idx, metric)| {
-            let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line);
+            let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line)
+                .with_column(metric.column);
             (idx, func_id)
         })
         .collect();
@@ -34,7 +35,10 @@ pub fn populate_call_graph_data(
                 graph_dependencies_for_function(call_graph, func_id);
 
             // If no results and this is a Python file, try with line 0
-            if upstream_callers.is_empty() && downstream_callees.is_empty() {
+            if crate::core::Language::from_path(&metric.file) == crate::core::Language::Python
+                && upstream_callers.is_empty()
+                && downstream_callees.is_empty()
+            {
                 let func_id_zero_line =
                     FunctionId::new(func_id.file.clone(), func_id.name.clone(), 0);
 
@@ -109,6 +113,7 @@ mod tests {
 
     fn create_test_function_metric(name: &str, file: &str, line: usize) -> FunctionMetrics {
         FunctionMetrics {
+            column: None,
             name: name.to_string(),
             file: PathBuf::from(file),
             line,

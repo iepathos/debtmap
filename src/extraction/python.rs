@@ -146,6 +146,7 @@ impl<'a> PythonExtractor<'a> {
             .unwrap_or_default();
 
         Ok(ExtractedFunctionData {
+            column: None,
             name: name.clone(),
             qualified_name,
             line,

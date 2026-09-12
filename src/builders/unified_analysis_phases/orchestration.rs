@@ -78,7 +78,8 @@ pub fn run_purity_propagation(
     metrics
         .iter()
         .map(|metric| {
-            let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line);
+            let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line)
+                .with_column(metric.column);
 
             if let Some(result) = propagator.get_result(&func_id) {
                 let mut updated = metric.clone();

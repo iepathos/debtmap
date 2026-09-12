@@ -29,6 +29,7 @@ mod tests {
     #[test]
     fn test_is_trivial_delegation() {
         let trivial = FunctionMetrics {
+            column: None,
             name: "delegate".to_string(),
             file: PathBuf::from("main.rs"),
             line: 10,
@@ -60,6 +61,7 @@ mod tests {
         assert!(is_trivial_delegation(&trivial));
 
         let simple = FunctionMetrics {
+            column: None,
             name: "simple".to_string(),
             file: PathBuf::from("main.rs"),
             line: 20,
@@ -91,6 +93,7 @@ mod tests {
         assert!(is_trivial_delegation(&simple));
 
         let complex = FunctionMetrics {
+            column: None,
             name: "complex".to_string(),
             file: PathBuf::from("main.rs"),
             line: 30,
@@ -125,6 +128,7 @@ mod tests {
     #[test]
     fn test_calculate_complexity_weight() {
         let trivial = FunctionMetrics {
+            column: None,
             name: "delegate".to_string(),
             file: PathBuf::from("main.rs"),
             line: 10,
@@ -156,6 +160,7 @@ mod tests {
         assert_eq!(calculate_complexity_weight(&trivial), 0.1);
 
         let simple = FunctionMetrics {
+            column: None,
             name: "simple".to_string(),
             file: PathBuf::from("main.rs"),
             line: 20,
@@ -187,6 +192,7 @@ mod tests {
         assert_eq!(calculate_complexity_weight(&simple), 0.5);
 
         let complex = FunctionMetrics {
+            column: None,
             name: "complex".to_string(),
             file: PathBuf::from("main.rs"),
             line: 30,

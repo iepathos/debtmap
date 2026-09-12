@@ -35,7 +35,8 @@ pub fn build_call_graph(metrics: &[FunctionMetrics]) -> CallGraph {
     let mut call_graph = CallGraph::new();
 
     for metric in metrics {
-        let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line);
+        let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line)
+            .with_column(metric.column);
 
         call_graph.add_function(
             func_id,
@@ -115,6 +116,7 @@ mod tests {
 
     fn test_metric(name: &str, file: &str, line: usize) -> FunctionMetrics {
         FunctionMetrics {
+            column: None,
             name: name.to_string(),
             file: PathBuf::from(file),
             line,

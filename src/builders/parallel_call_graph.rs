@@ -598,6 +598,7 @@ impl CalleeResolutionIndex {
 
 fn extracted_function_id(path: &Path, func: &ExtractedFunctionData) -> FunctionId {
     FunctionId::new(path.to_path_buf(), func.qualified_name.clone(), func.line)
+        .with_column(func.column)
 }
 
 fn add_same_file_function(

@@ -685,6 +685,7 @@ mod tests {
 
     fn create_test_function(name: &str, line: usize) -> ExtractedFunctionData {
         ExtractedFunctionData {
+            column: None,
             name: name.to_string(),
             qualified_name: name.to_string(),
             line,

@@ -44,6 +44,7 @@ fn create_large_graph_with_unresolved_calls(num_files: usize, calls_per_file: us
             let target_func = call_idx % 10;
 
             let callee = FunctionId {
+                column: None,
                 file: PathBuf::from("unknown.rs"),
                 name: format!("function_{}_{}", target_file, target_func),
                 line: 0, // Line 0 indicates unresolved

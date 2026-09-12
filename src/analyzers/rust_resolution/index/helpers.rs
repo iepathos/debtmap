@@ -15,7 +15,8 @@ pub(super) fn make_callable(
         name,
         signature.ident.span().start().line,
         ModuleTree::infer_module_from_file(&context.file),
-    );
+    )
+    .with_column(Some(signature.ident.span().start().column));
     Callable {
         id,
         context: context.clone(),

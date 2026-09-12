@@ -10,6 +10,7 @@ use std::path::PathBuf;
 fn test_framework_pattern_exclusions_in_dead_code_detection() {
     // Create a test function that looks like dead code but should be excluded
     let test_func = FunctionMetrics {
+        column: None,
         name: "test_something".to_string(),
         file: PathBuf::from("src/lib.rs"),
         line: 10,
@@ -85,6 +86,7 @@ fn test_framework_pattern_exclusions_in_dead_code_detection() {
 fn test_visit_trait_pattern_exclusion() {
     // Create a function that implements the Visit trait
     let visit_func = FunctionMetrics {
+        column: None,
         name: "visit_expr".to_string(),
         file: PathBuf::from("src/visitor.rs"),
         line: 50,

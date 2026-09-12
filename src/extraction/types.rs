@@ -103,6 +103,9 @@ pub struct ExtractedFunctionData {
     pub qualified_name: String,
     /// Starting line number (1-indexed)
     pub line: usize,
+    /// Zero-based source identifier column, when available.
+    #[serde(default)]
+    pub column: Option<usize>,
     /// Ending line number
     pub end_line: usize,
     /// Function length in lines
@@ -466,9 +469,10 @@ impl ExtractedFunctionData {
     ) -> crate::priority::call_graph::FunctionId {
         crate::priority::call_graph::FunctionId::new(
             file_path.to_path_buf(),
-            self.name.clone(),
+            self.qualified_name.clone(),
             self.line,
         )
+        .with_column(self.column)
     }
 
     /// Create a minimal function data for testing.
@@ -478,6 +482,7 @@ impl ExtractedFunctionData {
             name: name.to_string(),
             qualified_name: name.to_string(),
             line,
+            column: None,
             end_line: line + 1,
             length: 1,
             cyclomatic: 1,
@@ -506,6 +511,7 @@ impl Default for ExtractedFunctionData {
             name: String::new(),
             qualified_name: String::new(),
             line: 0,
+            column: None,
             end_line: 0,
             length: 0,
             cyclomatic: 1,
@@ -698,6 +704,7 @@ mod tests {
             path: PathBuf::from("test.rs"),
             rust_source: None,
             functions: vec![ExtractedFunctionData {
+                column: None,
                 name: "test".to_string(),
                 qualified_name: "MyStruct::test".to_string(),
                 line: 1,

@@ -110,6 +110,7 @@ mod tests {
 
     fn test_metric(name: &str, file: &str, complexity: u32, length: usize) -> FunctionMetrics {
         FunctionMetrics {
+            column: None,
             name: name.to_string(),
             file: PathBuf::from(file),
             line: 1,

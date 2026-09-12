@@ -46,7 +46,8 @@ pub fn populate_data_flow(
     for (path, file_data) in extracted {
         for func in &file_data.functions {
             // Use qualified_name for method disambiguation (e.g., "Type::method")
-            let func_id = FunctionId::new(path.clone(), func.qualified_name.clone(), func.line);
+            let func_id = FunctionId::new(path.clone(), func.qualified_name.clone(), func.line)
+                .with_column(func.column);
 
             // Purity info
             stats.purity_entries += populate_purity(graph, &func_id, &func.purity_analysis);
@@ -234,6 +235,7 @@ mod tests {
 
     fn create_test_function(name: &str, line: usize) -> ExtractedFunctionData {
         ExtractedFunctionData {
+            column: None,
             name: name.to_string(),
             qualified_name: name.to_string(),
             line,

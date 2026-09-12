@@ -78,9 +78,13 @@ fn add_node(
     extracted: &HashMap<PathBuf, ExtractedFileData>,
 ) {
     let function = extracted.get(&id.file).and_then(|file| {
-        file.functions
-            .iter()
-            .find(|function| function.line == id.line && function.qualified_name == id.name)
+        let mut matches = file.functions.iter().filter(|function| {
+            function.line == id.line
+                && (function.column.is_none() || function.column == id.column)
+                && function.qualified_name == id.name
+        });
+        let first = matches.next()?;
+        matches.next().is_none().then_some(first)
     });
     let Some(function) = function else {
         graph.add_function_with_evidence(id, metadata.0, metadata.1, metadata.2);
@@ -108,7 +112,11 @@ fn extracted_identity(
         .get(&id.file)
         .into_iter()
         .flat_map(|file| &file.functions)
-        .filter(|function| function.line == id.line && same_source_name(&id.name, function))
+        .filter(|function| {
+            function.line == id.line
+                && (function.column.is_none() || function.column == id.column)
+                && same_source_name(&id.name, function)
+        })
         .collect();
     let exact: Vec<_> = candidates
         .iter()
@@ -121,7 +129,8 @@ fn extracted_identity(
         &exact
     };
     match matches.as_slice() {
-        [function] => FunctionId::new(id.file.clone(), function.qualified_name.clone(), id.line),
+        [function] => FunctionId::new(id.file.clone(), function.qualified_name.clone(), id.line)
+            .with_column(function.column.or(id.column)),
         _ => id.clone(),
     }
 }
@@ -157,7 +166,8 @@ mod tests {
         assert!(available.contains(&path));
         assert_eq!(graph.node_count(), data.functions.len());
         for function in &data.functions {
-            let id = FunctionId::new(path.clone(), function.qualified_name.clone(), function.line);
+            let id = FunctionId::new(path.clone(), function.qualified_name.clone(), function.line)
+                .with_column(function.column);
             let node = graph.nodes.get(&id).expect("exact extracted node identity");
             assert_eq!(node.complexity, function.cyclomatic);
             assert_eq!(node._lines, function.length);
@@ -167,7 +177,8 @@ mod tests {
             .iter()
             .find(|function| function.name == "caller")
             .expect("caller");
-        let caller = FunctionId::new(path.clone(), caller.qualified_name.clone(), caller.line);
+        let caller = FunctionId::new(path.clone(), caller.qualified_name.clone(), caller.line)
+            .with_column(caller.column);
         let targets: BTreeSet<_> = graph
             .get_callees_exact(&caller)
             .into_iter()

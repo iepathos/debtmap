@@ -354,6 +354,7 @@ mod tests {
     fn create_test_results(debt_count: usize, avg_complexity: f64) -> AnalysisResults {
         let metrics: Vec<FunctionMetrics> = (0..5)
             .map(|i| FunctionMetrics {
+                column: None,
                 file: PathBuf::from(format!("test_{}.rs", i)),
                 name: format!("test_function_{}", i),
                 line: i * 10,

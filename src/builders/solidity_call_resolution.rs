@@ -214,6 +214,7 @@ fn resolution_from_unique(mut candidates: Vec<FunctionId>, query: &str) -> Resol
 
 fn function_id(metric: &FunctionMetrics) -> FunctionId {
     FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line)
+        .with_column(metric.column)
 }
 
 #[cfg(test)]

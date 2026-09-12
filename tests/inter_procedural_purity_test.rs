@@ -22,6 +22,7 @@ fn create_test_metric(
     confidence: Option<f32>,
 ) -> FunctionMetrics {
     FunctionMetrics {
+        column: None,
         name: name.to_string(),
         file: PathBuf::from(file),
         line,

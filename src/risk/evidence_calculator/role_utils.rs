@@ -20,6 +20,7 @@ pub fn classify_role(function: &FunctionAnalysis, call_graph: &CallGraph) -> Fun
     );
 
     let func_metrics = crate::core::FunctionMetrics {
+        column: None,
         file: function.file.clone(),
         name: function.function.clone(),
         line: function.line,

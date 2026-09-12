@@ -24,6 +24,7 @@ pub struct TraitVisitorResult {
 /// Visitor for extracting trait information from AST
 pub struct TraitVisitor {
     file_path: PathBuf,
+    modules: Vec<String>,
     result: TraitVisitorResult,
 }
 
@@ -31,6 +32,7 @@ impl TraitVisitor {
     pub fn new(file_path: PathBuf) -> Self {
         Self {
             file_path,
+            modules: Vec::new(),
             result: TraitVisitorResult::default(),
         }
     }
@@ -61,6 +63,15 @@ impl TraitVisitor {
                 .collect();
             Some(segments.join("::"))
         }
+    }
+
+    fn qualified_name(&self, name: &str) -> String {
+        self.modules
+            .iter()
+            .map(String::as_str)
+            .chain([name])
+            .collect::<Vec<_>>()
+            .join("::")
     }
 
     /// Get line number from a span
@@ -102,9 +113,10 @@ impl TraitVisitor {
 
         let method_id = FunctionId::new(
             self.file_path.clone(),
-            format!("{implementing_type}::{method_name}"),
+            self.qualified_name(&format!("{implementing_type}::{method_name}")),
             line,
-        );
+        )
+        .with_column(Some(method.sig.ident.span().start().column));
 
         if is_visit_trait {
             self.result.visit_trait_methods.insert(method_id.clone());
@@ -147,9 +159,10 @@ impl TraitVisitor {
 
         let method_id = FunctionId::new(
             self.file_path.clone(),
-            format!("{trait_name}::{method_name}"),
+            self.qualified_name(&format!("{trait_name}::{method_name}")),
             line,
-        );
+        )
+        .with_column(Some(method.sig.ident.span().start().column));
 
         Some(TraitMethod {
             trait_name: trait_name.to_string(),
@@ -197,6 +210,12 @@ impl TraitVisitor {
 }
 
 impl<'ast> Visit<'ast> for TraitVisitor {
+    fn visit_item_mod(&mut self, item: &'ast syn::ItemMod) {
+        self.modules.push(item.ident.to_string());
+        syn::visit::visit_item_mod(self, item);
+        self.modules.pop();
+    }
+
     fn visit_item_trait(&mut self, item: &'ast ItemTrait) {
         self.process_trait_definition(item);
         syn::visit::visit_item_trait(self, item);

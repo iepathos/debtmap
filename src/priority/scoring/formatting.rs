@@ -22,6 +22,7 @@ mod tests {
     #[test]
     fn test_determine_visibility() {
         let pub_func = FunctionMetrics {
+            column: None,
             name: "test".to_string(),
             file: "test.rs".into(),
             line: 1,

@@ -16,6 +16,7 @@ use std::path::PathBuf;
 /// Helper to create minimal FunctionMetrics for testing
 fn create_test_metrics(name: &str, file: PathBuf, line: usize) -> FunctionMetrics {
     FunctionMetrics {
+        column: None,
         name: name.to_string(),
         file,
         line,

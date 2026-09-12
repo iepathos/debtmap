@@ -79,12 +79,25 @@ pub fn possible(graph: &CallGraph, caller: &str, query: &str) -> BTreeSet<String
         .collect()
 }
 
-pub fn normalized(graph: &CallGraph) -> (Vec<String>, Vec<String>, Vec<String>) {
+pub fn normalized(graph: &CallGraph) -> (Vec<String>, Vec<String>, Vec<String>, Vec<String>) {
     let sorted = |mut values: Vec<String>| {
         values.sort();
         values
     };
     (
+        sorted(
+            graph
+                .get_all_functions()
+                .map(|id| {
+                    format!(
+                        "{id:?} {:?} {:?} {:?}",
+                        graph.get_function_info(id),
+                        graph.get_roles(id),
+                        graph.get_role_evidence(id)
+                    )
+                })
+                .collect(),
+        ),
         sorted(
             graph
                 .get_all_calls()

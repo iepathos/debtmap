@@ -9,6 +9,7 @@ fn test_complexity_calculator_new() {
     let calc = ComplexityCalculator::new(10, 15);
     // Test that it creates successfully (internal fields are private)
     let metrics = FunctionMetrics {
+        column: None,
         name: "test".to_string(),
         file: PathBuf::from("test.rs"),
         line: 1,
@@ -44,6 +45,7 @@ fn test_complexity_calculator_new() {
 fn test_complexity_calculator_is_complex_cyclomatic() {
     let calc = ComplexityCalculator::new(10, 15);
     let metrics = FunctionMetrics {
+        column: None,
         name: "test".to_string(),
         file: PathBuf::from("test.rs"),
         line: 1,
@@ -82,6 +84,7 @@ fn test_complexity_calculator_is_complex_cyclomatic() {
 fn test_complexity_calculator_is_complex_cognitive() {
     let calc = ComplexityCalculator::new(10, 15);
     let metrics = FunctionMetrics {
+        column: None,
         name: "test".to_string(),
         file: PathBuf::from("test.rs"),
         line: 1,
@@ -120,6 +123,7 @@ fn test_complexity_calculator_is_complex_cognitive() {
 fn test_complexity_calculator_is_complex_both() {
     let calc = ComplexityCalculator::new(10, 15);
     let metrics = FunctionMetrics {
+        column: None,
         name: "test".to_string(),
         file: PathBuf::from("test.rs"),
         line: 1,
@@ -158,6 +162,7 @@ fn test_complexity_calculator_is_complex_both() {
 fn test_complexity_calculator_is_not_complex() {
     let calc = ComplexityCalculator::new(10, 15);
     let metrics = FunctionMetrics {
+        column: None,
         name: "test".to_string(),
         file: PathBuf::from("test.rs"),
         line: 1,
@@ -196,6 +201,7 @@ fn test_complexity_calculator_is_not_complex() {
 fn test_complexity_calculator_calculate_score_low() {
     let calc = ComplexityCalculator::new(10, 20);
     let metrics = FunctionMetrics {
+        column: None,
         name: "test".to_string(),
         file: PathBuf::from("test.rs"),
         line: 1,
@@ -235,6 +241,7 @@ fn test_complexity_calculator_calculate_score_low() {
 fn test_complexity_calculator_calculate_score_medium() {
     let calc = ComplexityCalculator::new(10, 20);
     let metrics = FunctionMetrics {
+        column: None,
         name: "test".to_string(),
         file: PathBuf::from("test.rs"),
         line: 1,
@@ -274,6 +281,7 @@ fn test_complexity_calculator_calculate_score_medium() {
 fn test_complexity_calculator_calculate_score_high() {
     let calc = ComplexityCalculator::new(10, 20);
     let metrics = FunctionMetrics {
+        column: None,
         name: "test".to_string(),
         file: PathBuf::from("test.rs"),
         line: 1,
@@ -313,6 +321,7 @@ fn test_complexity_calculator_calculate_score_high() {
 fn test_complexity_calculator_calculate_score_zero() {
     let calc = ComplexityCalculator::new(10, 20);
     let metrics = FunctionMetrics {
+        column: None,
         name: "test".to_string(),
         file: PathBuf::from("test.rs"),
         line: 1,
@@ -431,6 +440,7 @@ fn test_complexity_calculator_boundary_values() {
     let calc = ComplexityCalculator::new(1, 1);
 
     let metrics_zero = FunctionMetrics {
+        column: None,
         name: "zero".to_string(),
         file: PathBuf::from("test.rs"),
         line: 1,
@@ -462,6 +472,7 @@ fn test_complexity_calculator_boundary_values() {
     assert!(!calc.is_complex(&metrics_zero));
 
     let metrics_one = FunctionMetrics {
+        column: None,
         name: "one".to_string(),
         file: PathBuf::from("test.rs"),
         line: 1,
@@ -493,6 +504,7 @@ fn test_complexity_calculator_boundary_values() {
     assert!(!calc.is_complex(&metrics_one));
 
     let metrics_two = FunctionMetrics {
+        column: None,
         name: "two".to_string(),
         file: PathBuf::from("test.rs"),
         line: 1,
@@ -529,6 +541,7 @@ fn test_complexity_score_proportions() {
     let calc = ComplexityCalculator::new(10, 10);
 
     let metrics_cyclo_only = FunctionMetrics {
+        column: None,
         name: "cyclo".to_string(),
         file: PathBuf::from("test.rs"),
         line: 1,
@@ -564,6 +577,7 @@ fn test_complexity_score_proportions() {
     );
 
     let metrics_cognitive_only = FunctionMetrics {
+        column: None,
         name: "cognitive".to_string(),
         file: PathBuf::from("test.rs"),
         line: 1,

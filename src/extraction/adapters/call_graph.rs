@@ -40,7 +40,8 @@ pub fn build_call_graph(extracted: &HashMap<PathBuf, ExtractedFileData>) -> Call
     for (path, file_data) in extracted {
         for func in &file_data.functions {
             // Use qualified_name for method disambiguation (e.g., "Type::method")
-            let func_id = FunctionId::new(path.clone(), func.qualified_name.clone(), func.line);
+            let func_id = FunctionId::new(path.clone(), func.qualified_name.clone(), func.line)
+                .with_column(func.column);
 
             let evidence = crate::analysis::role_policy::evidence_for_facts(
                 crate::analysis::role_policy::RoleFacts {
@@ -68,7 +69,8 @@ pub fn build_call_graph(extracted: &HashMap<PathBuf, ExtractedFileData>) -> Call
             continue;
         }
         for func in &file_data.functions {
-            let caller_id = FunctionId::new(path.clone(), func.qualified_name.clone(), func.line);
+            let caller_id = FunctionId::new(path.clone(), func.qualified_name.clone(), func.line)
+                .with_column(func.column);
 
             for (ordinal, call) in func.calls.iter().enumerate() {
                 if missing_rust_context(path, call) {
@@ -151,11 +153,10 @@ fn resolve_call(
     if let Some(file_data) = extracted.get(caller_file)
         && let Some(func) = find_function_by_name(file_data, &call.callee_name)
     {
-        return Some(FunctionId::new(
-            caller_file.clone(),
-            func.name.clone(),
-            func.line,
-        ));
+        return Some(
+            FunctionId::new(caller_file.clone(), func.name.clone(), func.line)
+                .with_column(func.column),
+        );
     }
 
     // Try cross-file resolution for direct and static method calls
@@ -167,7 +168,10 @@ fn resolve_call(
                     continue;
                 }
                 if let Some(func) = find_function_by_name(file_data, &call.callee_name) {
-                    return Some(FunctionId::new(path.clone(), func.name.clone(), func.line));
+                    return Some(
+                        FunctionId::new(path.clone(), func.name.clone(), func.line)
+                            .with_column(func.column),
+                    );
                 }
             }
         }
@@ -266,6 +270,7 @@ mod tests {
 
     fn create_test_function(name: &str, line: usize) -> ExtractedFunctionData {
         ExtractedFunctionData {
+            column: None,
             name: name.to_string(),
             qualified_name: name.to_string(),
             line,

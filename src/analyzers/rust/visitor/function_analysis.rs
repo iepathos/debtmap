@@ -120,6 +120,7 @@ pub fn build_function_metrics(
         name: context.name.clone(),
         file: context.file.clone(),
         line: context.line,
+        column: Some(item_fn.sig.ident.span().start().column),
         cyclomatic: complexity.cyclomatic,
         cognitive: complexity.cognitive,
         nesting: rust_complexity_calculation::calculate_nesting(block),

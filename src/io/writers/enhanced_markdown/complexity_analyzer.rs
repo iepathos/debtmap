@@ -592,6 +592,7 @@ mod tests {
             complexity: ComplexityResults {
                 metrics: vec![
                     FunctionMetrics {
+                        column: None,
                         name: "func1".to_string(),
                         file: PathBuf::from("file1.rs"),
                         line: 10,
@@ -621,6 +622,7 @@ mod tests {
                         entropy_analysis: None,
                     },
                     FunctionMetrics {
+                        column: None,
                         name: "func2".to_string(),
                         file: PathBuf::from("file2.rs"),
                         line: 20,
@@ -650,6 +652,7 @@ mod tests {
                         entropy_analysis: None,
                     },
                     FunctionMetrics {
+                        column: None,
                         name: "func3".to_string(),
                         file: PathBuf::from("file3.rs"),
                         line: 30,

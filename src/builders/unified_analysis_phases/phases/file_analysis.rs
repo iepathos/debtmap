@@ -305,6 +305,7 @@ mod tests {
 
     fn create_test_metric(file: &str, name: &str) -> FunctionMetrics {
         FunctionMetrics {
+            column: None,
             name: name.to_string(),
             file: PathBuf::from(file),
             line: 1,

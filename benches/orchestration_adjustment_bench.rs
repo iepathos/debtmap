@@ -15,6 +15,7 @@ use std::path::PathBuf;
 
 fn create_test_func(name: &str, cyclomatic: u32, cognitive: u32, length: usize) -> FunctionMetrics {
     FunctionMetrics {
+        column: None,
         file: PathBuf::from("test.rs"),
         name: name.to_string(),
         line: 1,

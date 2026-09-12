@@ -736,6 +736,7 @@ mod tests {
         cognitive: u32,
     ) -> FunctionMetrics {
         FunctionMetrics {
+            column: None,
             name: name.to_string(),
             file: PathBuf::from("src/test.rs"),
             line: 42,

@@ -80,6 +80,9 @@ pub struct FunctionMetrics {
     pub name: String,
     pub file: PathBuf,
     pub line: usize,
+    /// Zero-based source identifier column, when available.
+    #[serde(default)]
+    pub column: Option<usize>,
     pub cyclomatic: u32,
     pub cognitive: u32,
     pub nesting: u32,
@@ -158,6 +161,7 @@ impl FunctionMetrics {
             name,
             file,
             line,
+            column: None,
             cyclomatic: 1,
             cognitive: 0,
             nesting: 0,

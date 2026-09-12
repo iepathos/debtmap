@@ -14,6 +14,7 @@
 //! - `visitor` - AST visitor for extraction (I/O boundary)
 //! - `mod` (this file) - Coordinator and state management (the shell)
 
+pub(super) mod identity;
 pub mod patterns;
 pub mod resolution;
 #[cfg(test)]
@@ -383,6 +384,7 @@ mod tests {
         let mut call_graph = CallGraph::new();
 
         let default_method = make_function_id("MyConfig::default", 10);
+        call_graph.add_function(default_method.clone(), false, false, 1, 1);
 
         let trait_impl = TraitImplementation {
             trait_name: "Default".to_string(),
@@ -411,6 +413,8 @@ mod tests {
 
         let clone_method = make_function_id("MyType::clone", 20);
         let clone_box_method = make_function_id("MyType::clone_box", 25);
+        call_graph.add_function(clone_method.clone(), false, false, 1, 1);
+        call_graph.add_function(clone_box_method.clone(), false, false, 1, 1);
 
         let trait_impl = TraitImplementation {
             trait_name: "Clone".to_string(),

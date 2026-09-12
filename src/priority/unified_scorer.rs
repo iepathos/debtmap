@@ -321,7 +321,8 @@ pub fn calculate_unified_priority_with_debt(
     debt_aggregator: Option<&DebtAggregator>,
     has_coverage_data: bool,
 ) -> UnifiedScore {
-    let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
+    let func_id =
+        FunctionId::new(func.file.clone(), func.name.clone(), func.line).with_column(func.column);
 
     // Check if this function is actually technical debt
     // Simple I/O wrappers, entry points, and trivial pure functions with low complexity
@@ -1047,7 +1048,8 @@ pub fn calculate_unified_priority_with_data_flow(
     debt_aggregator: Option<&DebtAggregator>,
     config: &crate::config::DataFlowScoringConfig,
 ) -> UnifiedScore {
-    let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
+    let func_id =
+        FunctionId::new(func.file.clone(), func.name.clone(), func.line).with_column(func.column);
     let role = classify_function_role(func, &func_id, call_graph);
 
     // Delegate to the role-aware version (spec 205)

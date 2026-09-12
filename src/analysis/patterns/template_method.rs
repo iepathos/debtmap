@@ -263,6 +263,7 @@ mod tests {
         };
 
         let function = FunctionMetrics {
+            column: None,
             name: "CSVProcessor.load_data".to_string(),
             file: PathBuf::from("processor.py"),
             line: 30,

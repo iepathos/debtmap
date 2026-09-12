@@ -33,6 +33,7 @@ pub fn to_function_metrics(file_path: &Path, extracted: &ExtractedFunctionData) 
         name: metric_function_name(file_path, extracted),
         file: file_path.to_path_buf(),
         line: extracted.line,
+        column: extracted.column,
         cyclomatic: extracted.cyclomatic,
         cognitive: extracted.cognitive,
         nesting: extracted.nesting,
@@ -367,6 +368,7 @@ mod tests {
 
     fn create_test_function(name: &str, line: usize, cyclomatic: u32) -> ExtractedFunctionData {
         ExtractedFunctionData {
+            column: None,
             name: name.to_string(),
             qualified_name: name.to_string(),
             line,

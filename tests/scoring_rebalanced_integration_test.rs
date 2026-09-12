@@ -523,6 +523,7 @@ fn create_test_function(
     length: usize,
 ) -> FunctionMetrics {
     FunctionMetrics {
+        column: None,
         name: name.to_string(),
         file: PathBuf::from("test.rs"),
         line: 1,

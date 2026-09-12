@@ -7,6 +7,7 @@ use std::path::PathBuf;
 
 fn create_test_metrics() -> FunctionMetrics {
     FunctionMetrics {
+        column: None,
         file: PathBuf::from("test.rs"),
         name: "test_function".to_string(),
         line: 10,
@@ -1058,7 +1059,8 @@ fn test_calculate_unified_priority_with_data_flow_enabled() {
     let call_graph = CallGraph::new();
     let mut data_flow = DataFlowGraph::from_call_graph(call_graph.clone());
 
-    let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
+    let func_id =
+        FunctionId::new(func.file.clone(), func.name.clone(), func.line).with_column(func.column);
 
     // Add some purity info
     data_flow.set_purity_info(

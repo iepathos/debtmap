@@ -143,6 +143,7 @@ mod tests {
 
         let metrics = vec![
             FunctionMetrics {
+                column: None,
                 file: PathBuf::from("test1.rs"),
                 name: "low_complexity".to_string(),
                 line: 10,
@@ -172,6 +173,7 @@ mod tests {
                 entropy_analysis: None,
             },
             FunctionMetrics {
+                column: None,
                 file: PathBuf::from("test2.rs"),
                 name: "high_complexity".to_string(),
                 line: 20,
@@ -201,6 +203,7 @@ mod tests {
                 entropy_analysis: None,
             },
             FunctionMetrics {
+                column: None,
                 file: PathBuf::from("test3.rs"),
                 name: "critical_complexity".to_string(),
                 line: 30,

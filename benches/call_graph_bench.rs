@@ -129,12 +129,14 @@ fn bench_cross_file_resolution(c: &mut Criterion) {
             for i in 0..50 {
                 let call = FunctionCall {
                     caller: FunctionId {
+                        column: None,
                         file: PathBuf::from(format!("file{}.rs", i % 10)),
                         name: format!("caller_{}", i),
                         line: i * 10,
                         module_path: String::new(),
                     },
                     callee: FunctionId {
+                        column: None,
                         file: PathBuf::from("unknown.rs"),
                         name: format!("unresolved_{}", i),
                         line: 0, // Line 0 indicates unresolved

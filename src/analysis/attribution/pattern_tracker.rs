@@ -287,6 +287,7 @@ mod tests {
         let detector = ErrorHandlingDetector::new();
 
         let func = FunctionMetrics {
+            column: None,
             name: "handle_error".to_string(),
             file: PathBuf::from("test.rs"),
             line: 10,
@@ -329,6 +330,7 @@ mod tests {
         let detector = ValidationDetector::new();
 
         let func = FunctionMetrics {
+            column: None,
             name: "validate_input".to_string(),
             file: PathBuf::from("test.rs"),
             line: 20,
@@ -370,6 +372,7 @@ mod tests {
         let detector = ErrorHandlingDetector::new();
 
         let func = FunctionMetrics {
+            column: None,
             name: "calculate_sum".to_string(),
             file: PathBuf::from("test.rs"),
             line: 30,
@@ -417,6 +420,7 @@ mod tests {
     fn test_analyze_patterns_with_functions() {
         let tracker = PatternTracker::new();
         let functions = vec![FunctionMetrics {
+            column: None,
             name: "handle_request_error".to_string(),
             file: PathBuf::from("test.rs"),
             line: 10,

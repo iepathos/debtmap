@@ -67,6 +67,7 @@ pub fn build_closure_metrics(
     };
 
     FunctionMetrics {
+        column: None,
         name,
         file,
         line,

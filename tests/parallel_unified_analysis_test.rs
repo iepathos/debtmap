@@ -11,6 +11,7 @@ use std::path::PathBuf;
 fn create_test_metrics(count: usize) -> Vec<FunctionMetrics> {
     (0..count)
         .map(|i| FunctionMetrics {
+            column: None,
             file: PathBuf::from(format!("test{}.rs", i / 10)),
             name: format!("function_{}", i),
             line: i * 10,
@@ -236,6 +237,7 @@ fn test_parallel_analysis_determinism() {
     let dup_line = 10;
 
     metrics.push(FunctionMetrics {
+        column: None,
         file: dup_file.clone(),
         name: "function_dup_1".to_string(),
         line: dup_line,
@@ -266,6 +268,7 @@ fn test_parallel_analysis_determinism() {
     });
 
     metrics.push(FunctionMetrics {
+        column: None,
         file: dup_file.clone(),
         name: "function_dup_2".to_string(),
         line: dup_line,
@@ -718,6 +721,7 @@ fn test_god_objects_created_in_parallel_analysis() {
     // Create metrics for this god object file
     let metrics: Vec<FunctionMetrics> = (0..60)
         .map(|i| FunctionMetrics {
+            column: None,
             file: god_file_path.clone(),
             name: format!("method_{}", i),
             line: i * 10 + 100,
@@ -849,6 +853,7 @@ fn test_god_objects_not_created_when_disabled() {
 
     let metrics: Vec<FunctionMetrics> = (0..60)
         .map(|i| FunctionMetrics {
+            column: None,
             file: file_path.clone(),
             name: format!("method_{}", i),
             line: i * 10,
@@ -931,6 +936,7 @@ fn test_god_objects_visible_in_tui() {
 
     let metrics: Vec<FunctionMetrics> = (0..60)
         .map(|i| FunctionMetrics {
+            column: None,
             file: god_file_path.clone(),
             name: format!("method_{}", i),
             line: i * 10 + 10,
@@ -1153,6 +1159,7 @@ fn complex_function(data: &[String]) -> HashMap<String, usize> {
     // Create metrics for the test file functions
     let metrics = vec![
         FunctionMetrics {
+            column: None,
             file: test_file.clone(),
             name: "Calculator::new".to_string(),
             line: 10,
@@ -1182,6 +1189,7 @@ fn complex_function(data: &[String]) -> HashMap<String, usize> {
             call_dependencies: None,
         },
         FunctionMetrics {
+            column: None,
             file: test_file.clone(),
             name: "Calculator::add".to_string(),
             line: 14,
@@ -1211,6 +1219,7 @@ fn complex_function(data: &[String]) -> HashMap<String, usize> {
             call_dependencies: None,
         },
         FunctionMetrics {
+            column: None,
             file: test_file.clone(),
             name: "Calculator::compute_complex".to_string(),
             line: 19,
@@ -1240,6 +1249,7 @@ fn complex_function(data: &[String]) -> HashMap<String, usize> {
             call_dependencies: None,
         },
         FunctionMetrics {
+            column: None,
             file: test_file.clone(),
             name: "pure_function".to_string(),
             line: 27,
@@ -1269,6 +1279,7 @@ fn complex_function(data: &[String]) -> HashMap<String, usize> {
             call_dependencies: None,
         },
         FunctionMetrics {
+            column: None,
             file: test_file.clone(),
             name: "complex_function".to_string(),
             line: 31,

@@ -158,6 +158,7 @@ mod tests {
 
         let metrics = vec![
             FunctionMetrics {
+                column: None,
                 file: PathBuf::from("test1.rs"),
                 name: "func1".to_string(),
                 line: 10,
@@ -187,6 +188,7 @@ mod tests {
                 entropy_analysis: None,
             },
             FunctionMetrics {
+                column: None,
                 file: PathBuf::from("test2.rs"),
                 name: "func2".to_string(),
                 line: 20,

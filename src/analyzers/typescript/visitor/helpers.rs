@@ -317,6 +317,7 @@ pub fn convert_to_function_metrics(
     };
 
     let mut metrics = FunctionMetrics {
+        column: None,
         name: js_metrics.name.clone(),
         file: js_metrics.file.clone(),
         line: js_metrics.line,

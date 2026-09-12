@@ -140,6 +140,13 @@ impl CrossModuleTracker {
 
     /// Analyze workspace files for cross-module dependencies
     pub fn analyze_workspace(&mut self, workspace_files: &[(PathBuf, File)]) -> Result<()> {
+        self.collect_workspace(workspace_files)?;
+        self.finalize_workspace();
+        Ok(())
+    }
+
+    /// Accumulate owned module metadata without revisiting previous batches.
+    pub(crate) fn collect_workspace(&mut self, workspace_files: &[(PathBuf, File)]) -> Result<()> {
         // First pass: Build module structure
         for (file_path, ast) in workspace_files {
             let module_path = self.infer_module_path(file_path);
@@ -179,10 +186,12 @@ impl CrossModuleTracker {
             }
         }
 
-        // Third pass: Build public API mappings
-        self.build_public_api_mappings();
-
         Ok(())
+    }
+
+    /// Finalize public APIs once all workspace files have been collected.
+    pub(crate) fn finalize_workspace(&mut self) {
+        self.build_public_api_mappings();
     }
 
     /// Get all cross-module calls

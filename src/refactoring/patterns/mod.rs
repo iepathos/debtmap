@@ -546,6 +546,7 @@ mod tests {
 
     fn create_test_function(name: &str, cyclomatic: u32) -> FunctionMetrics {
         FunctionMetrics {
+            column: None,
             name: name.to_string(),
             file: PathBuf::from("test.rs"),
             line: 42,

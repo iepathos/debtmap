@@ -174,7 +174,8 @@ impl UnifiedAnalysisUtils for UnifiedAnalysis {
 
     fn populate_purity_analysis(&mut self, metrics: &[crate::core::FunctionMetrics]) {
         for metric in metrics {
-            let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line);
+            let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line)
+                .with_column(metric.column);
 
             let purity_info = PurityInfo {
                 is_pure: metric.is_pure.unwrap_or(false),

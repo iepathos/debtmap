@@ -19,6 +19,7 @@ fn create_test_function(
     length: usize,
 ) -> FunctionMetrics {
     FunctionMetrics {
+        column: None,
         name: name.to_string(),
         file: PathBuf::from(file),
         line: 10,

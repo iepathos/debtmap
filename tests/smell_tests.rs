@@ -4,6 +4,7 @@ use std::path::PathBuf;
 #[test]
 fn test_code_smell_long_parameter_list() {
     let func = FunctionMetrics {
+        column: None,
         name: "test_function".to_string(),
         file: PathBuf::from("test.rs"),
         line: 10,
@@ -52,6 +53,7 @@ fn test_code_smell_long_parameter_list() {
 #[test]
 fn test_code_smell_long_method() {
     let mut func = FunctionMetrics {
+        column: None,
         name: "test_function".to_string(),
         file: PathBuf::from("test.rs"),
         line: 10,
@@ -100,6 +102,7 @@ fn test_code_smell_long_method() {
 #[test]
 fn test_code_smell_deep_nesting() {
     let mut func = FunctionMetrics {
+        column: None,
         name: "test_function".to_string(),
         file: PathBuf::from("test.rs"),
         line: 10,
@@ -148,6 +151,7 @@ fn test_code_smell_deep_nesting() {
 #[test]
 fn test_code_smell_detection_multiple() {
     let func = FunctionMetrics {
+        column: None,
         name: "bad_function".to_string(),
         file: PathBuf::from("test.rs"),
         line: 10,

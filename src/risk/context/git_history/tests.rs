@@ -42,6 +42,7 @@ fn function_history_git2(
 #[cfg(test)]
 fn test_function_metric(file: PathBuf, name: &str) -> crate::core::FunctionMetrics {
     crate::core::FunctionMetrics {
+        column: None,
         name: name.to_string(),
         file,
         line: 1,
@@ -749,6 +750,7 @@ fn test_batched_function_preload_matches_direct_lookup() -> Result<()> {
     let mut provider = GitHistoryProvider::new(repo_path.clone())?;
     let metrics = vec![
         crate::core::FunctionMetrics {
+            column: None,
             name: "alpha".to_string(),
             file: PathBuf::from("test.rs"),
             line: 1,
@@ -778,6 +780,7 @@ fn test_batched_function_preload_matches_direct_lookup() -> Result<()> {
             entropy_analysis: None,
         },
         crate::core::FunctionMetrics {
+            column: None,
             name: "beta".to_string(),
             file: PathBuf::from("test.rs"),
             line: 2,

@@ -482,6 +482,7 @@ mod tests {
     #[test]
     fn test_build_complexity_report_single_function() {
         let functions = vec![FunctionMetrics {
+            column: None,
             name: "test_func".to_string(),
             file: PathBuf::from("test.rs"),
             line: 10,
@@ -534,6 +535,7 @@ mod tests {
                 language: Language::Rust,
                 complexity: ComplexityMetrics {
                     functions: vec![FunctionMetrics {
+                        column: None,
                         name: "func_a".to_string(),
                         file: PathBuf::from("file1.rs"),
                         line: 5,
@@ -579,6 +581,7 @@ mod tests {
                 complexity: ComplexityMetrics {
                     functions: vec![
                         FunctionMetrics {
+                            column: None,
                             name: "func_b".to_string(),
                             file: PathBuf::from("file2.rs"),
                             line: 10,
@@ -608,6 +611,7 @@ mod tests {
                             entropy_analysis: None,
                         },
                         FunctionMetrics {
+                            column: None,
                             name: "func_c".to_string(),
                             file: PathBuf::from("file2.rs"),
                             line: 35,

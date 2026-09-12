@@ -28,6 +28,7 @@ mod stress_tests {
                 };
 
                 metrics.push(FunctionMetrics {
+                    column: None,
                     file: file_path.clone(),
                     name,
                     line: func_idx * 50 + 10,

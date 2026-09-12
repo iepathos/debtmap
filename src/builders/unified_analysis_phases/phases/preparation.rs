@@ -33,7 +33,8 @@ fn populate_extracted_facts(
 
 fn populate_metric_purity(graph: &mut DataFlowGraph, metrics: &[FunctionMetrics]) {
     for metric in metrics {
-        let function = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line);
+        let function = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line)
+            .with_column(metric.column);
         graph.set_purity_info(function, purity_from_metric(metric));
     }
 }
@@ -60,7 +61,8 @@ mod tests {
         let mut metric = FunctionMetrics::new("pure_function".to_string(), file.clone(), 7);
         metric.is_pure = Some(true);
         metric.purity_confidence = Some(0.9);
-        let function = FunctionId::new(file, metric.name.clone(), metric.line);
+        let function =
+            FunctionId::new(file, metric.name.clone(), metric.line).with_column(metric.column);
 
         let graph = build_data_flow_graph(&[metric], &CallGraph::new(), None);
 

@@ -120,7 +120,8 @@ impl PurityPropagator {
         // Phase 1: Initial purity analysis using existing PurityAnalyzer
         for func in functions {
             let initial = self.analyze_intrinsic_purity(func)?;
-            let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
+            let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line)
+                .with_column(func.column);
             self.cache.insert(func_id, initial);
         }
 
