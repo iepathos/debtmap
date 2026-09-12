@@ -2,7 +2,7 @@ use crate::debt::suppression_audit::SuppressionAudit;
 use crate::{
     builders::unified_analysis_phases::phases::scoring::{
         PreparedScoringInput, ScoringExecution, SuppressionContextCache,
-        score_metrics_with_policy_audited,
+        score_metrics_with_progress,
     },
     config::AnalysisPolicy,
     core::FunctionMetrics,
@@ -725,9 +725,13 @@ impl ParallelUnifiedAnalysisBuilder {
             ScoringExecution::Sequential
         };
         let scoring_start = Instant::now();
+        let processed = std::sync::atomic::AtomicUsize::new(0);
+        let last_update = Mutex::new(scoring_start);
         let outcome = {
             time_span!("score_functions", parent: "debt_scoring");
-            score_metrics_with_policy_audited(metrics, &input, execution, &self.analysis_policy)
+            score_metrics_with_progress(metrics, &input, execution, &self.analysis_policy, || {
+                record_scoring_progress(&processed, &last_update, total_metrics);
+            })
         };
         self.suppression_audit = outcome.audit;
         self.timings.score_functions = scoring_start.elapsed();
@@ -988,6 +992,35 @@ impl ParallelUnifiedAnalysisBuilder {
         log::debug!("  - Calculate impact: {:?}", self.timings.calculate_impact);
         log::debug!("  - Sorting: {:?}", self.timings.sorting);
     }
+}
+
+/// Count every completed metric, but acquire the UI lock only at batch boundaries.
+fn record_scoring_progress(
+    processed: &std::sync::atomic::AtomicUsize,
+    last_update: &Mutex<Instant>,
+    total: usize,
+) {
+    use std::sync::atomic::Ordering;
+    let current = processed.fetch_add(1, Ordering::Relaxed) + 1;
+    let batch = total.div_ceil(100).clamp(1, 32);
+    if !current.is_multiple_of(batch) {
+        return;
+    }
+    let Some(mut last) = last_update.try_lock() else {
+        return;
+    };
+    if last.elapsed() < Duration::from_millis(100) {
+        return;
+    }
+    if let Some(manager) = ProgressManager::global() {
+        manager.tui_update_subtask(
+            5,
+            1,
+            crate::tui::app::StageStatus::Active,
+            Some((processed.load(Ordering::Relaxed), total)),
+        );
+    }
+    *last = Instant::now();
 }
 
 fn record_file_progress(

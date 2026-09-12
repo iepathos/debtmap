@@ -1,7 +1,8 @@
 //! Pure scoring and debt prioritization functions.
 //!
 //! This module provides pure functions for calculating complexity scores
-//! and prioritizing debt items without any I/O or progress reporting.
+//! and prioritizing debt items. Scheduling can notify a caller-owned progress
+//! callback while the per-metric scoring transformation stays pure.
 //!
 //! # Parallelism (spec 196)
 //!
@@ -375,15 +376,26 @@ pub fn score_metrics_with_policy_audited(
     execution: ScoringExecution,
     policy: &crate::config::AnalysisPolicy,
 ) -> SuppressionOutcome<UnifiedDebtItem> {
-    let items: Vec<UnifiedDebtItem> = match execution {
-        ScoringExecution::Sequential => metrics
-            .iter()
-            .flat_map(|metric| score_metric(metric, input, policy))
-            .collect(),
-        ScoringExecution::Parallel => metrics
-            .par_iter()
-            .flat_map(|metric| score_metric(metric, input, policy))
-            .collect(),
+    score_metrics_with_progress(metrics, input, execution, policy, || {})
+}
+
+/// Notify the scheduling caller after each metric, including filtered metrics.
+/// The callback may run concurrently and does not participate in scoring results.
+pub(crate) fn score_metrics_with_progress(
+    metrics: &[FunctionMetrics],
+    input: &PreparedScoringInput<'_>,
+    execution: ScoringExecution,
+    policy: &crate::config::AnalysisPolicy,
+    on_metric_scored: impl Fn() + Sync,
+) -> SuppressionOutcome<UnifiedDebtItem> {
+    let score = |metric| {
+        let items = score_metric(metric, input, policy);
+        on_metric_scored();
+        items
+    };
+    let items = match execution {
+        ScoringExecution::Sequential => metrics.iter().flat_map(score).collect(),
+        ScoringExecution::Parallel => metrics.par_iter().flat_map(score).collect(),
     };
 
     apply_suppressions(items, input.suppression_contexts)
@@ -480,6 +492,69 @@ mod tests {
         let mut metric = create_test_metric(name, 1, 0);
         metric.is_pure = is_pure;
         metric
+    }
+
+    #[test]
+    fn progress_counts_filtered_metrics_without_changing_scoring_or_audit() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let graph = CallGraph::new();
+        let exclusions = HashSet::new();
+        let aggregator = DebtAggregator::new();
+        let line_counts = HashMap::from([(PathBuf::from("test.rs"), 100)]);
+        let suppressions = HashMap::from([(
+            PathBuf::from("test.rs"),
+            parse_suppression_comments(
+                "// debtmap:ignore[complexity] -- audited exception\nfn suppressed() {}",
+                Language::Rust,
+                Path::new("test.rs"),
+            ),
+        )]);
+        let input = PreparedScoringInput {
+            call_graph: &graph,
+            test_only_functions: &exclusions,
+            coverage_data: None,
+            framework_exclusions: &exclusions,
+            function_pointer_used_functions: None,
+            debt_aggregator: &aggregator,
+            data_flow: None,
+            risk_analyzer: None,
+            project_path: Path::new("."),
+            file_line_counts: &line_counts,
+            suppression_contexts: &suppressions,
+        };
+        let policy = crate::config::AnalysisPolicy::from_config(&Default::default());
+        let mut skipped = create_test_metric("test_skipped", 30, 40);
+        skipped.is_test = true;
+        let mut suppressed = create_test_metric("suppressed", 30, 40);
+        suppressed.line = 2;
+        let metrics = vec![create_test_metric("work", 30, 40), skipped, suppressed];
+        let expected = score_metrics_with_policy_audited(
+            &metrics,
+            &input,
+            ScoringExecution::Sequential,
+            &policy,
+        );
+        assert!(!expected.emitted.is_empty());
+        assert!(!expected.audit.is_empty());
+
+        for execution in [ScoringExecution::Sequential, ScoringExecution::Parallel] {
+            let completed = AtomicUsize::new(0);
+            let actual = score_metrics_with_progress(&metrics, &input, execution, &policy, || {
+                completed.fetch_add(1, Ordering::Relaxed);
+            });
+            assert_eq!(completed.load(Ordering::Relaxed), metrics.len());
+            assert_eq!(actual.audit, expected.audit);
+            assert_eq!(
+                serde_json::to_value(actual.emitted).unwrap(),
+                serde_json::to_value(&expected.emitted).unwrap(),
+            );
+            let empty = score_metrics_with_progress(&[], &input, execution, &policy, || {
+                panic!("empty scoring must not report completed metrics");
+            });
+            assert!(empty.emitted.is_empty());
+            assert!(empty.audit.is_empty());
+        }
     }
 
     #[test]

@@ -43,7 +43,7 @@ declaration spelling, such as `fn run` for `Worker::run`. A completed history pr
 also remembers missing results, allowing cached file-history fallback without
 repeating the repository scan during scoring. This history search remains based on
 textual occurrences; it does not distinguish same-named historical declarations
-within one file.
+within one file. Function-scoring progress advances as metrics finish.
 
 Type identity includes its file, lexical module, and declaration location. Printed
 names are display values. A dotted call cannot select a free function or an
