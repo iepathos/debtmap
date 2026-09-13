@@ -1,29 +1,17 @@
-//! Lexical declaration paths and imports.
-
+//! Lexical declaration paths and namespace-specific import precedence.
 use super::*;
+#[path = "path_conflicts.rs"]
+mod conflicts;
+#[path = "path_namespaces.rs"]
+mod namespaces;
+
+#[derive(Clone, Copy)]
+enum Namespace {
+    Type,
+    Value,
+}
 
 impl WorkspaceIndex {
-    pub(super) fn type_candidates(
-        &self,
-        path: &[String],
-        context: &Context,
-    ) -> Vec<&TypeDeclaration> {
-        let paths = self.resolve_paths(path, context);
-        let positions: HashSet<_> = paths
-            .iter()
-            .filter_map(|path| self.type_paths.get(path))
-            .flatten()
-            .copied()
-            .collect();
-        let mut candidates: Vec<_> = positions
-            .into_iter()
-            .map(|position| &self.declarations[position])
-            .filter(|decl| self.same_workspace(&context.file, &decl.id.file))
-            .collect();
-        candidates.sort_by(|left, right| left.id.cmp(&right.id));
-        candidates
-    }
-
     pub(super) fn same_workspace(&self, left: &Path, right: &Path) -> bool {
         left == right
             || (self
@@ -44,9 +32,91 @@ impl WorkspaceIndex {
     }
 
     pub(super) fn resolve_paths(&self, path: &[String], context: &Context) -> Vec<Vec<String>> {
-        self.resolve_paths_bounded(path, context, 0)
+        self.resolved_namespace_paths(path, context, Namespace::Type)
+    }
+
+    pub(super) fn resolve_value_paths(
+        &self,
+        path: &[String],
+        context: &Context,
+    ) -> Vec<Vec<String>> {
+        self.resolved_namespace_paths(path, context, Namespace::Value)
+    }
+
+    fn resolved_namespace_paths(
+        &self,
+        path: &[String],
+        context: &Context,
+        namespace: Namespace,
+    ) -> Vec<Vec<String>> {
+        self.resolve_namespace_paths(path, context, 0, namespace)
             .iter()
-            .flat_map(|path| self.expand_reexports(path, context, 0))
+            .flat_map(|path| self.expand_reexports(path, context, 0, namespace))
+            .collect()
+    }
+
+    fn resolve_namespace_paths(
+        &self,
+        path: &[String],
+        context: &Context,
+        depth: usize,
+        namespace: Namespace,
+    ) -> Vec<Vec<String>> {
+        if depth >= EXPANSION_LIMIT || path.is_empty() {
+            return Vec::new();
+        }
+        if matches!(path[0].as_str(), "crate" | "self" | "super" | "::") {
+            return vec![relative_path(path, &context.module)];
+        }
+        let first_namespace = if path.len() > 1 {
+            Namespace::Type
+        } else {
+            namespace
+        };
+        let first = qualified(&context.module, &path[0]);
+        let local = qualified_path(&context.module, path);
+        let mut explicit = self
+            .has_binding(&first, context, first_namespace)
+            .then(|| local.clone())
+            .into_iter()
+            .collect::<Vec<_>>();
+        explicit.extend(
+            self.context_imports(context)
+                .filter(|import| !import.glob && import.alias == path[0])
+                .flat_map(|import| self.import_targets(import, context, depth, first_namespace))
+                .map(|prefix| qualified_path(&prefix, &path[1..])),
+        );
+        if !explicit.is_empty() {
+            return explicit;
+        }
+        std::iter::once(local)
+            .chain(
+                self.context_imports(context)
+                    .filter(|import| import.glob)
+                    .map(|import| {
+                        qualified_path(&relative_path(&import.path, &context.module), path)
+                    }),
+            )
+            .collect()
+    }
+
+    fn import_targets(
+        &self,
+        import: &Import,
+        context: &Context,
+        depth: usize,
+        namespace: Namespace,
+    ) -> Vec<Vec<String>> {
+        let targets = if import.path == [import.alias.clone()] {
+            vec![relative_path(&import.path, &import.context.module)]
+        } else {
+            self.resolve_namespace_paths(&import.path, &import.context, depth + 1, namespace)
+        };
+        targets
+            .into_iter()
+            .filter(|path| {
+                self.has_binding(path, context, namespace) || !self.path_is_known(path, context)
+            })
             .collect()
     }
 
@@ -55,75 +125,62 @@ impl WorkspaceIndex {
         path: &[String],
         context: &Context,
         depth: usize,
+        namespace: Namespace,
     ) -> Vec<Vec<String>> {
         if depth >= EXPANSION_LIMIT {
             return Vec::new();
         }
         for position in 0..path.len() {
+            let segment_namespace = if position + 1 < path.len() {
+                Namespace::Type
+            } else {
+                namespace
+            };
             let imports: Vec<_> = self
                 .module_imports(&path[..position])
                 .filter(|import| !import.glob && import.alias == path[position])
                 .filter(|import| self.same_workspace(&context.file, &import.context.file))
+                .flat_map(|import| self.import_targets(import, context, depth, segment_namespace))
+                .map(|prefix| qualified_path(&prefix, &path[position + 1..]))
+                .filter(|expanded| expanded != path)
                 .collect();
             if !imports.is_empty() {
-                return imports
-                    .into_iter()
-                    .flat_map(|import| {
-                        self.resolve_paths_bounded(&import.path, &import.context, depth + 1)
-                            .into_iter()
-                            .map(|prefix| qualified_path(&prefix, &path[position + 1..]))
-                            .filter(|expanded| expanded != path)
-                            .flat_map(|expanded| {
-                                self.expand_reexports(&expanded, context, depth + 1)
-                            })
-                            .collect::<Vec<_>>()
-                    })
+                let local = self
+                    .has_binding(&path[..=position], context, segment_namespace)
+                    .then(|| path.to_vec())
+                    .into_iter();
+                return local
+                    .chain(imports.iter().flat_map(|expanded| {
+                        self.expand_reexports(expanded, context, depth + 1, namespace)
+                    }))
                     .collect();
             }
         }
         vec![path.to_vec()]
     }
 
-    pub(super) fn resolve_paths_bounded(
-        &self,
-        path: &[String],
-        context: &Context,
-        depth: usize,
-    ) -> Vec<Vec<String>> {
-        if depth >= EXPANSION_LIMIT || path.is_empty() {
-            return Vec::new();
-        }
-        if matches!(path[0].as_str(), "crate" | "self" | "super" | "::") {
-            return vec![relative_path(path, &context.module)];
-        }
-        let imports: Vec<_> = self
-            .context_imports(context)
-            .filter(|import| import.alias == path[0] && !import.glob)
-            .collect();
-        if !imports.is_empty() {
-            return imports
-                .iter()
-                .flat_map(|import| {
-                    let expanded = import
-                        .path
-                        .iter()
-                        .chain(path.iter().skip(1))
-                        .cloned()
-                        .collect::<Vec<_>>();
-                    if expanded == path {
-                        vec![relative_path(&expanded, &context.module)]
-                    } else {
-                        self.resolve_paths_bounded(&expanded, context, depth + 1)
-                    }
+    /// Identify established import namespaces; unavailable imports remain conservative.
+    pub fn path_namespaces(&self, path: &[String], context: &Context) -> Option<(bool, bool)> {
+        let types = self
+            .resolve_paths(path, context)
+            .iter()
+            .any(|path| self.has_binding(path, context, Namespace::Type));
+        let values = self
+            .resolve_value_paths(path, context)
+            .iter()
+            .any(|path| self.has_binding(path, context, Namespace::Value));
+        (types || values).then_some((types, values))
+    }
+
+    pub(super) fn explicitly_bound_type(&self, name: &str, context: &Context) -> bool {
+        self.has_binding(&qualified(&context.module, name), context, Namespace::Type)
+            || self
+                .context_imports(context)
+                .filter(|import| !import.glob && import.alias == name)
+                .any(|import| {
+                    !self
+                        .import_targets(import, context, 0, Namespace::Type)
+                        .is_empty()
                 })
-                .collect();
-        }
-        let local = qualified_path(&context.module, path);
-        let mut paths = vec![local];
-        for import in self.context_imports(context).filter(|import| import.glob) {
-            let prefix = relative_path(&import.path, &context.module);
-            paths.push(qualified_path(&prefix, path));
-        }
-        paths
     }
 }

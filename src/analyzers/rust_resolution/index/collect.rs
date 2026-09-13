@@ -47,6 +47,8 @@ impl WorkspaceIndex {
                     DeclarationKind::Trait,
                 ),
                 syn::Item::Mod(item) => {
+                    self.module_paths
+                        .insert(child_context(context, &item.ident.to_string()));
                     if let Some((_, items)) = &item.content {
                         self.collect_types(items, &child_context(context, &item.ident.to_string()));
                     }
@@ -115,6 +117,14 @@ impl WorkspaceIndex {
             fields: field_types,
             alias: alias.as_ref().map(TypeSyntax::from_syn),
             is_trait: kind == DeclarationKind::Trait,
+            tuple_arity: if kind == DeclarationKind::Struct {
+                match fields {
+                    syn::Fields::Unnamed(fields) => Some(fields.unnamed.len()),
+                    _ => None,
+                }
+            } else {
+                None
+            },
             unit: matches!(fields, syn::Fields::Unit) && kind == DeclarationKind::Struct,
         });
     }

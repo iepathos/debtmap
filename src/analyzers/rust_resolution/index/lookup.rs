@@ -43,6 +43,7 @@ impl WorkspaceIndex {
             candidates,
             justified,
             provenance: CallEdgeProvenance::TypeResolution,
+            reason: None,
         }
     }
 
@@ -162,7 +163,7 @@ impl WorkspaceIndex {
                 return self.lookup_associated(&owner, &segments[segments.len() - 1], context);
             }
         }
-        let paths = self.resolve_paths(&segments, context);
+        let paths = self.resolve_value_paths(&segments, context);
         let candidates = self
             .named_callables(segments.last().map(String::as_str).unwrap_or_default())
             .filter(|call| call.kind == CallableKind::FreeFunction)
@@ -174,7 +175,8 @@ impl WorkspaceIndex {
                 ))
             })
             .collect::<Vec<_>>();
-        let justified = candidates.len() == 1;
+        let ambiguous = candidates.len() == 1 && self.value_path_conflicts(&segments, context);
+        let justified = candidates.len() == 1 && !ambiguous;
         let provenance = if candidates.first().is_some_and(|call| {
             qualified(&call.context.module, &call.signature.ident.to_string())
                 != relative_path(&segments, &context.module)
@@ -187,6 +189,7 @@ impl WorkspaceIndex {
             candidates,
             justified,
             provenance,
+            reason: ambiguous.then_some(UncertaintyReason::AmbiguousDeclaration),
         }
     }
 
@@ -232,6 +235,7 @@ impl WorkspaceIndex {
             .collect::<Vec<_>>();
         let justified = candidates.len() == 1
             && owner.has_receiver_identity()
+            && !trait_type.is_uncertain()
             && candidates[0].requirements_known
             && candidates[0]
                 .owner
@@ -241,6 +245,11 @@ impl WorkspaceIndex {
             candidates,
             justified,
             provenance: CallEdgeProvenance::TypeResolution,
+            reason: matches!(
+                trait_type.uncertainty_reason(),
+                Some(UnknownReason::AmbiguousDeclaration)
+            )
+            .then_some(UncertaintyReason::AmbiguousDeclaration),
         }
     }
 }

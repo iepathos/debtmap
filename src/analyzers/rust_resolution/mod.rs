@@ -2,8 +2,10 @@
 //!
 //! This module deliberately keeps possible targets outside resolved graph edges.
 mod bindings;
+mod block_items;
 mod body;
 pub(crate) mod cached;
+mod expression_paths;
 mod expressions;
 mod flow;
 pub(crate) mod index;

@@ -41,6 +41,7 @@ impl DeclarationCollector {
         let known = self.known.into_values().flatten().collect();
         self.index.establish_modules(known, self.edges);
         self.index.rebase_declarations();
+        self.index.index_module_files();
         self.index.index_declarations();
         self.index.finish_callables();
         self.index
@@ -48,6 +49,15 @@ impl DeclarationCollector {
 }
 
 impl WorkspaceIndex {
+    fn index_module_files(&mut self) {
+        for context in &self.module_paths {
+            self.module_files
+                .entry(context.module.clone())
+                .or_default()
+                .insert(context.file.clone());
+        }
+    }
+
     fn rebase_declarations(&mut self) {
         let bases: HashMap<_, _> = self
             .contexts
@@ -68,6 +78,14 @@ impl WorkspaceIndex {
         for import in &mut self.imports {
             rebase_context(&mut import.context, &bases);
         }
+        self.module_paths = self
+            .module_paths
+            .drain()
+            .map(|mut context| {
+                rebase_context(&mut context, &bases);
+                context
+            })
+            .collect();
         for callable in &mut self.callables {
             rebase_context(&mut callable.context, &bases);
             for fact in callable.substitutions.values_mut() {

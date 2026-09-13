@@ -12,7 +12,7 @@ impl WorkspaceIndex {
         if let Some(value) = self.declared_value_type(path, context) {
             return Some(value);
         }
-        let declarations = self.type_candidates(&resolution_segments(path), context);
+        let declarations = self.constructor_declarations(path, context);
         match declarations.as_slice() {
             [declaration] if declaration.unit => {
                 Some(self.type_from_path(path, context, substitutions))
@@ -21,12 +21,31 @@ impl WorkspaceIndex {
         }
     }
 
+    fn constructor_declarations(
+        &self,
+        path: &syn::Path,
+        context: &Context,
+    ) -> Vec<&TypeDeclaration> {
+        let positions: HashSet<_> = self
+            .resolve_value_paths(&resolution_segments(path), context)
+            .iter()
+            .filter_map(|path| self.type_paths.get(path))
+            .flatten()
+            .copied()
+            .collect();
+        positions
+            .into_iter()
+            .map(|position| &self.declarations[position])
+            .filter(|declaration| self.same_workspace(&context.file, &declaration.id.file))
+            .collect()
+    }
+
     pub(super) fn declared_value_type(
         &self,
         path: &syn::Path,
         context: &Context,
     ) -> Option<TypeFact> {
-        let paths = self.resolve_paths(&resolution_segments(path), context);
+        let paths = self.resolve_value_paths(&resolution_segments(path), context);
         let positions: HashSet<_> = paths
             .iter()
             .filter_map(|path| self.value_paths.get(path))
@@ -45,7 +64,13 @@ impl WorkspaceIndex {
             .collect();
         match facts.as_slice() {
             [] => None,
-            [fact] => Some(fact.clone()),
+            [fact] => Some(
+                if self.value_path_conflicts(&resolution_segments(path), context) {
+                    with_uncertainty(fact.clone(), UnknownReason::AmbiguousDeclaration)
+                } else {
+                    fact.clone()
+                },
+            ),
             _ => Some(with_uncertainty(
                 TypeFact::Ambiguous(facts),
                 UnknownReason::AmbiguousDeclaration,

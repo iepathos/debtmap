@@ -12,7 +12,9 @@ impl WorkspaceIndex {
             .map(|declaration| declaration.id.clone())
             .collect();
         match candidates.as_slice() {
-            [declaration] => TraitBoundFact::Resolved(declaration.clone()),
+            [declaration] if !self.type_path_conflicts(path, context) => {
+                TraitBoundFact::Resolved(declaration.clone())
+            }
             _ => TraitBoundFact::Unresolved {
                 path: path.to_vec(),
                 file: context.file.clone(),

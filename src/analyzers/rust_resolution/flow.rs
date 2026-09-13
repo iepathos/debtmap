@@ -1,12 +1,20 @@
 //! Side-effect discovery for conservative loop-carried facts, respecting local shadows.
+use super::index::{Context, WorkspaceIndex};
 use std::collections::HashSet;
 use syn::{
     Expr, Pat,
     visit::{self, Visit},
 };
 
-pub(super) fn loop_writes(condition: Option<&Expr>, block: &syn::Block) -> HashSet<String> {
+pub(super) fn loop_writes(
+    condition: Option<&Expr>,
+    block: &syn::Block,
+    index: &WorkspaceIndex,
+    context: &Context,
+) -> HashSet<String> {
     let mut collector = Writes {
+        index,
+        context,
         scopes: vec![HashSet::new()],
         names: HashSet::new(),
     };
@@ -17,12 +25,14 @@ pub(super) fn loop_writes(condition: Option<&Expr>, block: &syn::Block) -> HashS
     collector.names
 }
 
-struct Writes {
+struct Writes<'a> {
+    index: &'a WorkspaceIndex,
+    context: &'a Context,
     scopes: Vec<HashSet<String>>,
     names: HashSet<String>,
 }
 
-impl Writes {
+impl Writes<'_> {
     fn bind(&mut self, pat: &Pat) {
         let mut collector = Names::default();
         collector.visit_pat(pat);
@@ -54,12 +64,24 @@ impl Writes {
     }
 }
 
-impl<'ast> Visit<'ast> for Writes {
+impl<'ast> Visit<'ast> for Writes<'_> {
     fn visit_item(&mut self, _: &'ast syn::Item) {}
     fn visit_expr_closure(&mut self, _: &'ast syn::ExprClosure) {}
 
     fn visit_block(&mut self, block: &'ast syn::Block) {
-        self.scopes.push(block_items(block).collect());
+        self.scopes.push(
+            super::block_items::block_items(block)
+                .into_iter()
+                .filter(|item| {
+                    item.import
+                        .as_ref()
+                        .and_then(|path| self.index.path_namespaces(path, self.context))
+                        .map(|(_, values)| values)
+                        .unwrap_or(item.values)
+                })
+                .map(|item| item.name)
+                .collect(),
+        );
         for statement in &block.stmts {
             self.visit_stmt(statement);
         }
@@ -125,61 +147,5 @@ impl<'ast> Visit<'ast> for Names {
     fn visit_pat_ident(&mut self, pat: &'ast syn::PatIdent) {
         self.0.insert(pat.ident.to_string());
         visit::visit_pat_ident(self, pat);
-    }
-}
-
-/// Block items are in scope throughout their block, including preceding statements.
-pub(super) fn block_items(block: &syn::Block) -> impl Iterator<Item = String> + '_ {
-    block
-        .stmts
-        .iter()
-        .filter_map(|stmt| match stmt {
-            syn::Stmt::Item(item) => Some(item_names(item)),
-            _ => None,
-        })
-        .flatten()
-}
-
-fn item_names(item: &syn::Item) -> Vec<String> {
-    let name = match item {
-        syn::Item::Fn(item) => &item.sig.ident,
-        syn::Item::Struct(item) => &item.ident,
-        syn::Item::Enum(item) => &item.ident,
-        syn::Item::Union(item) => &item.ident,
-        syn::Item::Type(item) => &item.ident,
-        syn::Item::Const(item) => &item.ident,
-        syn::Item::Static(item) => &item.ident,
-        syn::Item::Mod(item) => &item.ident,
-        syn::Item::Trait(item) => &item.ident,
-        syn::Item::TraitAlias(item) => &item.ident,
-        syn::Item::ExternCrate(item) => item
-            .rename
-            .as_ref()
-            .map(|(_, name)| name)
-            .unwrap_or(&item.ident),
-        syn::Item::Use(item) => return use_names(&item.tree, None),
-        _ => return Vec::new(),
-    };
-    vec![name.to_string()]
-}
-
-fn use_names(tree: &syn::UseTree, parent: Option<&syn::Ident>) -> Vec<String> {
-    match tree {
-        syn::UseTree::Path(path) => use_names(&path.tree, Some(&path.ident)),
-        syn::UseTree::Name(name) => vec![
-            if name.ident == "self" {
-                parent.unwrap_or(&name.ident)
-            } else {
-                &name.ident
-            }
-            .to_string(),
-        ],
-        syn::UseTree::Rename(rename) => vec![rename.rename.to_string()],
-        syn::UseTree::Group(group) => group
-            .items
-            .iter()
-            .flat_map(|item| use_names(item, parent))
-            .collect(),
-        syn::UseTree::Glob(_) => vec!["*".into()],
     }
 }

@@ -2,7 +2,7 @@
 
 use super::types::{DeclarationId, TypeFact, UnknownReason};
 use crate::analyzers::call_graph::module_tree::ModuleTree;
-use crate::priority::call_graph::{CallEdgeProvenance, FunctionId};
+use crate::priority::call_graph::{CallEdgeProvenance, FunctionId, UncertaintyReason};
 use quote::ToTokens;
 
 #[path = "index/adjustments.rs"]
@@ -89,6 +89,7 @@ pub struct Lookup<'a> {
     pub candidates: Vec<&'a Callable>,
     pub justified: bool,
     pub provenance: CallEdgeProvenance,
+    pub reason: Option<UncertaintyReason>,
 }
 
 impl Default for Lookup<'_> {
@@ -97,6 +98,7 @@ impl Default for Lookup<'_> {
             candidates: Vec::new(),
             justified: false,
             provenance: CallEdgeProvenance::AstDirect,
+            reason: None,
         }
     }
 }
@@ -110,6 +112,7 @@ struct TypeDeclaration {
     alias: Option<TypeSyntax>,
     is_trait: bool,
     unit: bool,
+    tuple_arity: Option<usize>,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -140,6 +143,8 @@ struct Import {
 #[derive(Default)]
 pub struct WorkspaceIndex {
     declarations: Vec<TypeDeclaration>,
+    module_paths: HashSet<Context>,
+    module_files: HashMap<Vec<String>, HashSet<PathBuf>>,
     values: Vec<ValueDeclaration>,
     value_paths: HashMap<Vec<String>, Vec<usize>>,
     callables: Vec<Callable>,

@@ -115,7 +115,14 @@ impl WorkspaceIndex {
             .collect();
         match candidates.as_slice() {
             [] => self.unavailable_type(segments, context),
-            [declaration] => self.expand_declaration(declaration, arguments, depth),
+            [declaration] => {
+                let fact = self.expand_declaration(declaration, arguments, depth);
+                if self.type_path_conflicts(segments, context) {
+                    with_uncertainty(fact, UnknownReason::AmbiguousDeclaration)
+                } else {
+                    fact
+                }
+            }
             declarations => TypeFact::Uncertain {
                 constraint: Box::new(TypeFact::Ambiguous(
                     declarations
@@ -133,9 +140,7 @@ impl WorkspaceIndex {
     fn unavailable_type(&self, segments: &[String], context: &Context) -> TypeFact {
         let paths = self.resolve_paths(segments, context);
         if segments.len() == 1
-            && !self
-                .context_imports(context)
-                .any(|import| !import.glob && import.alias == segments[0])
+            && !self.explicitly_bound_type(&segments[0], context)
             && let Some(primitive) = super::super::types::PrimitiveType::from_name(&segments[0])
         {
             return TypeFact::Primitive(primitive);

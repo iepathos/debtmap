@@ -10,8 +10,13 @@ impl<'ast> Visit<'ast> for Body<'_> {
 
     fn visit_block(&mut self, block: &'ast syn::Block) {
         self.bindings.push();
-        for name in super::flow::block_items(block) {
-            self.bindings.shadow_item(name);
+        for item in super::block_items::block_items(block) {
+            let namespaces = item
+                .import
+                .as_ref()
+                .and_then(|path| self.index.path_namespaces(path, &self.callable.context));
+            let (types, values) = namespaces.unwrap_or((item.types, item.values));
+            self.bindings.shadow_item(item.name, types, values);
         }
         for stmt in &block.stmts {
             self.visit_stmt(stmt);
@@ -177,7 +182,12 @@ impl Body<'_> {
     }
 
     fn visit_while(&mut self, expr: &syn::ExprWhile) {
-        let writes = super::flow::loop_writes(Some(&expr.cond), &expr.body);
+        let writes = super::flow::loop_writes(
+            Some(&expr.cond),
+            &expr.body,
+            self.index,
+            &self.callable.context,
+        );
         self.bindings.invalidate_writes(&writes);
         self.bindings.push();
         self.visit_expr(&expr.cond);
@@ -187,7 +197,7 @@ impl Body<'_> {
     }
 
     fn visit_loop_body(&mut self, block: &syn::Block) {
-        let writes = super::flow::loop_writes(None, block);
+        let writes = super::flow::loop_writes(None, block, self.index, &self.callable.context);
         self.bindings.invalidate_writes(&writes);
         self.visit_block(block);
         self.bindings.invalidate_writes(&writes);

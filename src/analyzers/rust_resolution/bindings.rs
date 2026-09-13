@@ -16,14 +16,14 @@ struct Binding {
 #[derive(Clone, Debug)]
 pub(super) struct Bindings {
     scopes: Vec<HashMap<String, Binding>>,
-    item_scopes: Vec<HashSet<String>>,
+    type_scopes: Vec<HashSet<String>>,
 }
 
 impl Default for Bindings {
     fn default() -> Self {
         Self {
             scopes: vec![HashMap::new()],
-            item_scopes: vec![HashSet::new()],
+            type_scopes: vec![HashSet::new()],
         }
     }
 }
@@ -31,22 +31,29 @@ impl Default for Bindings {
 impl Bindings {
     pub fn push(&mut self) {
         self.scopes.push(HashMap::new());
-        self.item_scopes.push(HashSet::new());
+        self.type_scopes.push(HashSet::new());
     }
     pub fn pop(&mut self) {
         self.scopes.pop();
-        self.item_scopes.pop();
+        self.type_scopes.pop();
     }
-    pub fn shadow_item(&mut self, name: String) {
-        if let Some(scope) = self.item_scopes.last_mut() {
+    pub fn shadow_item(&mut self, name: String, types: bool, values: bool) {
+        if types && let Some(scope) = self.type_scopes.last_mut() {
             scope.insert(name.clone());
         }
-        self.insert(name, unknown(), false);
+        if values {
+            self.insert(name, unknown(), false);
+        }
     }
-    pub fn item_shadowed(&self, name: &str) -> bool {
-        self.item_scopes
+    pub fn type_shadowed(&self, name: &str) -> bool {
+        self.type_scopes
             .iter()
             .any(|scope| scope.contains(name) || scope.contains("*"))
+    }
+    pub fn value_shadowed(&self, name: &str) -> bool {
+        self.scopes
+            .iter()
+            .any(|scope| scope.contains_key(name) || scope.contains_key("*"))
     }
     pub fn get(&self, name: &str) -> Option<TypeFact> {
         self.scopes

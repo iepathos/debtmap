@@ -105,7 +105,9 @@ impl<'a> Body<'a> {
         if lookup.justified && candidates.len() == 1 {
             self.record_resolved(candidates[0].clone(), site, lookup.provenance);
         } else {
-            let reason = uncertainty_reason(receiver.as_ref(), candidates.len());
+            let reason = lookup
+                .reason
+                .unwrap_or_else(|| uncertainty_reason(receiver.as_ref(), candidates.len()));
             self.graph.record_uncertain_call(UncertainCall {
                 caller: self.callable.id.clone(),
                 call_site: site,
@@ -178,11 +180,12 @@ struct TypeShadows<'a> {
 
 impl<'ast> Visit<'ast> for TypeShadows<'_> {
     fn visit_type_path(&mut self, ty: &'ast syn::TypePath) {
-        self.found |= ty
-            .path
-            .segments
-            .first()
-            .is_some_and(|s| self.bindings.item_shadowed(&s.ident.to_string()));
+        self.found |= ty.path.leading_colon.is_none()
+            && ty
+                .path
+                .segments
+                .first()
+                .is_some_and(|s| self.bindings.type_shadowed(&s.ident.to_string()));
         syn::visit::visit_type_path(self, ty);
     }
 }
