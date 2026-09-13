@@ -1,5 +1,7 @@
 //! Rust source positions remain authoritative across extraction and enhancement.
 
+#[path = "rust_method_resolution_support/source_builders.rs"]
+mod source_builders;
 use debtmap::analysis::call_graph::RustCallGraphBuilder;
 use debtmap::analyzers::rust_call_graph::extract_call_graph;
 use debtmap::extraction::{UnifiedFileExtractor, adapters};
@@ -144,6 +146,11 @@ fn legacy_json_defaults_column_and_current_postcard_retains_it() {
     let restored: debtmap::extraction::ExtractedFunctionData =
         postcard::from_bytes(&bytes).unwrap();
     assert_eq!(restored.column, function.column);
+    let metric = &adapters::metrics::all_function_metrics(&extracted)[0];
+    let mut legacy = serde_json::to_value(metric).unwrap();
+    legacy.as_object_mut().unwrap().remove("column");
+    let legacy: debtmap::core::FunctionMetrics = serde_json::from_value(legacy).unwrap();
+    assert_eq!(legacy.column, None);
 }
 
 #[test]
@@ -175,4 +182,102 @@ fn same_line_trait_roles_attach_to_the_exact_implementation() {
             .trait_registry
             .has_trait_implementations(&methods[1])
     );
+}
+
+#[test]
+fn cached_enhancement_preserves_exact_trait_roles_and_framework_exclusions() {
+    let source = "mod nested { struct Foo; trait Alternate { fn default() -> Self; } impl Default for Foo { fn default() -> Self { Foo } } impl Alternate for Foo { fn default() -> Self { Foo } } fn visit_item() {} fn map(callback: fn()) {} fn caller() { map(visit_item); } }";
+    let path = PathBuf::from("src/lib.rs");
+    let extracted = UnifiedFileExtractor::extract(&path, source).unwrap();
+    let count = extracted.functions.len();
+    let snapshots = HashMap::from([(path, extracted)]);
+    let (graph, exclusions, pointer_used) =
+        debtmap::builders::parallel_call_graph::build_call_graph_from_extracted(
+            CallGraph::new(),
+            &snapshots,
+        );
+    assert_eq!(graph.node_count(), count);
+    let mut methods: Vec<_> = graph
+        .get_all_functions()
+        .filter(|id| id.name == "nested::Foo::default")
+        .cloned()
+        .collect();
+    methods.sort();
+    assert_eq!(methods.len(), 2);
+    assert!(graph.is_entry_point(&methods[0]));
+    assert!(!graph.is_entry_point(&methods[1]));
+    let visitor = graph
+        .get_all_functions()
+        .find(|id| id.name == "nested::visit_item")
+        .unwrap();
+    assert!(exclusions.contains(visitor));
+    assert!(
+        exclusions
+            .iter()
+            .chain(&pointer_used)
+            .all(|id| graph.get_function_info(id).is_some())
+    );
+    assert!(
+        graph
+            .get_all_calls()
+            .iter()
+            .all(|call| graph.get_function_info(&call.caller).is_some()
+                && graph.get_function_info(&call.callee).is_some())
+    );
+    let adapter = adapters::call_graph::build_call_graph(&snapshots);
+    assert!(adapter.is_entry_point(&methods[0]));
+    assert!(!adapter.is_entry_point(&methods[1]));
+}
+
+#[test]
+fn cached_pointer_exclusions_use_canonical_definition_identities() {
+    let source =
+        "fn handler() {} fn map(callback: fn()) {} fn caller() { map(handler); map(unavailable); }";
+    let path = PathBuf::from("src/lib.rs");
+    let extracted = UnifiedFileExtractor::extract(&path, source).unwrap();
+    let (graph, _, pointer_used) =
+        debtmap::builders::parallel_call_graph::build_call_graph_from_extracted(
+            CallGraph::new(),
+            &HashMap::from([(path, extracted)]),
+        );
+    let handler = graph
+        .get_all_functions()
+        .find(|id| id.name == "handler")
+        .unwrap();
+    assert_eq!(pointer_used, [handler.clone()].into_iter().collect());
+    assert!(handler.column.is_some());
+}
+
+#[test]
+fn source_file_builders_preserve_same_line_implementation_identity() {
+    for graph in source_builders::graphs(&[("src/lib.rs", SOURCE)]) {
+        assert_separate_bodies(&graph);
+        assert!(
+            graph
+                .get_all_functions()
+                .all(|id| id.file == PathBuf::from("src/lib.rs"))
+        );
+    }
+}
+
+#[test]
+fn source_file_builders_mark_the_exact_same_line_trait_implementation() {
+    let source = "mod nested { struct Foo; trait Alternate { fn default() -> Self; } impl Default for Foo { fn default() -> Self { Foo } } impl Alternate for Foo { fn default() -> Self { Foo } } }";
+    for graph in source_builders::graphs(&[("src/lib.rs", source)]) {
+        let mut methods: Vec<_> = graph
+            .get_all_functions()
+            .filter(|id| id.name == "nested::Foo::default")
+            .cloned()
+            .collect();
+        methods.sort();
+        assert_eq!(methods.len(), 2);
+        assert_ne!(methods[0].column, methods[1].column);
+        assert!(graph.is_entry_point(&methods[0]));
+        assert!(!graph.is_entry_point(&methods[1]));
+        assert_eq!(
+            graph.node_count(),
+            2,
+            "enhancement must not manufacture ghost definitions"
+        );
+    }
 }

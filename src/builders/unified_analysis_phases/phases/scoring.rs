@@ -226,7 +226,8 @@ pub fn create_function_mappings(
     metrics
         .iter()
         .map(|m| {
-            let func_id = AggregatorFunctionId::new(m.file.clone(), m.name.clone(), m.line);
+            let func_id = AggregatorFunctionId::new(m.file.clone(), m.name.clone(), m.line)
+                .with_column(m.column);
             (func_id, m.line, m.line + m.length)
         })
         .collect()

@@ -62,12 +62,16 @@ impl WorkspaceIndex {
                 syn::Item::Const(item) => self.values.push(ValueDeclaration {
                     context: context.clone(),
                     name: item.ident.to_string(),
-                    ty: *item.ty.clone(),
+                    ty: TypeSyntax::from_syn(&item.ty),
+                    line: item.ident.span().start().line,
+                    column: item.ident.span().start().column,
                 }),
                 syn::Item::Static(item) => self.values.push(ValueDeclaration {
                     context: context.clone(),
                     name: item.ident.to_string(),
-                    ty: *item.ty.clone(),
+                    ty: TypeSyntax::from_syn(&item.ty),
+                    line: item.ident.span().start().line,
+                    column: item.ident.span().start().column,
                 }),
                 _ => {}
             }
@@ -100,7 +104,7 @@ impl WorkspaceIndex {
                         .as_ref()
                         .map(ToString::to_string)
                         .unwrap_or_else(|| index.to_string()),
-                    field.ty.clone(),
+                    TypeSyntax::from_syn(&field.ty),
                 )
             })
             .collect();
@@ -109,7 +113,7 @@ impl WorkspaceIndex {
             context: context.clone(),
             generics: generic_names(generics),
             fields: field_types,
-            alias,
+            alias: alias.as_ref().map(TypeSyntax::from_syn),
             is_trait: kind == DeclarationKind::Trait,
             unit: matches!(fields, syn::Fields::Unit) && kind == DeclarationKind::Struct,
         });
@@ -177,13 +181,7 @@ impl WorkspaceIndex {
         for item in items {
             match item {
                 syn::Item::Fn(item) => {
-                    let call = make_callable(
-                        context,
-                        inline,
-                        &item.sig,
-                        &item.attrs,
-                        Some(*item.block.clone()),
-                    );
+                    let call = make_callable(context, inline, &item.sig, &item.attrs, true);
                     self.callables.push(call);
                 }
                 syn::Item::Impl(item) => self.collect_impl(item, context, inline),
@@ -209,7 +207,7 @@ impl WorkspaceIndex {
         inline: &[String],
     ) {
         let substitutions = generic_substitutions(&item.generics);
-        let owner = self.type_from_syn(&item.self_ty, context, &substitutions);
+        let owner_syntax = TypeSyntax::from_syn(&item.self_ty);
         let owner_name = match item.self_ty.as_ref() {
             syn::Type::Path(path) => path_segments(&path.path).join("::"),
             _ => item.self_ty.to_token_stream().to_string(),
@@ -223,17 +221,17 @@ impl WorkspaceIndex {
                 &qualified(inline, &owner_name),
                 &method.sig,
                 &method.attrs,
-                Some(method.block.clone()),
+                true,
             );
-            call.owner = Some(owner.clone());
+            call.owner_syntax = Some(owner_syntax.clone());
             call.trait_path = item
                 .trait_
                 .as_ref()
                 .map(|(_, path, _)| resolution_segments(path));
-            call.trait_type = item
+            call.trait_syntax = item
                 .trait_
                 .as_ref()
-                .map(|(_, path, _)| self.type_from_path(path, context, &substitutions));
+                .map(|(_, path, _)| TypeSyntax::from_path(path));
             call.kind = if call.trait_path.is_some() {
                 CallableKind::TraitMethod
             } else if call.has_receiver() {
@@ -243,7 +241,6 @@ impl WorkspaceIndex {
             };
             call.requirements_known = requirements_known(&item.generics)
                 && requirements_known(&method.sig.generics)
-                && matches!(owner, TypeFact::Nominal { .. })
                 && item.trait_.as_ref().is_none_or(|(negative, path, _)| {
                     negative.is_none() && !has_trait_type_arguments(path)
                 });
@@ -253,7 +250,6 @@ impl WorkspaceIndex {
                     .const_params()
                     .map(|parameter| parameter.ident.to_string()),
             );
-            call.substitutions.insert("Self".to_string(), owner.clone());
             self.callables.push(call);
         }
     }
@@ -273,7 +269,7 @@ impl WorkspaceIndex {
                 &qualified(inline, &item.ident.to_string()),
                 &method.sig,
                 &method.attrs,
-                method.default.clone(),
+                method.default.is_some(),
             );
             call.kind = CallableKind::TraitDeclaration;
             call.owner = Some(TypeFact::SelfType);

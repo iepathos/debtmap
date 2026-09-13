@@ -3,19 +3,11 @@
 use super::*;
 
 impl WorkspaceIndex {
-    pub(super) fn establish_modules(&mut self, files: &[(PathBuf, syn::File)]) {
-        let known: HashSet<_> = files.iter().map(|(file, _)| file.clone()).collect();
-        let mut normalized = HashMap::<PathBuf, Vec<PathBuf>>::new();
-        for file in &known {
-            normalized
-                .entry(normalize_module_path(file))
-                .or_default()
-                .push(file.clone());
-        }
-        let edges = files
-            .iter()
-            .flat_map(|(file, ast)| module_edges(file, &ast.items, &normalized))
-            .collect::<Vec<_>>();
+    pub(super) fn establish_modules(
+        &mut self,
+        known: HashSet<PathBuf>,
+        edges: Vec<(PathBuf, PathBuf, Vec<String>)>,
+    ) {
         let children: HashSet<_> = edges.iter().map(|(_, child, _)| child.clone()).collect();
         let mut roots = known
             .iter()
@@ -69,7 +61,7 @@ impl WorkspaceIndex {
     }
 }
 
-fn module_edges(
+pub(super) fn module_edges(
     file: &Path,
     items: &[syn::Item],
     known: &HashMap<PathBuf, Vec<PathBuf>>,
@@ -129,7 +121,7 @@ fn collect_module_edges(
     }
 }
 
-fn normalize_module_path(path: &Path) -> PathBuf {
+pub(super) fn normalize_module_path(path: &Path) -> PathBuf {
     use std::path::Component;
     path.components()
         .fold(PathBuf::new(), |mut normalized, component| {

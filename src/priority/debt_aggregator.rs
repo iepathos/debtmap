@@ -7,6 +7,7 @@ pub struct FunctionId {
     pub file: PathBuf,
     pub name: String,
     pub start_line: usize,
+    pub column: Option<usize>,
     pub end_line: usize,
 }
 
@@ -17,8 +18,14 @@ impl FunctionId {
             file,
             name,
             start_line,
+            column: None,
             end_line: start_line, // Initialize end_line to start_line
         }
+    }
+    /// Preserve exact declaration identity for definitions sharing a source line.
+    pub fn with_column(mut self, column: Option<usize>) -> Self {
+        self.column = column;
+        self
     }
 }
 
@@ -278,6 +285,7 @@ mod tests {
             file: PathBuf::from("test.rs"),
             name: "test_func".to_string(),
             start_line: 10,
+            column: None,
             end_line: 20,
         };
 
@@ -324,6 +332,7 @@ mod tests {
             file: PathBuf::from("test.rs"),
             name: "critical_func".to_string(),
             start_line: 1,
+            column: None,
             end_line: 50,
         };
 

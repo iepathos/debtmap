@@ -7,6 +7,12 @@ use quote::ToTokens;
 
 #[path = "index/adjustments.rs"]
 mod adjustments;
+#[path = "index/syntax.rs"]
+mod syntax;
+#[path = "index/workspace.rs"]
+mod workspace;
+pub use syntax::{SignatureSyntax, TypeSyntax};
+pub(crate) use workspace::DeclarationCollector;
 #[path = "index/collect.rs"]
 mod collect;
 #[path = "index/expansion.rs"]
@@ -21,6 +27,8 @@ mod matching;
 mod modules;
 #[path = "index/paths.rs"]
 mod paths;
+#[path = "index/propagation.rs"]
+mod propagation;
 #[cfg(test)]
 #[path = "index/tests.rs"]
 mod tests;
@@ -55,13 +63,15 @@ pub enum CallableKind {
 pub struct Callable {
     pub id: FunctionId,
     pub context: Context,
-    pub signature: syn::Signature,
+    pub signature: SignatureSyntax,
     pub owner: Option<TypeFact>,
     pub trait_path: Option<Vec<String>>,
     pub trait_type: Option<TypeFact>,
     pub kind: CallableKind,
     pub requirements_known: bool,
-    pub body: Option<syn::Block>,
+    pub has_body: bool,
+    pub owner_syntax: Option<TypeSyntax>,
+    pub trait_syntax: Option<TypeSyntax>,
     pub is_test: bool,
     pub substitutions: Substitutions,
     pub const_parameters: Vec<String>,
@@ -94,8 +104,8 @@ struct TypeDeclaration {
     id: DeclarationId,
     context: Context,
     generics: Vec<String>,
-    fields: HashMap<String, syn::Type>,
-    alias: Option<syn::Type>,
+    fields: HashMap<String, TypeSyntax>,
+    alias: Option<TypeSyntax>,
     is_trait: bool,
     unit: bool,
 }
@@ -112,7 +122,9 @@ enum DeclarationKind {
 struct ValueDeclaration {
     context: Context,
     name: String,
-    ty: syn::Type,
+    ty: TypeSyntax,
+    line: usize,
+    column: usize,
 }
 
 #[derive(Clone)]
@@ -135,34 +147,24 @@ pub struct WorkspaceIndex {
     type_paths: HashMap<Vec<String>, Vec<usize>>,
     declaration_positions: HashMap<DeclarationId, usize>,
     callable_names: HashMap<String, Vec<usize>>,
+    callable_positions: HashMap<PathBuf, HashMap<(usize, Option<usize>), usize>>,
     imports_context: HashMap<Context, Vec<usize>>,
     imports_module: HashMap<Vec<String>, Vec<usize>>,
 }
 
 impl WorkspaceIndex {
     pub fn build(files: &[(PathBuf, syn::File)]) -> Self {
-        let mut index = Self::default();
-        index.establish_modules(files);
-        for (file, ast) in files {
-            let context = index.context(file, &[]);
-            index.collect_types(&ast.items, &context);
-        }
-        index.index_declarations();
-        for (file, ast) in files {
-            let context = index.context(file, &[]);
-            index.collect_callables(&ast.items, &context, &[]);
-        }
-        index
-            .callables
-            .sort_by(|left, right| left.id.cmp(&right.id));
-        index.index_callable_names();
-        index
+        let known = files.iter().map(|(path, _)| path.clone()).collect();
+        let mut collector = workspace::DeclarationCollector::new(known);
+        collector.collect(files);
+        collector.finish()
     }
 
     pub fn callables(&self) -> &[Callable] {
         &self.callables
     }
 
+    #[cfg(test)]
     pub fn context(&self, file: &Path, inline_modules: &[String]) -> Context {
         let mut context = self
             .contexts
@@ -212,11 +214,22 @@ impl WorkspaceIndex {
 
     fn index_callable_names(&mut self) {
         for (position, callable) in self.callables.iter().enumerate() {
+            self.callable_positions
+                .entry(callable.id.file.clone())
+                .or_default()
+                .insert((callable.id.line, callable.id.column), position);
             self.callable_names
-                .entry(callable.signature.ident.to_string())
+                .entry(callable.signature.ident.clone())
                 .or_default()
                 .push(position);
         }
+    }
+
+    pub fn callable_at(&self, file: &Path, line: usize, column: usize) -> Option<&Callable> {
+        self.callable_positions
+            .get(file)?
+            .get(&(line, Some(column)))
+            .map(|position| &self.callables[*position])
     }
 
     fn named_callables(&self, name: &str) -> impl Iterator<Item = &Callable> {

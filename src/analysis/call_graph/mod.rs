@@ -206,6 +206,11 @@ impl RustCallGraphBuilder {
         Ok(())
     }
 
+    /// Install authoritative workspace outcomes after collecting enhancement metadata.
+    pub(crate) fn merge_base_graph(&mut self, graph: CallGraph) {
+        self.enhanced_graph.base_graph.merge(graph);
+    }
+
     /// Complete the analysis and return the Rust-specific call graph
     pub fn build(self) -> RustCallGraph {
         self.enhanced_graph

@@ -1,7 +1,6 @@
 //! Value-namespace declarations are independent of type aliases and enums.
 
 use super::*;
-use syn::spanned::Spanned;
 
 impl WorkspaceIndex {
     pub fn value_from_path(
@@ -39,16 +38,10 @@ impl WorkspaceIndex {
             .map(|position| &self.values[position])
             .filter(|value| self.same_workspace(&value.context.file, &context.file))
             .collect();
-        values.sort_by_key(|value| {
-            (
-                value.context.file.clone(),
-                value.ty.span().start().line,
-                value.ty.span().start().column,
-            )
-        });
+        values.sort_by_key(|value| (value.context.file.clone(), value.line, value.column));
         let facts: Vec<_> = values
             .iter()
-            .map(|value| self.type_from_syn(&value.ty, &value.context, &Substitutions::new()))
+            .map(|value| self.type_from_owned(&value.ty, &value.context, &Substitutions::new()))
             .collect();
         match facts.as_slice() {
             [] => None,

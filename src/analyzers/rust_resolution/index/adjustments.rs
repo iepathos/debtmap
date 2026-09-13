@@ -21,13 +21,12 @@ pub(super) fn receiver_adjustment_known(
     let Some(parameter) = call.signature.receiver() else {
         return false;
     };
-    if parameter.colon_token.is_some() {
+    if parameter.explicit {
         return false;
     }
     match receiver {
         TypeFact::Reference { .. } => {
-            parameter.reference.is_some()
-                && (parameter.mutability.is_none() || references_allow_mutable_borrow(receiver))
+            parameter.reference && (!parameter.mutable || references_allow_mutable_borrow(receiver))
         }
         _ => true,
     }

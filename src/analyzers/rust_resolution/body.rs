@@ -37,8 +37,8 @@ impl<'a> Body<'a> {
         }
     }
 
-    pub fn analyze(mut self, block: &syn::Block) {
-        for input in &self.callable.signature.inputs {
+    pub fn analyze(mut self, signature: &syn::Signature, block: &syn::Block) {
+        for input in &signature.inputs {
             self.bind_parameter(input);
         }
         self.visit_block(block);

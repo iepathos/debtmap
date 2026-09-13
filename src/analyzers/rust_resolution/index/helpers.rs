@@ -7,7 +7,7 @@ pub(super) fn make_callable(
     prefix: &[String],
     signature: &syn::Signature,
     attrs: &[syn::Attribute],
-    body: Option<syn::Block>,
+    has_body: bool,
 ) -> Callable {
     let name = qualified(prefix, &signature.ident.to_string()).join("::");
     let id = FunctionId::with_module_path(
@@ -20,13 +20,15 @@ pub(super) fn make_callable(
     Callable {
         id,
         context: context.clone(),
-        signature: signature.clone(),
+        signature: SignatureSyntax::from_syn(signature),
         owner: None,
         trait_path: None,
         trait_type: None,
         kind: CallableKind::FreeFunction,
         requirements_known: true,
-        body,
+        has_body,
+        owner_syntax: None,
+        trait_syntax: None,
         is_test: attrs.iter().any(|attr| {
             attr.path().segments.last().is_some_and(|segment| {
                 matches!(

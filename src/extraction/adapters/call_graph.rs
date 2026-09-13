@@ -6,7 +6,7 @@
 //! # Design
 //!
 //! All functions in this module are pure (no I/O). Rust source snapshots are
-//! parsed once for complete workspace resolution. The call graph
+//! parsed in bounded passes for complete workspace resolution. The call graph
 //! construction is O(n*m) where n is the number of functions and m is the average
 //! number of calls per function.
 //!
@@ -61,7 +61,7 @@ pub fn build_call_graph(extracted: &HashMap<PathBuf, ExtractedFileData>) -> Call
 
     let (rust_graph, resolved_files) =
         crate::analyzers::rust_resolution::cached::extract(extracted);
-    graph.merge(rust_graph);
+    graph = crate::builders::rust_workspace::identity::merge(graph, rust_graph);
 
     // Source-backed Rust outcomes are final; summaries must not add weaker edges.
     for (path, file_data) in extracted {

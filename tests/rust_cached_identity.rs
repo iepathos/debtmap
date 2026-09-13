@@ -1,6 +1,7 @@
 //! Cached graph identities must match metrics, including same-line module declarations.
 use debtmap::builders::call_graph::build_initial_call_graph;
 use debtmap::builders::parallel_call_graph::build_call_graph_from_extracted;
+use debtmap::core::FunctionMetrics;
 use debtmap::extraction::UnifiedFileExtractor;
 use debtmap::extraction::adapters::metrics::to_function_metrics;
 use debtmap::priority::call_graph::FunctionId;
@@ -27,8 +28,8 @@ fn same_line_inline_modules_share_exact_metric_and_graph_identities() {
         build_call_graph_from_extracted(base, &HashMap::from([(path.clone(), data)]));
     assert_eq!(graph.node_count(), 4, "No orphan summary aliases");
     for module in ["left", "right"] {
-        let caller = FunctionId::new(path.clone(), format!("{module}::caller"), 1);
-        let target = FunctionId::new(path.clone(), format!("{module}::A::bar"), 1);
+        let caller = metric_id(&metrics, &format!("{module}::caller"));
+        let target = metric_id(&metrics, &format!("{module}::A::bar"));
         assert_eq!(graph.get_callees_exact(&caller), vec![target.clone()]);
         assert_eq!(graph.get_callers_exact(&target), vec![caller]);
     }
@@ -60,9 +61,16 @@ fn nested_modules_and_same_line_free_functions_keep_qualified_names() {
         &HashMap::from([(path.clone(), data)]),
     );
     assert_eq!(graph.node_count(), 3);
-    let caller = FunctionId::new(path.clone(), "outer::inner::caller".into(), 1);
+    let caller = metric_id(&metrics, "outer::inner::caller");
     assert_eq!(
         graph.get_callees_exact(&caller),
-        vec![FunctionId::new(path, "outer::inner::A::bar".into(), 1)]
+        vec![metric_id(&metrics, "outer::inner::A::bar")]
     );
+}
+
+fn metric_id(metrics: &[FunctionMetrics], name: &str) -> FunctionId {
+    let metric = metrics.iter().find(|metric| metric.name == name).unwrap();
+    assert!(metric.column.is_some());
+    FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line)
+        .with_column(metric.column)
 }

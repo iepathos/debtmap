@@ -182,13 +182,13 @@ impl WorkspaceIndex {
             .filter(|call| {
                 paths.contains(&qualified(
                     &call.context.module,
-                    &call.signature.ident.to_string(),
+                    &call.signature.ident.clone(),
                 ))
             })
             .collect::<Vec<_>>();
         let justified = candidates.len() == 1;
         let provenance = if candidates.first().is_some_and(|call| {
-            qualified(&call.context.module, &call.signature.ident.to_string())
+            qualified(&call.context.module, &call.signature.ident.clone())
                 != relative_path(&segments, &context.module)
         }) {
             CallEdgeProvenance::ImportResolution

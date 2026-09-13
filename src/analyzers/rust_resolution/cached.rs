@@ -4,47 +4,54 @@ use crate::core::Language;
 use crate::extraction::{ExtractedFileData, ExtractedFunctionData};
 use crate::priority::call_graph::{CallGraph, FunctionId};
 use std::collections::{HashMap, HashSet};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
+
+#[path = "cached_enhancement.rs"]
+mod enhancement;
+pub(crate) use enhancement::EnhancedExtraction;
 
 /// Resolve available Rust snapshots and retain existing extracted node identities.
 pub(crate) fn extract(
     extracted: &HashMap<PathBuf, ExtractedFileData>,
 ) -> (CallGraph, HashSet<PathBuf>) {
-    let mut paths: Vec<_> = extracted.keys().collect();
-    paths.sort();
-    let files: Vec<_> = paths
-        .into_iter()
-        .filter_map(|path| parse_snapshot(path, &extracted[path]))
-        .collect();
-    let available = files.iter().map(|(path, _)| path.clone()).collect();
-    if files.is_empty() {
-        return (CallGraph::new(), available);
-    }
-    let graph = super::extract(&files);
-    (remap_graph(graph, extracted), available)
+    let result = extract_with_enhancement(extracted);
+    (result.graph, result.available)
 }
 
-fn parse_snapshot(path: &Path, data: &ExtractedFileData) -> Option<(PathBuf, syn::File)> {
-    if Language::from_path(path) != Language::Rust {
-        return None;
-    }
-    let source = data.rust_source.as_ref()?;
-    match syn::parse_file(source) {
-        Ok(ast) => Some((path.to_path_buf(), ast)),
-        Err(error) => {
-            log::warn!(
-                "Cannot resolve cached Rust source {}: {error}",
-                path.display()
-            );
-            None
-        }
-    }
+pub(crate) fn extract_with_enhancement(
+    extracted: &HashMap<PathBuf, ExtractedFileData>,
+) -> EnhancedExtraction {
+    let mut builder = crate::analysis::call_graph::RustCallGraphBuilder::new();
+    let (graph, available) =
+        super::workspace::extract_sources(&source_snapshots(extracted), |batch| {
+            enhancement::collect(&mut builder, batch);
+        });
+    enhancement::finish(builder, remap_graph(graph, extracted), available)
+}
+
+fn source_snapshots(extracted: &HashMap<PathBuf, ExtractedFileData>) -> Vec<(PathBuf, String)> {
+    let mut sources: Vec<_> = extracted
+        .iter()
+        .filter(|(path, _)| Language::from_path(path) == Language::Rust)
+        .filter_map(|(path, data)| {
+            data.rust_source
+                .as_ref()
+                .map(|source| (path.clone(), source.clone()))
+        })
+        .collect();
+    sources.sort_by(|left, right| left.0.cmp(&right.0));
+    sources
 }
 
 fn remap_graph(graph: CallGraph, extracted: &HashMap<PathBuf, ExtractedFileData>) -> CallGraph {
+    let counts = legacy_source_counts(&graph);
+    let functions: HashMap<_, _> = graph
+        .get_all_functions()
+        .map(|id| (id.clone(), extracted_function(id, extracted, &counts)))
+        .collect();
     let identities: HashMap<_, _> = graph
         .get_all_functions()
-        .map(|id| (id.clone(), extracted_identity(id, extracted)))
+        .map(|id| (id.clone(), extracted_identity(id, functions[id])))
         .collect();
     let identity = |id: &FunctionId| identities.get(id).cloned().unwrap_or_else(|| id.clone());
     let mut remapped = CallGraph::new();
@@ -53,7 +60,7 @@ fn remap_graph(graph: CallGraph, extracted: &HashMap<PathBuf, ExtractedFileData>
             &mut remapped,
             (node.role_evidence.clone(), node.complexity, node._lines),
             identity(&node.id),
-            extracted,
+            functions[&node.id],
         );
     }
     for evidence in graph.edge_evidence() {
@@ -75,17 +82,8 @@ fn add_node(
     graph: &mut CallGraph,
     metadata: (crate::analysis::role_policy::RoleEvidence, u32, usize),
     id: FunctionId,
-    extracted: &HashMap<PathBuf, ExtractedFileData>,
+    function: Option<&ExtractedFunctionData>,
 ) {
-    let function = extracted.get(&id.file).and_then(|file| {
-        let mut matches = file.functions.iter().filter(|function| {
-            function.line == id.line
-                && (function.column.is_none() || function.column == id.column)
-                && function.qualified_name == id.name
-        });
-        let first = matches.next()?;
-        matches.next().is_none().then_some(first)
-    });
     let Some(function) = function else {
         graph.add_function_with_evidence(id, metadata.0, metadata.1, metadata.2);
         return;
@@ -104,17 +102,38 @@ fn add_node(
     graph.add_function_with_evidence(id, evidence, function.cyclomatic, function.length);
 }
 
-fn extracted_identity(
+type LegacyKey = (PathBuf, String, usize);
+
+fn legacy_source_counts(graph: &CallGraph) -> HashMap<LegacyKey, usize> {
+    let mut counts = HashMap::new();
+    for id in graph.get_all_functions() {
+        let segments: Vec<_> = id.name.split("::").collect();
+        for position in 0..segments.len() {
+            let key = (id.file.clone(), segments[position..].join("::"), id.line);
+            *counts.entry(key).or_default() += 1;
+        }
+    }
+    counts
+}
+
+fn extracted_function<'a>(
     id: &FunctionId,
-    extracted: &HashMap<PathBuf, ExtractedFileData>,
-) -> FunctionId {
+    extracted: &'a HashMap<PathBuf, ExtractedFileData>,
+    counts: &HashMap<LegacyKey, usize>,
+) -> Option<&'a ExtractedFunctionData> {
     let candidates: Vec<_> = extracted
         .get(&id.file)
         .into_iter()
         .flat_map(|file| &file.functions)
         .filter(|function| {
             function.line == id.line
-                && (function.column.is_none() || function.column == id.column)
+                && (function.column == id.column
+                    || (function.column.is_none()
+                        && counts.get(&(
+                            id.file.clone(),
+                            function.qualified_name.clone(),
+                            id.line,
+                        )) == Some(&1)))
                 && same_source_name(&id.name, function)
         })
         .collect();
@@ -129,9 +148,18 @@ fn extracted_identity(
         &exact
     };
     match matches.as_slice() {
-        [function] => FunctionId::new(id.file.clone(), function.qualified_name.clone(), id.line)
-            .with_column(function.column.or(id.column)),
-        _ => id.clone(),
+        [function] => Some(function),
+        _ => None,
+    }
+}
+
+fn extracted_identity(id: &FunctionId, function: Option<&ExtractedFunctionData>) -> FunctionId {
+    match function {
+        Some(function) => {
+            FunctionId::new(id.file.clone(), function.qualified_name.clone(), id.line)
+                .with_column(function.column.or(id.column))
+        }
+        None => id.clone(),
     }
 }
 

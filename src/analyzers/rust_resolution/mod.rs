@@ -9,6 +9,7 @@ mod flow;
 pub(crate) mod index;
 pub(crate) mod types;
 mod visitor;
+pub(crate) mod workspace;
 
 use crate::priority::call_graph::CallGraph;
 use index::WorkspaceIndex;
@@ -16,15 +17,8 @@ use std::path::PathBuf;
 
 pub(crate) fn extract(files: &[(PathBuf, syn::File)]) -> CallGraph {
     let index = WorkspaceIndex::build(files);
-    let mut graph = CallGraph::new();
-    for callable in index.callables().iter().filter(|c| c.body.is_some()) {
-        graph.add_function(callable.id.clone(), false, callable.is_test, 0, 0);
-    }
-    for callable in index.callables() {
-        if let Some(block) = &callable.body {
-            body::Body::new(&index, callable, &mut graph).analyze(block);
-        }
-    }
+    let mut graph = workspace::definitions(&index);
+    workspace::analyze(&index, files, &mut graph);
     report_counts(&graph);
     graph
 }

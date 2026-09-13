@@ -547,6 +547,17 @@ impl CallGraph {
     /// Find a function using fallback matching strategies
     /// Tries exact match first, then fuzzy match, then name-only match
     pub fn find_function(&self, query: &FunctionId) -> Option<FunctionId> {
+        if query.column.is_none()
+            && self.fuzzy_index.get(&query.fuzzy_key()).is_some_and(|ids| {
+                ids.iter()
+                    .filter(|id| id.line == query.line)
+                    .take(2)
+                    .count()
+                    > 1
+            })
+        {
+            return None;
+        }
         // 1. Try exact match (most common case)
         if self.nodes.contains_key(query) {
             return Some(query.clone());

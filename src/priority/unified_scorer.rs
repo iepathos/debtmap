@@ -716,7 +716,8 @@ fn calculate_debt_adjustment_with_details(
 ) -> (f64, DebtAdjustmentDetails) {
     if let Some(aggregator) = debt_aggregator {
         let agg_func_id =
-            AggregatorFunctionId::new(func.file.clone(), func.name.clone(), func.line);
+            AggregatorFunctionId::new(func.file.clone(), func.name.clone(), func.line)
+                .with_column(func.column);
         let debt_scores = aggregator.calculate_debt_scores(&agg_func_id);
 
         // Calculate individual components
