@@ -7,3 +7,10 @@ Block items shadow only the namespaces they introduce. Functions, constants and 
 The permanent lexical fixtures run through direct AST extraction, cached sources, and sequential and parallel source-file builders. Assertions use source identities and exact possible-target sets. The source builders compare nodes, metrics, roles, role evidence, resolved calls, edge evidence, uncertainty and exclusions before rebasing fixture paths.
 
 Validation: `cargo test --offline --test rust_method_resolution_lexical --test rust_method_resolution_scope --test rust_method_resolution_review_fixes` in debug mode. Full block-local declaration indexing and transitive glob reexports remain outside this repair.
+
+Shadow checks also traverse qualified receiver types and trait bounds such as
+`dyn T`. Unindexed block-local declarations retain unavailable receiver constraints,
+so module-level namesakes cannot become resolved or possible targets. Explicit
+`crate::` qualification continues to select the module-level declaration.
+`tests/rust_method_resolution_review_followup.rs` covers these cases and controls
+through direct, cached, enhanced, sequential, parallel and repeated-merge paths.

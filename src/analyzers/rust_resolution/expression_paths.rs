@@ -32,7 +32,12 @@ impl<'a> Body<'a> {
     }
 
     pub(super) fn lookup_path(&self, path: &syn::ExprPath) -> Lookup<'a> {
-        if self.path_shadowed(&path.path) {
+        if self.path_shadowed(&path.path)
+            || path
+                .qself
+                .as_ref()
+                .is_some_and(|qself| self.shadowed_type(&qself.ty).is_some())
+        {
             return Lookup::default();
         }
         if path.path.segments.len() == 1

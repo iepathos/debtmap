@@ -7,3 +7,11 @@ Conditions carry separate successful and unsuccessful binding states. The right 
 The lexical fixture target includes constructor fields, missing generic inference, constructor/type namespace coexistence, successful nested let chains, while let chains, conditional side effects and scope exits. Every fixture runs through direct, cached, sequential and parallel extraction; source-builder comparisons include complete graph metadata.
 
 Validation: `cargo test --offline --test rust_method_resolution_lexical --test rust_method_resolution_scope --test rust_method_resolution_review_fixes` in debug mode. Arbitrary generic inference and fixed-point loop analysis remain deferred.
+
+Constructor candidate sets include only declarations introducing constructor
+values. A braced struct sharing a glob-imported unit or tuple constructor's name
+does not make that value ambiguous. Unit constructors preserve the selected value
+declaration directly instead of resolving the spelling again in the type namespace.
+Explicit import conflicts remain uncertain with their admissible owner constraints.
+The review-followup integration target checks both constructor forms, argument
+calls, exact method targets and absence of fake constructor diagnostics or nodes.

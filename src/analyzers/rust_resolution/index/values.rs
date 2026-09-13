@@ -15,9 +15,37 @@ impl WorkspaceIndex {
         let declarations = self.constructor_declarations(path, context);
         match declarations.as_slice() {
             [declaration] if declaration.unit => {
-                Some(self.type_from_path(path, context, substitutions))
+                let fact = self.unit_constructor_fact(declaration, path, context, substitutions);
+                Some(
+                    if self.value_path_conflicts(&resolution_segments(path), context) {
+                        with_uncertainty(fact, UnknownReason::AmbiguousDeclaration)
+                    } else {
+                        fact
+                    },
+                )
             }
             _ => None,
+        }
+    }
+
+    fn unit_constructor_fact(
+        &self,
+        declaration: &TypeDeclaration,
+        path: &syn::Path,
+        context: &Context,
+        substitutions: &Substitutions,
+    ) -> TypeFact {
+        let arguments = path
+            .segments
+            .last()
+            .map(|segment| TypeSyntax::arguments(&segment.arguments))
+            .unwrap_or_default()
+            .iter()
+            .map(|ty| self.type_from_owned(ty, context, substitutions))
+            .collect();
+        TypeFact::Nominal {
+            declaration: declaration.id.clone(),
+            arguments: complete_arguments(arguments, &declaration.generics),
         }
     }
 
@@ -62,6 +90,7 @@ impl WorkspaceIndex {
         positions
             .into_iter()
             .map(|position| &self.declarations[position])
+            .filter(|declaration| declaration.unit || declaration.tuple_arity.is_some())
             .filter(|declaration| self.same_workspace(&context.file, &declaration.id.file))
             .collect()
     }

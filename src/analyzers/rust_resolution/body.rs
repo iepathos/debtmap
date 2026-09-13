@@ -9,6 +9,8 @@ use crate::priority::call_graph::{
 use std::collections::HashMap;
 use syn::{spanned::Spanned, visit::Visit};
 
+mod type_shadows;
+
 pub(super) struct Body<'a> {
     pub index: &'a WorkspaceIndex,
     pub callable: &'a Callable,
@@ -72,16 +74,18 @@ impl<'a> Body<'a> {
     }
 
     pub fn declared_type(&self, ty: &syn::Type) -> TypeFact {
-        let mut shadow = TypeShadows {
-            bindings: &self.bindings,
-            found: false,
-        };
-        shadow.visit_type(ty);
-        if shadow.found {
-            return unknown();
+        if let Some(path) = self.shadowed_type(ty) {
+            return TypeFact::Uncertain {
+                constraint: Box::new(TypeFact::UnavailablePath(path)),
+                reason: UnknownReason::UnsupportedTypeOperation,
+            };
         }
         self.index
             .type_from_syn(ty, &self.callable.context, &self.substitutions)
+    }
+
+    pub fn shadowed_type(&self, ty: &syn::Type) -> Option<Vec<String>> {
+        type_shadows::find(&self.bindings, ty)
     }
 
     pub fn record(
@@ -170,22 +174,5 @@ fn fact_reason(fact: &TypeFact) -> Option<&UnknownReason> {
             bounds.iter().find_map(|bound| bound.uncertainty_reason())
         }
         _ => None,
-    }
-}
-
-struct TypeShadows<'a> {
-    bindings: &'a Bindings,
-    found: bool,
-}
-
-impl<'ast> Visit<'ast> for TypeShadows<'_> {
-    fn visit_type_path(&mut self, ty: &'ast syn::TypePath) {
-        self.found |= ty.path.leading_colon.is_none()
-            && ty
-                .path
-                .segments
-                .first()
-                .is_some_and(|s| self.bindings.type_shadowed(&s.ident.to_string()));
-        syn::visit::visit_type_path(self, ty);
     }
 }

@@ -128,6 +128,10 @@ consumes shared call uncertainty and cannot recreate ordinary method edges throu
 weaker name matching. Sequential, parallel, and cached-source builders accumulate
 enhancement metadata across batches and finalize it once against existing canonical
 definitions. Unmatched legacy metadata remains diagnostic; it creates no ghost node.
+Public `RustCallGraphBuilder::build()` also finalizes collected enhancement. Explicit
+finalization followed by `build()` performs one pass; collecting more metadata
+requires another pass without duplicating Visit patterns. The effects entry point
+seeds canonical definitions from its supplied AST before applying enhancement.
 
 ### Possible Calls and Dead Code
 
@@ -169,7 +173,9 @@ a possible target found only by method name. Custom
 `Deref`, blanket-impl solving, associated-type projection, arbitrary coercions,
 general `?`/wrapper inference, and const-generic evaluation remain unsupported.
 Block-local item declarations and imports are not indexed as independent lexical
-module contexts; calls requiring those contexts remain uncertain. Generic arguments
+module contexts; calls requiring those contexts remain uncertain. Receiver checks
+respect those block-local shadows in qualified types and trait bounds inside
+`dyn T`, excluding unrelated module-level targets. Generic arguments
 are not inferred from arbitrary argument constraints, including tuple-constructor
 arguments. Constructors supply a nominal type without manufacturing a callable node.
 Renamed free-function imports retain the existing basename lookup restriction.
