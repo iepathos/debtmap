@@ -1,4 +1,5 @@
 //! Two-pass collection. Only owned records survive an active parsing batch.
+use super::super::types::TraitBoundFact;
 use super::*;
 
 pub(crate) struct DeclarationCollector {
@@ -69,6 +70,9 @@ impl WorkspaceIndex {
         }
         for callable in &mut self.callables {
             rebase_context(&mut callable.context, &bases);
+            for fact in callable.substitutions.values_mut() {
+                rebase_bounds(fact, &bases);
+            }
         }
     }
 
@@ -86,9 +90,11 @@ impl WorkspaceIndex {
 
     fn resolve_callable(&self, original: &Callable) -> Callable {
         let mut call = original.clone();
+        call.substitutions = self.resolve_substitutions(&call.substitutions);
         if let Some(ty) = &call.owner_syntax {
             let owner = self.type_from_owned(ty, &call.context, &call.substitutions);
-            call.requirements_known &= matches!(owner, TypeFact::Nominal { .. });
+            call.requirements_known &=
+                matches!(owner, TypeFact::Nominal { .. } | TypeFact::Primitive(_));
             call.substitutions.insert("Self".into(), owner.clone());
             call.owner = Some(owner);
         }
@@ -103,6 +109,20 @@ impl WorkspaceIndex {
 fn rebase_context(context: &mut Context, bases: &HashMap<PathBuf, Vec<String>>) {
     if let Some(prefix) = bases.get(&context.file) {
         context.module = qualified_path(prefix, &context.module);
+    }
+}
+
+fn rebase_bounds(fact: &mut TypeFact, bases: &HashMap<PathBuf, Vec<String>>) {
+    let traits = match fact {
+        TypeFact::BoundedGeneric { traits, .. } | TypeFact::Dynamic(traits) => traits,
+        _ => return,
+    };
+    for bound in traits {
+        if let TraitBoundFact::Unresolved { file, module, .. } = bound
+            && let Some(prefix) = bases.get(file)
+        {
+            *module = qualified_path(prefix, module);
+        }
     }
 }
 

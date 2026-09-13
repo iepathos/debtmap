@@ -206,7 +206,7 @@ impl WorkspaceIndex {
         context: &Context,
         inline: &[String],
     ) {
-        let substitutions = generic_substitutions(&item.generics);
+        let substitutions = generic_substitutions(&item.generics, context);
         let owner_syntax = TypeSyntax::from_syn(&item.self_ty);
         let owner_name = match item.self_ty.as_ref() {
             syn::Type::Path(path) => path_segments(&path.path).join("::"),
@@ -276,7 +276,7 @@ impl WorkspaceIndex {
             call.trait_path = Some(vec![item.ident.to_string()]);
             call.requirements_known = false;
             call.substitutions
-                .extend(generic_substitutions(&item.generics));
+                .extend(generic_substitutions(&item.generics, context));
             call.const_parameters.extend(
                 item.generics
                     .const_params()

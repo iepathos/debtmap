@@ -164,6 +164,9 @@ fn fact_reason(fact: &TypeFact) -> Option<&UnknownReason> {
     match fact {
         TypeFact::Unknown(reason) | TypeFact::Uncertain { reason, .. } => Some(reason),
         TypeFact::Reference { inner, .. } => fact_reason(inner),
+        TypeFact::Dynamic(bounds) | TypeFact::BoundedGeneric { traits: bounds, .. } => {
+            bounds.iter().find_map(|bound| bound.uncertainty_reason())
+        }
         _ => None,
     }
 }

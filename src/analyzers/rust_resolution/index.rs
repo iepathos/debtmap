@@ -7,6 +7,8 @@ use quote::ToTokens;
 
 #[path = "index/adjustments.rs"]
 mod adjustments;
+#[path = "index/bounds.rs"]
+mod bounds;
 #[path = "index/syntax.rs"]
 mod syntax;
 #[path = "index/workspace.rs"]

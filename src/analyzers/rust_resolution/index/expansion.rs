@@ -75,7 +75,12 @@ impl WorkspaceIndex {
                     .map(|ty| self.expand_owned(ty, context, substitutions, depth + 1))
                     .collect(),
             ),
-            TypeSyntax::Dynamic(bounds) => TypeFact::Dynamic(bounds.clone()),
+            TypeSyntax::Dynamic(bounds) => TypeFact::Dynamic(
+                bounds
+                    .iter()
+                    .map(|path| self.resolve_trait_bound(path, context))
+                    .collect(),
+            ),
             TypeSyntax::Const(value) => TypeFact::Const(value.clone()),
             TypeSyntax::Unsupported => TypeFact::Unknown(UnknownReason::UnsupportedTypeOperation),
         }
@@ -127,6 +132,14 @@ impl WorkspaceIndex {
 
     fn unavailable_type(&self, segments: &[String], context: &Context) -> TypeFact {
         let paths = self.resolve_paths(segments, context);
+        if segments.len() == 1
+            && !self
+                .context_imports(context)
+                .any(|import| !import.glob && import.alias == segments[0])
+            && let Some(primitive) = super::super::types::PrimitiveType::from_name(&segments[0])
+        {
+            return TypeFact::Primitive(primitive);
+        }
         let explicitly_qualified =
             segments.len() > 1 || paths != [relative_path(segments, &context.module)];
         if explicitly_qualified {

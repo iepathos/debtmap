@@ -2,6 +2,20 @@
 
 use super::*;
 
+/// A represented owner constraint can admit candidates; unknown owners cannot.
+pub(super) fn constrained_owner_compatible(pattern: &TypeFact, receiver: &TypeFact) -> bool {
+    match strip_references(pattern) {
+        TypeFact::Ambiguous(owners) => owners
+            .iter()
+            .any(|owner| constrained_owner_compatible(owner, receiver)),
+        TypeFact::Nominal { .. }
+        | TypeFact::Primitive(_)
+        | TypeFact::Generic(_)
+        | TypeFact::BoundedGeneric { .. } => owner_compatible(pattern, receiver),
+        _ => false,
+    }
+}
+
 pub(super) fn owner_compatible(pattern: &TypeFact, receiver: &TypeFact) -> bool {
     types_match(strip_references(pattern), strip_references(receiver), false)
         && repeated_arguments_agree(strip_references(pattern), strip_references(receiver), false)

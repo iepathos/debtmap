@@ -37,7 +37,7 @@ pub(super) fn make_callable(
                 )
             })
         }),
-        substitutions: generic_substitutions(&signature.generics),
+        substitutions: generic_substitutions(&signature.generics, context),
         const_parameters: signature
             .generics
             .const_params()
@@ -73,7 +73,7 @@ pub(super) fn generic_names(generics: &syn::Generics) -> Vec<String> {
         .collect()
 }
 
-pub(super) fn generic_substitutions(generics: &syn::Generics) -> Substitutions {
+pub(super) fn generic_substitutions(generics: &syn::Generics, context: &Context) -> Substitutions {
     generic_names(generics)
         .into_iter()
         .map(|name| {
@@ -83,7 +83,16 @@ pub(super) fn generic_substitutions(generics: &syn::Generics) -> Substitutions {
             } else {
                 TypeFact::BoundedGeneric {
                     name: name.clone(),
-                    traits,
+                    traits: traits
+                        .into_iter()
+                        .map(|path| super::super::types::TraitBoundFact::Unresolved {
+                            path,
+                            file: context.file.clone(),
+                            module: context.module.clone(),
+                            candidates: Vec::new(),
+                            reason: UnknownReason::UnavailableDefinition,
+                        })
+                        .collect(),
                 }
             };
             (name, fact)

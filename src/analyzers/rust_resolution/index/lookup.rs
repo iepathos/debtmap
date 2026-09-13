@@ -63,26 +63,11 @@ impl WorkspaceIndex {
             }
             _ => {}
         }
-        if let Some((receiver_id, _)) = receiver.nominal() {
-            if matches!(
-                call.owner,
-                Some(TypeFact::Generic(_) | TypeFact::BoundedGeneric { .. })
-            ) {
-                return self.trait_in_scope(call, context);
-            }
-            if let Some(TypeFact::Ambiguous(owners)) = &call.owner {
-                return owners.iter().any(|owner| owner_compatible(owner, receiver))
-                    && self.trait_in_scope(call, context);
-            }
+        if receiver.has_receiver_identity() {
             return call
                 .owner
                 .as_ref()
-                .and_then(TypeFact::nominal)
-                .is_some_and(|(owner_id, _)| owner_id == receiver_id)
-                && call
-                    .owner
-                    .as_ref()
-                    .is_some_and(|owner| owner_compatible(owner, receiver))
+                .is_some_and(|owner| constrained_owner_compatible(owner, receiver))
                 && self.trait_in_scope(call, context);
         }
         if let TypeFact::Reference { inner, .. } = receiver {
@@ -92,9 +77,12 @@ impl WorkspaceIndex {
             receiver
         {
             return call.trait_path.as_ref().is_some_and(|trait_path| {
-                bounds
+                self.type_candidates(trait_path, &call.context)
                     .iter()
-                    .any(|bound| self.same_trait(bound, context, trait_path, &call.context))
+                    .any(|declaration| {
+                        declaration.is_trait
+                            && bounds.iter().any(|bound| bound.admits(&declaration.id))
+                    })
             });
         }
         !matches!(
@@ -170,7 +158,7 @@ impl WorkspaceIndex {
             let mut owner_path = path.clone();
             owner_path.segments.pop();
             let owner = self.type_from_path(&owner_path, context, substitutions);
-            if owner.has_nominal_candidates() {
+            if owner.has_nominal_candidates() || owner.has_receiver_identity() {
                 return self.lookup_associated(&owner, &segments[segments.len() - 1], context);
             }
         }
@@ -182,13 +170,13 @@ impl WorkspaceIndex {
             .filter(|call| {
                 paths.contains(&qualified(
                     &call.context.module,
-                    &call.signature.ident.clone(),
+                    &call.signature.ident.to_string(),
                 ))
             })
             .collect::<Vec<_>>();
         let justified = candidates.len() == 1;
         let provenance = if candidates.first().is_some_and(|call| {
-            qualified(&call.context.module, &call.signature.ident.clone())
+            qualified(&call.context.module, &call.signature.ident.to_string())
                 != relative_path(&segments, &context.module)
         }) {
             CallEdgeProvenance::ImportResolution
@@ -243,7 +231,7 @@ impl WorkspaceIndex {
             })
             .collect::<Vec<_>>();
         let justified = candidates.len() == 1
-            && owner.nominal().is_some()
+            && owner.has_receiver_identity()
             && candidates[0].requirements_known
             && candidates[0]
                 .owner

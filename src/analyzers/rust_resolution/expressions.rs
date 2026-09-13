@@ -1,7 +1,7 @@
 //! Pure, bounded expression type propagation over the workspace declarations.
 use super::body::{Body, unknown};
 use super::index::Lookup;
-use super::types::{TypeFact, UnknownReason};
+use super::types::{PrimitiveType, TypeFact, UnknownReason};
 use syn::{Expr, GenericArgument, PathArguments};
 
 impl<'a> Body<'a> {
@@ -15,6 +15,7 @@ impl<'a> Body<'a> {
         }
         match expr {
             Expr::Path(p) => self.path_fact(&p.path),
+            Expr::Lit(literal) => literal_fact(&literal.lit),
             Expr::Struct(s) => self.path_type(&s.path),
             Expr::Reference(r) => TypeFact::Reference {
                 mutable: r.mutability.is_some(),
@@ -217,4 +218,22 @@ impl<'a> Body<'a> {
             .unwrap_or_else(unknown);
         if left == right { left } else { unknown() }
     }
+}
+
+fn literal_fact(literal: &syn::Lit) -> TypeFact {
+    let primitive = match literal {
+        syn::Lit::Int(value) => PrimitiveType::from_name(value.suffix()),
+        syn::Lit::Float(value) => PrimitiveType::from_name(value.suffix()),
+        syn::Lit::Bool(_) => Some(PrimitiveType::Bool),
+        syn::Lit::Char(_) => Some(PrimitiveType::Char),
+        syn::Lit::Byte(_) => Some(PrimitiveType::U8),
+        syn::Lit::Str(_) => {
+            return TypeFact::Reference {
+                mutable: false,
+                inner: Box::new(TypeFact::Primitive(PrimitiveType::Str)),
+            };
+        }
+        _ => None,
+    };
+    primitive.map(TypeFact::Primitive).unwrap_or_else(unknown)
 }

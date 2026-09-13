@@ -2,6 +2,9 @@
 
 use std::path::PathBuf;
 
+mod primitives;
+pub use primitives::PrimitiveType;
+
 /// A declaration is identified by its source location and lexical module.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct DeclarationId {
@@ -21,6 +24,35 @@ pub enum UnknownReason {
     AnalysisLimit,
 }
 
+/// Bounds retain declaration identity or the lexical origin of missing knowledge.
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub enum TraitBoundFact {
+    Resolved(DeclarationId),
+    Unresolved {
+        path: Vec<String>,
+        file: PathBuf,
+        module: Vec<String>,
+        candidates: Vec<DeclarationId>,
+        reason: UnknownReason,
+    },
+}
+
+impl TraitBoundFact {
+    pub fn uncertainty_reason(&self) -> Option<&UnknownReason> {
+        match self {
+            Self::Resolved(_) => None,
+            Self::Unresolved { reason, .. } => Some(reason),
+        }
+    }
+
+    pub fn admits(&self, declaration: &DeclarationId) -> bool {
+        match self {
+            Self::Resolved(id) => id == declaration,
+            Self::Unresolved { candidates, .. } => candidates.contains(declaration),
+        }
+    }
+}
+
 /// Facts deliberately represent unavailable knowledge instead of inventing names.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum TypeFact {
@@ -32,10 +64,11 @@ pub enum TypeFact {
         mutable: bool,
         inner: Box<TypeFact>,
     },
+    Primitive(PrimitiveType),
     Generic(String),
     BoundedGeneric {
         name: String,
-        traits: Vec<Vec<String>>,
+        traits: Vec<TraitBoundFact>,
     },
     Ambiguous(Vec<TypeFact>),
     UnavailablePath(Vec<String>),
@@ -47,7 +80,7 @@ pub enum TypeFact {
     Tuple(Vec<TypeFact>),
     Future(Box<TypeFact>),
     Const(String),
-    Dynamic(Vec<Vec<String>>),
+    Dynamic(Vec<TraitBoundFact>),
     Unknown(UnknownReason),
 }
 
@@ -90,7 +123,7 @@ impl TypeFact {
             Self::Nominal { arguments, .. } | Self::Tuple(arguments) => {
                 arguments.iter().all(Self::is_known)
             }
-            Self::Const(_) => true,
+            Self::Const(_) | Self::Primitive(_) => true,
         }
     }
 
@@ -107,7 +140,19 @@ impl TypeFact {
             Self::Uncertain { reason, .. } => Some(reason.clone()),
             Self::Ambiguous(_) => Some(UnknownReason::AmbiguousDeclaration),
             Self::Reference { inner, .. } => inner.uncertainty_reason(),
+            Self::Dynamic(bounds) | Self::BoundedGeneric { traits: bounds, .. } => bounds
+                .iter()
+                .find_map(TraitBoundFact::uncertainty_reason)
+                .cloned(),
             _ => None,
+        }
+    }
+
+    pub fn has_receiver_identity(&self) -> bool {
+        match self {
+            Self::Nominal { .. } | Self::Primitive(_) => true,
+            Self::Reference { inner, .. } => inner.has_receiver_identity(),
+            _ => false,
         }
     }
 
