@@ -5,6 +5,7 @@ mod bindings;
 mod block_items;
 mod body;
 pub(crate) mod cached;
+mod conditions;
 mod expression_paths;
 mod expressions;
 mod flow;

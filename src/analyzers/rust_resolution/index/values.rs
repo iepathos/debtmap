@@ -21,6 +21,32 @@ impl WorkspaceIndex {
         }
     }
 
+    /// Tuple constructors provide a nominal result without being callable bodies.
+    pub fn constructor_result(
+        &self,
+        path: &syn::Path,
+        arity: usize,
+        context: &Context,
+        arguments: &[TypeFact],
+    ) -> Option<TypeFact> {
+        if self.declared_value_type(path, context).is_some() {
+            return None;
+        }
+        let declarations = self.constructor_declarations(path, context);
+        match declarations.as_slice() {
+            [declaration]
+                if declaration.tuple_arity == Some(arity)
+                    && !self.value_path_conflicts(&resolution_segments(path), context) =>
+            {
+                Some(TypeFact::Nominal {
+                    declaration: declaration.id.clone(),
+                    arguments: complete_arguments(arguments.to_vec(), &declaration.generics),
+                })
+            }
+            _ => None,
+        }
+    }
+
     fn constructor_declarations(
         &self,
         path: &syn::Path,

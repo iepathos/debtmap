@@ -50,11 +50,37 @@ impl<'a> Body<'a> {
         }
     }
 
+    pub(super) fn constructor_result(&self, call: &syn::ExprCall) -> Option<TypeFact> {
+        let Expr::Path(path) = &*call.func else {
+            return None;
+        };
+        if path.qself.is_some() || self.path_shadowed(&path.path) {
+            return None;
+        }
+        let arguments = path
+            .path
+            .segments
+            .last()
+            .map(|segment| self.arguments(&segment.arguments))
+            .unwrap_or_default();
+        self.index.constructor_result(
+            &path.path,
+            call.args.len(),
+            &self.callable.context,
+            &arguments,
+        )
+    }
+
     fn call_result(&self, call: &syn::ExprCall) -> TypeFact {
         let Expr::Path(path) = &*call.func else {
             return unknown();
         };
         let lookup = self.lookup_path(path);
+        if lookup.candidates.is_empty()
+            && let Some(fact) = self.constructor_result(call)
+        {
+            return fact;
+        }
         let owner = self.call_owner(path);
         let args = path
             .path

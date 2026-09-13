@@ -50,7 +50,7 @@ impl<'ast> Visit<'ast> for Body<'_> {
                 self.assign_target(&assign.left, value);
             }
             Expr::Binary(binary) if matches!(binary.op, syn::BinOp::And(_) | syn::BinOp::Or(_)) => {
-                self.visit_short_circuit(binary)
+                self.visit_short_circuit(expr)
             }
             Expr::If(branch) => self.visit_if(branch),
             Expr::Match(branch) => self.visit_match(branch),
@@ -79,8 +79,10 @@ impl Body<'_> {
     fn visit_call(&mut self, call: &syn::ExprCall, expr: &Expr) {
         if let Expr::Path(path) = &*call.func {
             let lookup = self.lookup_path(path);
-            let query = quote::quote!(#path).to_string();
-            self.record(lookup, expr, query, None);
+            if !lookup.candidates.is_empty() || self.constructor_result(call).is_none() {
+                let query = quote::quote!(#path).to_string();
+                self.record(lookup, expr, query, None);
+            }
         } else {
             self.visit_expr(&call.func);
         }
@@ -128,72 +130,12 @@ impl Body<'_> {
         }
     }
 
-    fn visit_short_circuit(&mut self, binary: &syn::ExprBinary) {
-        self.visit_expr(&binary.left);
-        let before = self.bindings.clone();
-        self.visit_expr(&binary.right);
-        self.bindings = before.join(&[before.clone(), self.bindings.clone()]);
-    }
-
-    fn visit_if(&mut self, branch: &syn::ExprIf) {
-        self.bindings.push();
-        self.visit_expr(&branch.cond);
-        let condition = self.bindings.clone();
-        self.visit_block(&branch.then_branch);
-        self.bindings.pop();
-        let left = self.bindings.clone();
-        self.bindings = condition;
-        self.bindings.pop();
-        let before = self.bindings.clone();
-        if let Some((_, expr)) = &branch.else_branch {
-            self.visit_expr(expr);
-        }
-        self.bindings = before.join(&[left, self.bindings.clone()]);
-    }
-
-    fn visit_match(&mut self, branch: &syn::ExprMatch) {
-        self.visit_expr(&branch.expr);
-        let fact = self.infer(&branch.expr);
-        let before = self.bindings.clone();
-        let mut outcomes = Vec::new();
-        for arm in &branch.arms {
-            let skipped = self.bindings.clone();
-            self.bindings.push();
-            self.bind_pattern(&arm.pat, fact.clone(), false);
-            if let Some((_, guard)) = &arm.guard {
-                self.visit_expr(guard);
-            }
-            let mut guarded = self.bindings.clone();
-            guarded.pop();
-            self.visit_expr(&arm.body);
-            self.bindings.pop();
-            outcomes.push(self.bindings.clone());
-            self.bindings = skipped.join(&[skipped.clone(), guarded]);
-        }
-        self.bindings = before.join(&outcomes);
-    }
-
     fn visit_for(&mut self, expr: &syn::ExprForLoop) {
         self.visit_expr(&expr.expr);
         self.bindings.push();
         self.bind_pattern(&expr.pat, unknown(), false);
         self.visit_loop_body(&expr.body);
         self.bindings.pop();
-    }
-
-    fn visit_while(&mut self, expr: &syn::ExprWhile) {
-        let writes = super::flow::loop_writes(
-            Some(&expr.cond),
-            &expr.body,
-            self.index,
-            &self.callable.context,
-        );
-        self.bindings.invalidate_writes(&writes);
-        self.bindings.push();
-        self.visit_expr(&expr.cond);
-        self.visit_block(&expr.body);
-        self.bindings.pop();
-        self.bindings.invalidate_writes(&writes);
     }
 
     fn visit_loop_body(&mut self, block: &syn::Block) {

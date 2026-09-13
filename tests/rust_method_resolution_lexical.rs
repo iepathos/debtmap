@@ -87,6 +87,23 @@ fn conflicting_globs_preserve_both_owners_and_exclude_unrelated_methods() {
 }
 
 #[test]
+fn tuple_constructors_propagate_fields_and_explicit_type_arguments() {
+    let source = "struct A; impl A { fn hit(&self) {} }\nstruct B; impl B { fn hit(&self) {} }\nstruct Wrap<T>(T);\nfn make() -> A { A }\nfn caller() { let w = Wrap::<A>(make()); w.0.hit(); }\n";
+    for graph in graphs(source) {
+        assert_targets(&graph, ("caller", 5), &[("make", 4), ("A::hit", 1)]);
+        assert!(!graph.get_all_functions().any(|id| id.name == "Wrap"));
+    }
+}
+
+#[test]
+fn nongeneric_tuple_constructor_propagates_nominal_owner() {
+    let source = "struct A; impl A { fn hit(&self) {} }\nstruct Wrap(A); impl Wrap { fn hit(&self) {} }\nfn caller() { let w = Wrap(A); w.hit(); w.0.hit(); }\n";
+    for graph in graphs(source) {
+        assert_targets(&graph, ("caller", 3), &[("Wrap::hit", 2), ("A::hit", 1)]);
+    }
+}
+
+#[test]
 fn block_value_items_do_not_shadow_types() {
     let source = "struct A; impl A { fn hit(&self) {} }\nfn caller() { fn A() {} let value: A = external(); value.hit(); }\n";
     for graph in graphs(source) {
@@ -103,6 +120,41 @@ fn block_type_items_do_not_shadow_values() {
     let source = "struct A; impl A { fn hit(&self) {} }\nconst VALUE: A = A;\nfn caller() { type VALUE = (); VALUE.hit(); }\n";
     for graph in graphs(source) {
         assert_targets(&graph, ("caller", 3), &[("A::hit", 1)]);
+    }
+}
+
+#[test]
+fn successful_nested_let_chain_retains_binding_and_visits_calls_once() {
+    let source = "struct A; impl A { fn hit(&self) -> bool { true } }\nstruct B; impl B { fn hit(&self) -> bool { true } }\nfn make() -> A { A }\nfn caller(flag: bool) { if flag && let x = make() && x.hit() { x.hit(); } }\n";
+    for graph in graphs(source) {
+        assert_targets(&graph, ("caller", 4), &[("make", 3), ("A::hit", 1)]);
+        assert_eq!(
+            graph
+                .edge_evidence()
+                .filter(|edge| edge.call.caller.name == "caller")
+                .count(),
+            3
+        );
+    }
+}
+
+#[test]
+fn while_let_chain_keeps_success_bindings() {
+    let source = "struct A; impl A { fn hit(&self) -> bool { true } }\nfn make() -> A { A }\nfn caller(flag: bool) { while flag && let x = make() && x.hit() { x.hit(); break; } }\n";
+    for graph in graphs(source) {
+        assert_targets(&graph, ("caller", 3), &[("make", 2), ("A::hit", 1)]);
+    }
+}
+
+#[test]
+fn false_short_circuit_path_carries_only_executed_effects() {
+    let source = "struct A; impl A { fn hit(&self) {} }\nstruct B; impl B { fn hit(&self) {} }\nfn caller(flag: bool) { let mut x = external(); if flag || { x = A; false } {} else { x.hit(); } }\n";
+    for graph in graphs(source) {
+        let caller = definition(&graph, "caller", 3);
+        assert_eq!(
+            graph.get_callees(&caller),
+            vec![definition(&graph, "A::hit", 1)]
+        );
     }
 }
 
@@ -161,6 +213,29 @@ fn shadowing_module_does_not_fall_back_to_glob_for_a_missing_member() {
 }
 
 #[test]
+fn constructor_type_arguments_are_not_inferred_from_arguments() {
+    let source = "struct A; impl A { fn hit(&self) {} }\nstruct B; impl B { fn hit(&self) {} }\nstruct Wrap<T>(T);\nfn caller() { let w = Wrap(A); w.0.hit(); }\n";
+    for graph in graphs(source) {
+        let caller = definition(&graph, "caller", 4);
+        assert!(graph.get_callees(&caller).is_empty());
+        let calls: Vec<_> = graph
+            .uncertain_calls()
+            .filter(|call| call.caller == caller)
+            .collect();
+        assert_eq!(calls.len(), 1, "constructor is not an unavailable function");
+        assert_eq!(calls[0].query, "hit");
+    }
+}
+
+#[test]
+fn success_bindings_do_not_escape_conditional_scope() {
+    let source = "struct A; impl A { fn hit(&self) {} }\nstruct B; impl B { fn hit(&self) {} }\nfn caller(flag: bool) { let x = B; if flag && let x = A { x.hit(); } x.hit(); }\n";
+    for graph in graphs(source) {
+        assert_targets(&graph, ("caller", 3), &[("A::hit", 1), ("B::hit", 2)]);
+    }
+}
+
+#[test]
 fn block_type_import_does_not_hide_loop_writes_to_value_binding() {
     let source = "struct A; impl A { fn hit(&self) {} }\nmod other { pub type x = (); }\nfn caller() { let mut x = A; loop { use other::x; x.hit(); x = external(); } }\n";
     for graph in graphs(source) {
@@ -171,6 +246,29 @@ fn block_type_import_does_not_hide_loop_writes_to_value_binding() {
                 .uncertain_calls()
                 .any(|call| call.caller == caller && call.query == "hit")
         );
+    }
+}
+
+#[test]
+fn local_type_alias_does_not_shadow_tuple_constructor_value() {
+    let source = "struct A; impl A { fn hit(&self) {} }\nstruct Wrap(A);\nfn caller() { type Wrap = (); let w = Wrap(A); w.0.hit(); }\n";
+    for graph in graphs(source) {
+        assert_targets(&graph, ("caller", 3), &[("A::hit", 1)]);
+    }
+}
+
+#[test]
+fn constructor_generic_argument_respects_block_type_shadowing() {
+    let source = "struct A; impl A { fn hit(&self) {} }\nstruct Wrap<T>(T);\nfn caller() { type A = (); let w = Wrap::<A>(()); w.0.hit(); }\n";
+    for graph in graphs(source) {
+        let caller = definition(&graph, "caller", 3);
+        assert!(graph.get_callees(&caller).is_empty());
+        let calls: Vec<_> = graph
+            .uncertain_calls()
+            .filter(|call| call.caller == caller)
+            .collect();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].query, "hit");
     }
 }
 

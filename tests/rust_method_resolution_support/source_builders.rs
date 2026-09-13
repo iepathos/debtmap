@@ -56,6 +56,10 @@ pub fn graphs(files: &[(&str, &str)]) -> Vec<CallGraph> {
             Some((metric.cyclomatic, metric.length))
         );
     }
+    let mut merged = parallel.clone();
+    merged.merge(sequential.clone());
+    merged.merge(parallel.clone());
+    assert_eq!(normalized(&merged), normalized(&parallel));
     assert_eq!(sequential_exclusions, parallel_exclusions);
     assert_eq!(sequential_used, parallel_used);
     vec![rebase(&sequential, &mapping), rebase(&parallel, &mapping)]
