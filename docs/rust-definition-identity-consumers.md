@@ -25,3 +25,12 @@ remains limited to the location information available in the report.
 Regression coverage lives in `tests/data_flow_definition_identity.rs`: unique
 and ambiguous legacy getter queries, separate same-line serialized identities,
 transformation pairs, and legacy key decoding.
+
+Data-flow setters canonicalize missing-column identities when the graph proves a
+unique match, including both transformation endpoints. Exact-column hits remain
+direct map lookups. On a miss, getters can recover legacy serialized facts only
+when their missing-column identity uniquely denotes the requested definition.
+Appending I/O migrates the matching legacy operations before adding the new one.
+Ambiguous legacy facts remain inaccessible to either same-line definition.
+`tests/data_flow_legacy_identity.rs` covers cached legacy extraction, legacy JSON,
+mixed transformation identities, ambiguity, and preserving existing I/O on append.

@@ -17,6 +17,7 @@ use std::collections::{HashMap, HashSet};
 
 pub mod population;
 
+mod identity;
 mod identity_serde;
 use identity_serde::{function_id_serde, function_id_tuple_serde};
 
@@ -196,18 +197,6 @@ impl DataFlowGraph {
         &self.call_graph
     }
 
-    fn identity_lookup<'a, T>(
-        &self,
-        values: &'a HashMap<FunctionId, T>,
-        id: &FunctionId,
-    ) -> Option<&'a T> {
-        if id.column.is_some() || self.call_graph.is_empty() {
-            return values.get(id);
-        }
-        let canonical = self.call_graph.find_function(id)?;
-        values.get(&canonical).or_else(|| values.get(id))
-    }
-
     /// Get variable dependencies for a function
     pub fn get_variable_dependencies(&self, func_id: &FunctionId) -> Option<&HashSet<String>> {
         self.identity_lookup(&self.variable_deps, func_id)
@@ -215,6 +204,7 @@ impl DataFlowGraph {
 
     /// Add variable dependencies for a function
     pub fn add_variable_dependencies(&mut self, func_id: FunctionId, variables: HashSet<String>) {
+        let func_id = self.storage_identity(func_id);
         self.variable_deps.insert(func_id, variables);
     }
 
@@ -224,15 +214,19 @@ impl DataFlowGraph {
         from: &FunctionId,
         to: &FunctionId,
     ) -> Option<&DataTransformation> {
-        let resolve = |id: &FunctionId| {
-            if id.column.is_some() || self.call_graph.is_empty() {
-                Some(id.clone())
-            } else {
-                self.call_graph.find_function(id)
-            }
-        };
-        self.data_transformations
-            .get(&(resolve(from)?, resolve(to)?))
+        if from.column.is_some()
+            && to.column.is_some()
+            && let Some(value) = self.data_transformations.get(&(from.clone(), to.clone()))
+        {
+            return Some(value);
+        }
+        let from = self.identity_candidates(from)?;
+        let to = self.identity_candidates(to)?;
+        from.iter().flatten().find_map(|from| {
+            to.iter()
+                .flatten()
+                .find_map(|to| self.data_transformations.get(&(from.clone(), to.clone())))
+        })
     }
 
     /// Add data transformation between two functions
@@ -242,6 +236,8 @@ impl DataFlowGraph {
         to: FunctionId,
         transformation: DataTransformation,
     ) {
+        let from = self.storage_identity(from);
+        let to = self.storage_identity(to);
         self.data_transformations.insert((from, to), transformation);
     }
 
@@ -252,6 +248,17 @@ impl DataFlowGraph {
 
     /// Add I/O operation for a function
     pub fn add_io_operation(&mut self, func_id: FunctionId, operation: IoOperation) {
+        let func_id = self.storage_identity(func_id);
+        if !self.io_operations.contains_key(&func_id) {
+            let operations = self
+                .identity_candidates(&func_id)
+                .into_iter()
+                .flatten()
+                .flatten()
+                .find_map(|key| self.io_operations.remove(&key))
+                .unwrap_or_default();
+            self.io_operations.insert(func_id.clone(), operations);
+        }
         self.io_operations
             .entry(func_id)
             .or_default()
@@ -265,6 +272,7 @@ impl DataFlowGraph {
 
     /// Set purity information for a function
     pub fn set_purity_info(&mut self, func_id: FunctionId, purity: PurityInfo) {
+        let func_id = self.storage_identity(func_id);
         self.purity_analysis.insert(func_id, purity);
     }
 
@@ -275,6 +283,7 @@ impl DataFlowGraph {
 
     /// Set CFG-based data flow analysis for a function
     pub fn set_cfg_analysis(&mut self, func_id: FunctionId, analysis: DataFlowAnalysis) {
+        let func_id = self.storage_identity(func_id);
         self.cfg_analysis.insert(func_id, analysis);
     }
 
@@ -285,6 +294,7 @@ impl DataFlowGraph {
 
     /// Set mutation analysis for a function
     pub fn set_mutation_info(&mut self, func_id: FunctionId, info: MutationInfo) {
+        let func_id = self.storage_identity(func_id);
         self.mutation_analysis.insert(func_id, info);
     }
 
@@ -302,6 +312,7 @@ impl DataFlowGraph {
         func_id: FunctionId,
         context: CfgAnalysisWithContext,
     ) {
+        let func_id = self.storage_identity(func_id);
         self.cfg_analysis_with_context.insert(func_id, context);
     }
 
