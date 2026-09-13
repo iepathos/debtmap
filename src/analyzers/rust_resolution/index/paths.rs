@@ -14,21 +14,11 @@ enum Namespace {
 impl WorkspaceIndex {
     pub(super) fn same_workspace(&self, left: &Path, right: &Path) -> bool {
         left == right
-            || (self
-                .contexts
+            || self
+                .workspace_membership
                 .get(left)
-                .is_some_and(|contexts| contexts.len() == 1)
-                && self
-                    .contexts
-                    .get(right)
-                    .is_some_and(|contexts| contexts.len() == 1)
-                && self
-                    .roots
-                    .get(left)
-                    .zip(self.roots.get(right))
-                    .is_some_and(|(left, right)| {
-                        left.len() == 1 && right.len() == 1 && !left.is_disjoint(right)
-                    }))
+                .zip(self.workspace_membership.get(right))
+                .is_some_and(|(left, right)| left == right)
     }
 
     pub(super) fn resolve_paths(&self, path: &[String], context: &Context) -> Vec<Vec<String>> {
@@ -115,7 +105,12 @@ impl WorkspaceIndex {
         targets
             .into_iter()
             .filter(|path| {
-                self.has_binding(path, context, namespace) || !self.path_is_known(path, context)
+                let other = match namespace {
+                    Namespace::Type => Namespace::Value,
+                    Namespace::Value => Namespace::Type,
+                };
+                self.has_binding(path, context, namespace)
+                    || !self.has_binding(path, context, other)
             })
             .collect()
     }

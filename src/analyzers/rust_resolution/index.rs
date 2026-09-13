@@ -13,6 +13,7 @@ mod bounds;
 mod syntax;
 #[path = "index/workspace.rs"]
 mod workspace;
+mod workspace_membership;
 pub use syntax::{SignatureSyntax, TypeSyntax};
 pub(crate) use workspace::DeclarationCollector;
 #[path = "index/collect.rs"]
@@ -69,6 +70,8 @@ pub struct Callable {
     pub owner: Option<TypeFact>,
     pub trait_path: Option<Vec<String>>,
     pub trait_type: Option<TypeFact>,
+    /// Raw declaration positions, including ambiguous and non-trait bindings.
+    pub trait_candidates: Vec<usize>,
     pub kind: CallableKind,
     pub requirements_known: bool,
     pub has_body: bool,
@@ -151,9 +154,11 @@ pub struct WorkspaceIndex {
     imports: Vec<Import>,
     contexts: HashMap<PathBuf, Vec<Context>>,
     roots: HashMap<PathBuf, HashSet<PathBuf>>,
+    workspace_membership: HashMap<PathBuf, usize>,
     type_paths: HashMap<Vec<String>, Vec<usize>>,
     declaration_positions: HashMap<DeclarationId, usize>,
     callable_names: HashMap<String, Vec<usize>>,
+    free_callable_paths: HashMap<Vec<String>, Vec<usize>>,
     callable_positions: HashMap<PathBuf, HashMap<(usize, Option<usize>), usize>>,
     imports_context: HashMap<Context, Vec<usize>>,
     imports_module: HashMap<Vec<String>, Vec<usize>>,
@@ -221,6 +226,15 @@ impl WorkspaceIndex {
 
     fn index_callable_names(&mut self) {
         for (position, callable) in self.callables.iter().enumerate() {
+            if callable.kind == CallableKind::FreeFunction {
+                self.free_callable_paths
+                    .entry(qualified(
+                        &callable.context.module,
+                        &callable.signature.ident,
+                    ))
+                    .or_default()
+                    .push(position);
+            }
             self.callable_positions
                 .entry(callable.id.file.clone())
                 .or_default()
@@ -237,6 +251,47 @@ impl WorkspaceIndex {
             .get(file)?
             .get(&(line, Some(column)))
             .map(|position| &self.callables[*position])
+    }
+
+    fn free_callables_at(&self, path: &[String]) -> impl Iterator<Item = &Callable> {
+        self.free_callable_paths
+            .get(path)
+            .into_iter()
+            .flatten()
+            .map(|position| &self.callables[*position])
+    }
+
+    fn free_candidates(
+        &self,
+        paths: &[Vec<String>],
+        context: &Context,
+        name: &str,
+    ) -> Vec<&Callable> {
+        let mut positions: Vec<_> = paths
+            .iter()
+            .filter_map(|path| self.free_callable_paths.get(path))
+            .flatten()
+            .copied()
+            .collect();
+        positions.sort_unstable();
+        positions.dedup();
+        positions
+            .into_iter()
+            .map(|position| &self.callables[position])
+            .filter(|call| {
+                call.signature.ident == name
+                    && self.same_workspace(&call.context.file, &context.file)
+            })
+            .collect()
+    }
+
+    fn callable_traits<'a>(
+        &'a self,
+        call: &'a Callable,
+    ) -> impl Iterator<Item = &'a TypeDeclaration> {
+        call.trait_candidates
+            .iter()
+            .map(|position| &self.declarations[*position])
     }
 
     fn named_callables(&self, name: &str) -> impl Iterator<Item = &Callable> {

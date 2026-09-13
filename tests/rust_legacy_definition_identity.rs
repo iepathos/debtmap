@@ -102,3 +102,28 @@ fn same_line_debt_profiles_keep_definition_columns() {
     assert_eq!(aggregator.get_profile(&left).unwrap().function_id, left);
     assert_eq!(aggregator.get_profile(&right).unwrap().function_id, right);
 }
+
+#[test]
+fn canonical_cached_merge_keeps_base_metrics_and_source_role_evidence() {
+    let path = PathBuf::from("src/lib.rs");
+    let source = "struct Foo; impl Default for Foo { fn default() -> Self { helper(); Foo } } fn helper() {}";
+    let data = UnifiedFileExtractor::extract(&path, source).unwrap();
+    let mut metrics = all_function_metrics(&data);
+    for metric in &mut metrics {
+        metric.cyclomatic = 77;
+    }
+    let (graph, _, _) = build_call_graph_from_extracted(
+        build_initial_call_graph(&metrics),
+        &HashMap::from([(path, data)]),
+    );
+    assert_eq!(graph.node_count(), 2);
+    for id in graph.get_all_functions() {
+        assert_eq!(graph.get_function_info(id).unwrap().2, 77);
+    }
+    let constructor = graph
+        .get_all_functions()
+        .find(|id| id.name == "Foo::default")
+        .unwrap();
+    assert!(graph.is_entry_point(constructor));
+    assert_eq!(graph.get_callees_exact(constructor).len(), 1);
+}

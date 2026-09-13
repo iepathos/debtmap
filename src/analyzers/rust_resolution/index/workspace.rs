@@ -40,6 +40,7 @@ impl DeclarationCollector {
     pub fn finish(mut self) -> WorkspaceIndex {
         let known = self.known.into_values().flatten().collect();
         self.index.establish_modules(known, self.edges);
+        self.index.index_workspace_membership();
         self.index.rebase_declarations();
         self.index.index_module_files();
         self.index.index_declarations();
@@ -116,6 +117,11 @@ impl WorkspaceIndex {
             call.substitutions.insert("Self".into(), owner.clone());
             call.owner = Some(owner);
         }
+        call.trait_candidates = call
+            .trait_path
+            .as_ref()
+            .map(|path| self.type_candidate_positions(path, &call.context))
+            .unwrap_or_default();
         call.trait_type = call
             .trait_syntax
             .as_ref()

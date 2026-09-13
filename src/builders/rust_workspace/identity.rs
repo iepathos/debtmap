@@ -9,6 +9,16 @@ pub(crate) fn merge(base: CallGraph, source: CallGraph) -> CallGraph {
     if base.is_empty() {
         return source;
     }
+    if source
+        .get_all_functions()
+        .all(|id| base.nodes.contains_key(id))
+    {
+        // Fresh cached extraction already shares exact identities with metrics.
+        // Preserve metric precedence without rebuilding two complete graph maps.
+        let mut graph = source;
+        graph.merge(base);
+        return graph;
+    }
     let candidates = base_definitions(&base);
     let source_definitions = definitions_without_columns(&source);
     let base_definitions = definitions_without_columns(&base);

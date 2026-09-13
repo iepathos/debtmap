@@ -7,6 +7,17 @@ impl WorkspaceIndex {
         path: &[String],
         context: &Context,
     ) -> Vec<&TypeDeclaration> {
+        self.type_candidate_positions(path, context)
+            .into_iter()
+            .map(|position| &self.declarations[position])
+            .collect()
+    }
+
+    pub(in crate::analyzers::rust_resolution::index) fn type_candidate_positions(
+        &self,
+        path: &[String],
+        context: &Context,
+    ) -> Vec<usize> {
         let positions: HashSet<_> = self
             .resolve_paths(path, context)
             .iter()
@@ -16,10 +27,15 @@ impl WorkspaceIndex {
             .collect();
         let mut candidates: Vec<_> = positions
             .into_iter()
-            .map(|position| &self.declarations[position])
-            .filter(|decl| self.same_workspace(&context.file, &decl.id.file))
+            .filter(|position| {
+                self.same_workspace(&context.file, &self.declarations[*position].id.file)
+            })
             .collect();
-        candidates.sort_by(|left, right| left.id.cmp(&right.id));
+        candidates.sort_by(|left, right| {
+            self.declarations[*left]
+                .id
+                .cmp(&self.declarations[*right].id)
+        });
         candidates
     }
 
@@ -67,17 +83,8 @@ impl WorkspaceIndex {
                     (declaration.unit || declaration.tuple_arity.is_some())
                         && self.same_workspace(&context.file, &declaration.id.file)
                 })
-            || path.last().is_some_and(|name| {
-                self.named_callables(name).any(|call| {
-                    call.kind == CallableKind::FreeFunction
-                        && self.same_workspace(&context.file, &call.context.file)
-                        && qualified(&call.context.module, name) == path
-                })
-            })
-    }
-
-    pub(super) fn path_is_known(&self, path: &[String], context: &Context) -> bool {
-        self.has_binding(path, context, Namespace::Type)
-            || self.has_binding(path, context, Namespace::Value)
+            || self
+                .free_callables_at(path)
+                .any(|call| self.same_workspace(&context.file, &call.context.file))
     }
 }

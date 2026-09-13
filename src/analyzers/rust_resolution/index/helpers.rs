@@ -24,6 +24,7 @@ pub(super) fn make_callable(
         owner: None,
         trait_path: None,
         trait_type: None,
+        trait_candidates: Vec::new(),
         kind: CallableKind::FreeFunction,
         requirements_known: true,
         has_body,

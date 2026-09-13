@@ -77,13 +77,8 @@ impl WorkspaceIndex {
         if let TypeFact::Dynamic(bounds) | TypeFact::BoundedGeneric { traits: bounds, .. } =
             receiver
         {
-            return call.trait_path.as_ref().is_some_and(|trait_path| {
-                self.type_candidates(trait_path, &call.context)
-                    .iter()
-                    .any(|declaration| {
-                        declaration.is_trait
-                            && bounds.iter().any(|bound| bound.admits(&declaration.id))
-                    })
+            return self.callable_traits(call).any(|declaration| {
+                declaration.is_trait && bounds.iter().any(|bound| bound.admits(&declaration.id))
             });
         }
         !matches!(
@@ -95,26 +90,23 @@ impl WorkspaceIndex {
         ) && self.trait_in_scope(call, context)
     }
 
-    pub(super) fn same_trait(
-        &self,
-        left: &[String],
-        left_context: &Context,
-        right: &[String],
-        right_context: &Context,
-    ) -> bool {
-        let left = self.type_candidates(left, left_context);
-        let right = self.type_candidates(right, right_context);
-        left.len() == 1 && right.len() == 1 && left[0].is_trait && left[0].id == right[0].id
+    fn has_same_trait_candidate(&self, candidates: &[&TypeDeclaration], call: &Callable) -> bool {
+        match (candidates, call.trait_candidates.as_slice()) {
+            ([candidate], [position]) => {
+                candidate.is_trait && candidate.id == self.declarations[*position].id
+            }
+            _ => false,
+        }
     }
 
     pub(super) fn trait_in_scope(&self, call: &Callable, context: &Context) -> bool {
-        let Some(path) = &call.trait_path else {
+        if call.trait_path.is_none() {
             return true;
-        };
-        let targets = self.type_candidates(path, &call.context);
-        let [target] = targets.as_slice() else {
+        }
+        let [position] = call.trait_candidates.as_slice() else {
             return false;
         };
+        let target = &self.declarations[*position];
         if target.context.module == context.module
             && self.same_workspace(&target.id.file, &context.file)
         {
@@ -164,17 +156,11 @@ impl WorkspaceIndex {
             }
         }
         let paths = self.resolve_value_paths(&segments, context);
-        let candidates = self
-            .named_callables(segments.last().map(String::as_str).unwrap_or_default())
-            .filter(|call| call.kind == CallableKind::FreeFunction)
-            .filter(|call| self.same_workspace(&call.context.file, &context.file))
-            .filter(|call| {
-                paths.contains(&qualified(
-                    &call.context.module,
-                    &call.signature.ident.to_string(),
-                ))
-            })
-            .collect::<Vec<_>>();
+        let candidates = self.free_candidates(
+            &paths,
+            context,
+            segments.last().map(String::as_str).unwrap_or_default(),
+        );
         let ambiguous = candidates.len() == 1 && self.value_path_conflicts(&segments, context);
         let justified = candidates.len() == 1 && !ambiguous;
         let provenance = if candidates.first().is_some_and(|call| {
@@ -214,6 +200,7 @@ impl WorkspaceIndex {
             segments: path.segments.iter().take(qself.position).cloned().collect(),
         };
         let trait_type = self.type_from_path(&qualified_trait, context, substitutions);
+        let trait_candidates = self.type_candidates(trait_path, context);
         let candidates = self
             .named_callables(name)
             .filter(|call| call.kind != CallableKind::TraitDeclaration)
@@ -227,11 +214,7 @@ impl WorkspaceIndex {
                     .as_ref()
                     .is_some_and(|candidate| owner_compatible(candidate, &owner))
             })
-            .filter(|call| {
-                call.trait_path.as_ref().is_some_and(|candidate| {
-                    self.same_trait(trait_path, context, candidate, &call.context)
-                })
-            })
+            .filter(|call| self.has_same_trait_candidate(&trait_candidates, call))
             .collect::<Vec<_>>();
         let justified = candidates.len() == 1
             && owner.has_receiver_identity()
