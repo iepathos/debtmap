@@ -15,12 +15,16 @@ Call graph analysis builds a comprehensive map of which functions call which oth
 ## Call Graph Construction
 
 For Rust, Debtmap builds an immutable declaration index over all discovered
-source files before analyzing function bodies:
+source files before analyzing function bodies. Source readers capture each file once;
+both parsing passes use that snapshot:
 
-1. **Index declarations** — Record types, aliases, fields, imports, callable signatures,
-   receiver forms, and definition locations.
-2. **Collect source facts** — Track lexical bindings and propagate supported receiver
-   types through expressions.
+1. **Index declarations** — Parse batches of at most 200 files and retain owned
+   type syntax, aliases, fields, imports, callable signatures, receiver forms, module
+   relationships, and definition locations. Finalize the index after every batch
+   has contributed declarations; it contains no ASTs or spans.
+2. **Collect source facts** — Reparse bounded batches against the complete index,
+   tracking lexical bindings and supported receiver types. Drop each batch before
+   resetting span storage. File ordering and batch boundaries do not restrict lookup.
 3. **Record outcomes** — Add an ordinary edge when declaration evidence justifies a
    target; otherwise preserve the call and its admissible possible targets separately.
 
@@ -33,9 +37,9 @@ Rust extraction, metrics, and cached graphs use the same module-qualified functi
 names, including multiple inline modules on one source line. Current extraction
 records support Postcard round trips with present or absent source snapshots; this
 does not provide migration for older binary cache layouts.
-Keeping these snapshots costs source-sized storage and one additional parse per Rust
-file when constructing the workspace index; it avoids parsing separately for each
-function. Resolution totals are available in existing debug logs with
+Keeping these snapshots costs source-sized storage. Graph construction parses each
+snapshot twice, once for owned declarations and once for body analysis; it avoids
+retaining an entire workspace AST or parsing separately for each function. Resolution totals are available in existing debug logs with
 `RUST_LOG=debtmap=debug`.
 
 Git-history context retains qualified names as cache keys and searches the source
@@ -45,7 +49,11 @@ repeating the repository scan during scoring. This history search remains based 
 textual occurrences; it does not distinguish same-named historical declarations
 within one file. Function-scoring progress advances as metrics finish.
 
-Type identity includes its file, lexical module, and declaration location. Printed
+Definition identity includes its file, name, line, and optional zero-based identifier
+column. Rust extraction and metric adapters populate the same columns, distinguishing
+same-line implementations without changing display names. Older JSON records default
+missing columns to absent; a legacy lookup selects a definition only when unique.
+Type identity additionally preserves its lexical module. Printed
 names are display values. A dotted call cannot select a free function or an
 associated function without a receiver. Known receiver constraints remain in force
 through import lookup and fallback handling: `Timeline` never matches `PyTimeline`
@@ -73,13 +81,16 @@ The bounded Rust resolver supports:
 
 - Parameters, `self`/`Self`, annotated and inferred locals, local aliases,
   references, dereferences of known references, and parentheses.
-- Struct literals, declared unit structs, named and tuple fields, and known
+- Struct literals, declared unit structs, tuple-struct constructors with matching
+  arity, named and tuple fields, and known
   function/method return chains. Local async declarations propagate their output
   through `.await`.
-- Explicit module paths and imports, including aliases, when the discovered source
-  establishes one declaration identity. Module `#[path]` attributes normalize `.`
+- Explicit module paths and imports when the discovered source establishes one
+  declaration identity. Type import aliases retain declaration identities. Module `#[path]` attributes normalize `.`
   and `..` for lookup while preserving the discovered file's identity. Absolute
-  external paths such as `::std` do not select similarly named local modules.
+  external paths such as `::std` do not select similarly named local modules. Local
+  declarations and explicit imports shadow globs in the relevant namespace; conflicts
+  retain admissible owner constraints rather than selecting one declaration.
 - Constants and statics use their declared value types. Enums and type aliases
   do not establish unit-struct values merely by sharing a name.
 - Direct generic substitution from explicit arguments and known receiver arguments
@@ -89,13 +100,22 @@ The bounded Rust resolver supports:
 - Inherent methods and concrete trait implementations whose owner, trait scope,
   and requirements are established. Explicit trait qualification distinguishes
   competing implementation bodies from trait declarations and retains the enclosing
-  impl's `Self` substitution.
+  impl's `Self` substitution. Dynamic and generic trait bounds retain declaration
+  identities from their original lexical context through fields, aliases, returns,
+  and substitutions. Unavailable bounds retain that context and diagnostic reason.
+- Primitive receiver identities, references, aliases, and lexical type shadowing.
+  A primitive receiver excludes incompatible nominal owners; explicit qualification
+  may resolve a local trait implementation. Dotted primitive calls remain uncertain
+  because library inherent-method precedence is not indexed.
 
 Bindings follow lexical scope. An initializer sees the previous binding; an
 unknown inner binding shadows an outer known binding. Unsupported pattern bindings
 introduce unknown facts. Assignments update inferred types or preserve explicit
 constraints with uncertainty; branch joins require agreement. Loops conservatively
-invalidate inferred facts they modify.
+invalidate inferred facts they modify. Conditions carry distinct successful and
+unsuccessful binding states through `&&`, `||`, `if`, and `while`, so successful
+let-chain bindings reach their branch. Block items have separate type and value
+shadows with block-wide item scope.
 Tuple annotations retain each component's declared owner when initializer facts
 are unavailable. A contradictory component remains constrained uncertainty without
 making unrelated owners possible or invalidating an agreeing sibling.
@@ -105,7 +125,9 @@ checks as other methods. Their names alone do not establish library ownership.
 Existing supported macro argument scanning, function-pointer tracking, and framework
 registrations remain separate inputs to graph construction. Trait enhancement
 consumes shared call uncertainty and cannot recreate ordinary method edges through
-weaker name matching.
+weaker name matching. Sequential, parallel, and cached-source builders accumulate
+enhancement metadata across batches and finalize it once against existing canonical
+definitions. Unmatched legacy metadata remains diagnostic; it creates no ghost node.
 
 ### Possible Calls and Dead Code
 
@@ -148,7 +170,10 @@ a possible target found only by method name. Custom
 general `?`/wrapper inference, and const-generic evaluation remain unsupported.
 Block-local item declarations and imports are not indexed as independent lexical
 module contexts; calls requiring those contexts remain uncertain. Generic arguments
-are not inferred from arbitrary argument constraints. Alias and substitution
+are not inferred from arbitrary argument constraints, including tuple-constructor
+arguments. Constructors supply a nominal type without manufacturing a callable node.
+Renamed free-function imports retain the existing basename lookup restriction.
+Loop analysis does not compute a fixed point. Alias and substitution
 expansion stops at 32 levels; recursive aliases and other incomplete facts remain
 uncertain instead of triggering a name-only guess.
 
@@ -167,9 +192,20 @@ calls are recovered.
 
 The labeled regression corpus is in `tests/data/rust_method_resolution/`. Its
 exact-edge precision and recall describe those fixtures only, not arbitrary Rust
-projects. `scripts/benchmark_rust_method_resolution.py` measures five warmed debug
-runs on staged inputs and verifies that all fixture files were analyzed. Timing
-outputs are local evaluation artifacts.
+projects. The additional identity, receiver, lexical, and workspace-boundary regression
+targets cover the nine reviewed gaps, including exact possible-target sets and
+199/200/201/401-file workspaces. The existing Criterion call-graph benchmark measures
+sequential and parallel Rust workspace construction at those boundaries:
+
+```bash
+cargo bench --offline --profile dev --bench call_graph_bench -- rust_workspace_resolution
+```
+
+The [measured repair report](../../docs/benchmarks/rust-resolution-nine-gaps.md)
+records five warmed debug runs on identical frozen repository and synthetic inputs,
+including context/LCOV, phase timings, peak memory, and the full CLI commands with
+the interactive explorer disabled. Fixture and boundary benchmarks do not establish
+repository-scale performance.
 
 ### Parallel Construction
 

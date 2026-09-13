@@ -28,5 +28,6 @@ A regression preserves source trait roles while giving base metrics precedence.
 
 Import target filtering also avoids repeating the requested namespace lookup.
 These changes reduce repeated work without changing resolution policy. Final
-runtime and memory measurements belong to the overall repair validation report;
-the sampling profile alone is not evidence of a measured speedup.
+runtime and memory measurements are recorded in the
+[repair validation report](benchmarks/rust-resolution-nine-gaps.md); the sampling
+profile alone is not evidence of a measured speedup.

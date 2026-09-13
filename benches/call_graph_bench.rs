@@ -2,6 +2,9 @@
 //!
 //! This ensures that the refactoring hasn't introduced performance regressions
 
+#[path = "support/rust_workspace.rs"]
+mod rust_workspace;
+
 use criterion::{Criterion, criterion_group, criterion_main};
 use debtmap::analyzers::call_graph::debug::{CallGraphDebugger, DebugConfig, DebugFormat};
 use debtmap::analyzers::call_graph::validation::CallGraphValidator;
@@ -244,7 +247,8 @@ criterion_group!(
     bench_delegation_detection,
     bench_cross_file_resolution,
     bench_debug_mode_overhead,
-    bench_validation_operations
+    bench_validation_operations,
+    rust_workspace::bench_workspace_resolution
 );
 
 criterion_main!(benches);
