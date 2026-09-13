@@ -244,6 +244,13 @@ impl FrameworkPatternDetector {
 
     /// Mark a function as a Visit trait implementation
     pub fn add_visit_trait_function(&mut self, func_id: FunctionId) {
+        if self
+            .function_to_patterns
+            .get(&func_id)
+            .is_some_and(|patterns| patterns.contains(&PatternType::VisitTrait))
+        {
+            return;
+        }
         let pattern = FrameworkPattern {
             pattern_type: PatternType::VisitTrait,
             function_id: Some(func_id.clone()),
