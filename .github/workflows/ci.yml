@@ -118,6 +118,7 @@ jobs:
           --test rust_resolution_matrix_oracles \
           --test rust_resolution_matrix_invariants \
           --test rust_resolution_matrix_assertions \
+          --test recursive_dependency_metrics \
           --status-level fail --final-status-level slow
 
     - name: Verify installer contract

@@ -1078,6 +1078,7 @@ mod tests {
             upstream_production_callers: Vec::new(),
             upstream_test_callers: Vec::new(),
             production_blast_radius: 0,
+            immediate_neighbor_count: None,
             nesting_depth: nest,
             function_length: length,
             cyclomatic_complexity: cyc,

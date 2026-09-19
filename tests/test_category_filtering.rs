@@ -64,6 +64,7 @@ fn create_testing_item(function_name: &str) -> UnifiedDebtItem {
         upstream_production_callers: vec![],
         upstream_test_callers: vec![],
         production_blast_radius: 0,
+        immediate_neighbor_count: None,
         nesting_depth: 2,
         function_length: 30,
         cyclomatic_complexity: 10,

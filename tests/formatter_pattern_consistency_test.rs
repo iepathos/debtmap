@@ -32,6 +32,7 @@ fn create_test_item_with_state_machine() -> UnifiedDebtItem {
         upstream_production_callers: vec![],
         upstream_test_callers: vec![],
         production_blast_radius: 0,
+        immediate_neighbor_count: None,
         upstream_dependencies: 0,
         downstream_dependencies: 0,
         unified_score: UnifiedScore {
@@ -127,6 +128,7 @@ fn create_test_item_with_coordinator() -> UnifiedDebtItem {
         upstream_production_callers: vec![],
         upstream_test_callers: vec![],
         production_blast_radius: 0,
+        immediate_neighbor_count: None,
         upstream_dependencies: 0,
         downstream_dependencies: 0,
         unified_score: UnifiedScore {

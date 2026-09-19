@@ -1,16 +1,35 @@
 # Call Graph Analysis
 
-Debtmap constructs detailed call graphs to track function relationships and dependencies across your codebase. This enables critical path identification, circular dependency detection, and transitive coverage propagation.
+Debtmap constructs call graphs to track function relationships and dependencies across your codebase. This supports dependency analysis, circular dependency detection, and transitive coverage propagation.
 
 ## Overview
 
 Call graph analysis builds a comprehensive map of which functions call which other functions. This information powers several key features:
 
-- **Critical path identification** - Find frequently-called functions that deserve extra attention
+- **Dependency analysis** - Find functions with many direct callers or callees
 - **Circular dependency detection** - Identify problematic circular call patterns
 - **Transitive coverage** - Propagate test coverage through the call graph
 - **Dependency visualization** - See caller/callee relationships in output
 - **Risk assessment** - Factor calling patterns into priority scoring
+
+### Immediate dependency metrics
+
+Recursive calls remain in the graph, but a function does not count itself as an
+external caller or callee. Immediate neighborhood size counts distinct neighboring
+definitions across both directions: a mutually recursive neighbor counts once.
+Definitions are distinguished by their source identities before display names are
+formatted. Colliding display labels include source locations.
+
+Public JSON v3 retains the field names `blast_radius` and
+`production_blast_radius`. They report immediate neighborhood counts, not
+transitive impact. The production count unions production callers with direct
+callees. Historical records containing only display labels cannot recover exact
+definition identities; their fallback count deduplicates available labels and
+retains any unlabeled counts.
+
+Dependency degree alone does not establish a critical execution path and does
+not set `critical_path`. Human output reports factual neighbor counts without
+assigning impact severity from those counts.
 
 ## Call Graph Construction
 

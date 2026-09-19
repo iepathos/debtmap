@@ -42,21 +42,10 @@ pub fn build_page_lines(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> Ve
         width,
     );
 
-    let blast_radius = item.upstream_dependencies + item.downstream_dependencies;
     add_label_value(
         &mut lines,
-        "blast radius",
-        blast_radius.to_string(),
-        theme,
-        width,
-    );
-
-    // Critical path indicator (simplified - based on high dependency count)
-    let is_critical = item.upstream_dependencies > 5 || item.downstream_dependencies > 10;
-    add_label_value(
-        &mut lines,
-        "critical",
-        if is_critical { "Yes" } else { "No" }.to_string(),
+        "immediate neighbors",
+        item.immediate_neighbors().to_string(),
         theme,
         width,
     );
@@ -386,6 +375,7 @@ mod tests {
             upstream_production_callers: vec![],
             upstream_test_callers: vec![],
             production_blast_radius: 0,
+            immediate_neighbor_count: None,
             nesting_depth: 1,
             function_length: 20,
             cyclomatic_complexity: 20,

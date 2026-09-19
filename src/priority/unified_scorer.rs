@@ -171,6 +171,10 @@ pub struct UnifiedDebtItem {
     /// Production-only blast radius for scoring (Spec 267)
     #[serde(default)]
     pub production_blast_radius: usize,
+    /// Distinct immediate neighboring definitions, counted before display formatting.
+    /// Legacy serialized records lack exact identity counts.
+    #[serde(skip)]
+    pub immediate_neighbor_count: Option<usize>,
     pub nesting_depth: u32,
     pub function_length: usize,
     pub cyclomatic_complexity: u32,
@@ -226,6 +230,25 @@ pub struct UnifiedDebtItem {
 }
 
 impl UnifiedDebtItem {
+    /// Count immediate neighbors; legacy records can only deduplicate display labels.
+    pub fn immediate_neighbors(&self) -> usize {
+        self.immediate_neighbor_count.unwrap_or_else(|| {
+            let known = self
+                .upstream_callers
+                .iter()
+                .chain(&self.downstream_callees)
+                .collect::<std::collections::HashSet<_>>()
+                .len();
+            known
+                + self
+                    .upstream_dependencies
+                    .saturating_sub(self.upstream_callers.len())
+                + self
+                    .downstream_dependencies
+                    .saturating_sub(self.downstream_callees.len())
+        })
+    }
+
     /// Builder method to attach pattern analysis to this debt item (spec 151)
     pub fn with_pattern_analysis(
         mut self,
@@ -419,7 +442,7 @@ pub fn calculate_unified_priority_with_role(
 
     // Spec 267: Use production callers only for scoring
     // Test callers don't increase change risk, so they shouldn't inflate the dependency factor
-    let upstream_callers = call_graph.get_callers(func_id);
+    let upstream_callers = call_graph.external_callers(func_id);
     let production_upstream_count = count_production_callers(&upstream_callers, call_graph);
     let dependency_factor = calculate_dependency_factor(production_upstream_count);
 
@@ -851,18 +874,9 @@ fn normalize_complexity(
 /// Uses the call graph to check if each caller is a test function,
 /// then falls back to heuristics if call graph data is unavailable.
 fn count_production_callers(callers: &[FunctionId], call_graph: &CallGraph) -> usize {
-    use crate::priority::caller_classification::{CallerType, classify_caller};
-
     callers
         .iter()
-        .filter(|caller| {
-            // Check if caller is a test function via call graph
-            if call_graph.is_test_function(caller) {
-                return false;
-            }
-            // Fallback to heuristics for name-based detection
-            classify_caller(&caller.name, Some(call_graph)) == CallerType::Production
-        })
+        .filter(|caller| !call_graph.is_test_dependency(caller))
         .count()
 }
 

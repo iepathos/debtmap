@@ -91,8 +91,13 @@ pub fn create_god_object_debt_item(
     let function_role = classify_god_object_role(god_analysis);
 
     // Calculate production blast radius
-    let production_blast_radius =
-        classified_callers.production_count + aggregated_metrics.downstream_dependencies;
+    // Aggregated legacy metrics retain labels rather than definition identities.
+    let production_blast_radius = classified_callers
+        .production
+        .iter()
+        .chain(&aggregated_metrics.unique_downstream_callees)
+        .collect::<std::collections::HashSet<_>>()
+        .len();
 
     UnifiedDebtItem {
         location: crate::priority::unified_scorer::Location {
@@ -113,6 +118,7 @@ pub fn create_god_object_debt_item(
         upstream_production_callers: classified_callers.production,
         upstream_test_callers: classified_callers.test,
         production_blast_radius,
+        immediate_neighbor_count: None,
         nesting_depth: aggregated_metrics.max_nesting_depth,
         function_length: god_analysis.lines_of_code,
         cyclomatic_complexity: aggregated_metrics.total_cyclomatic,

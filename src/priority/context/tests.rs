@@ -71,6 +71,7 @@ mod integration_tests {
             upstream_production_callers: vec![],
             upstream_test_callers: vec![],
             production_blast_radius: 0,
+            immediate_neighbor_count: None,
             nesting_depth: 2,
             function_length: length,
             cyclomatic_complexity: 15,

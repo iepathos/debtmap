@@ -196,6 +196,7 @@ mod tests {
             upstream_production_callers: vec![],
             upstream_test_callers: vec![],
             production_blast_radius: 0,
+            immediate_neighbor_count: None,
             is_pure: Some(false),
             purity_confidence: Some(0.8),
             purity_level: None,

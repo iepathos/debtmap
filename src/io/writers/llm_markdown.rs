@@ -205,17 +205,15 @@ pub mod format {
 
         // Spec 267: Show production-only blast radius
         if deps.production_blast_radius > 0 {
-            let impact = classify_blast_radius(deps.production_blast_radius);
             writeln!(
                 out,
-                "- Production Blast Radius: {} ({})",
-                deps.production_blast_radius, impact
+                "- Immediate Production Neighbors: {}",
+                deps.production_blast_radius
             )
             .unwrap();
         } else if deps.blast_radius > 0 {
             // Fallback to legacy blast radius
-            let impact = classify_blast_radius(deps.blast_radius);
-            writeln!(out, "- Blast Radius: {} ({})", deps.blast_radius, impact).unwrap();
+            writeln!(out, "- Immediate Neighbors: {}", deps.blast_radius).unwrap();
         }
         if deps.critical_path {
             writeln!(out, "- Critical Path: Yes").unwrap();
@@ -254,16 +252,6 @@ pub mod format {
         writeln!(out, "- {}:", label).unwrap();
         for item in items {
             writeln!(out, "  - {}", item).unwrap();
-        }
-    }
-
-    /// Classify blast radius into impact severity level.
-    /// Pure function for consistent classification across production and legacy paths.
-    pub(crate) fn classify_blast_radius(radius: usize) -> &'static str {
-        match radius {
-            r if r >= 20 => "critical",
-            r if r >= 10 => "high",
-            _ => "moderate",
         }
     }
 
@@ -1071,8 +1059,8 @@ mod tests {
 
         // Check new dependency fields (Spec 267: Production Blast Radius)
         assert!(
-            markdown.contains("Production Blast Radius: 13 (high)"),
-            "Should show production blast radius: {}",
+            markdown.contains("Immediate Production Neighbors: 13"),
+            "Should show the immediate production neighborhood: {}",
             markdown
         );
         assert!(
@@ -1332,21 +1320,16 @@ mod tests {
     }
 
     #[test]
-    fn test_classify_blast_radius() {
-        // Critical threshold (>= 20)
-        assert_eq!(format::classify_blast_radius(20_usize), "critical");
-        assert_eq!(format::classify_blast_radius(25_usize), "critical");
-        assert_eq!(format::classify_blast_radius(100_usize), "critical");
-
-        // High threshold (>= 10, < 20)
-        assert_eq!(format::classify_blast_radius(10_usize), "high");
-        assert_eq!(format::classify_blast_radius(15_usize), "high");
-        assert_eq!(format::classify_blast_radius(19_usize), "high");
-
-        // Moderate (< 10)
-        assert_eq!(format::classify_blast_radius(0_usize), "moderate");
-        assert_eq!(format::classify_blast_radius(5_usize), "moderate");
-        assert_eq!(format::classify_blast_radius(9_usize), "moderate");
+    fn immediate_neighborhood_does_not_claim_severity() {
+        let deps = Dependencies {
+            blast_radius: 100,
+            ..Dependencies::default()
+        };
+        let markdown = format::dependencies(&deps);
+        assert!(markdown.contains("Immediate Neighbors: 100"));
+        assert!(!markdown.contains("critical"));
+        assert!(!markdown.contains("high"));
+        assert!(!markdown.contains("Critical Path"));
     }
 
     #[test]

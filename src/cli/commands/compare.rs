@@ -190,6 +190,7 @@ fn output_to_internal_function(
         upstream_production_callers: vec![],
         upstream_test_callers: vec![],
         production_blast_radius: 0,
+        immediate_neighbor_count: None,
         nesting_depth: output.metrics.nesting_depth,
         function_length: output.metrics.length,
         cyclomatic_complexity: output.metrics.cyclomatic_complexity,

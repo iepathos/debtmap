@@ -97,6 +97,7 @@ test-integration:
         --test data_flow_identity_matrix --test rust_resolution_constraint_matrix \
         --test rust_resolution_namespace_matrix --test rust_resolution_matrix_oracles \
         --test rust_resolution_matrix_invariants --test rust_resolution_matrix_assertions \
+        --test recursive_dependency_metrics \
         --test solidity_analyzer_tests --test suppression_tests --test token_classification_tests \
         --test validate_improvement_integration_test
 
@@ -136,7 +137,7 @@ coverage-fast:
         --test data_flow_identity_matrix --test rust_resolution_constraint_matrix \
         --test rust_resolution_namespace_matrix --test rust_resolution_matrix_oracles \
         --test rust_resolution_matrix_invariants --test rust_resolution_matrix_assertions \
-        -- --quiet
+        --test recursive_dependency_metrics -- --quiet
     echo "Coverage report generated at target/coverage/html/index.html"
 
 # Run tests with coverage (lcov format)
@@ -167,7 +168,7 @@ coverage-fast-lcov:
         --test data_flow_identity_matrix --test rust_resolution_constraint_matrix \
         --test rust_resolution_namespace_matrix --test rust_resolution_matrix_oracles \
         --test rust_resolution_matrix_invariants --test rust_resolution_matrix_assertions \
-        -- --quiet
+        --test recursive_dependency_metrics -- --quiet
     echo "Coverage report generated at target/coverage/lcov.info"
     # Verify the file was actually created
     if [ ! -f target/coverage/lcov.info ]; then

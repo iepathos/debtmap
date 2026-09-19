@@ -32,6 +32,10 @@ use crate::risk::lcov::LcovData;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
+#[path = "construction/dependencies.rs"]
+mod dependencies;
+use dependencies::{DependencyMetrics, extract_dependency_metrics};
+
 /// Type alias for file line count cache (spec 195).
 pub type FileLineCountCache = HashMap<PathBuf, usize>;
 
@@ -163,26 +167,7 @@ pub fn create_unified_debt_item_enhanced(
     let recommendation = generate_recommendation(func, &debt_type, role, &unified_score)?;
     let expected_impact = calculate_expected_impact(func, &debt_type, &unified_score);
 
-    // Use pre-populated call graph data from FunctionMetrics if available,
-    // otherwise fall back to querying the call graph directly
-    let (upstream_caller_names, downstream_callee_names) =
-        if func.upstream_callers.is_some() || func.downstream_callees.is_some() {
-            (
-                func.upstream_callers.clone().unwrap_or_default(),
-                func.downstream_callees.clone().unwrap_or_default(),
-            )
-        } else {
-            // Fallback: query call graph directly
-            let upstream_callers = call_graph.get_callers(&func_id);
-            let downstream_callees = call_graph.get_callees(&func_id);
-            (
-                upstream_callers.iter().map(|id| id.name.clone()).collect(),
-                downstream_callees
-                    .iter()
-                    .map(|id| id.name.clone())
-                    .collect(),
-            )
-        };
+    let deps = extract_dependency_metrics(func, &func_id, call_graph);
 
     // Detect function context (spec 122)
     // Use global singleton to avoid repeated regex compilation
@@ -217,13 +202,6 @@ pub fn create_unified_debt_item_enhanced(
     let responsibility_category =
         crate::organization::god_object::analyze_function_responsibility(&func.name);
 
-    // Spec 267: Classify callers into production and test
-    let classified = crate::priority::caller_classification::classify_callers(
-        upstream_caller_names.iter(),
-        Some(call_graph),
-    );
-    let production_blast_radius = classified.production_count + downstream_callee_names.len();
-
     let item = UnifiedDebtItem {
         location: Location {
             file: func.file.clone(),
@@ -236,14 +214,15 @@ pub fn create_unified_debt_item_enhanced(
         recommendation,
         expected_impact,
         transitive_coverage,
-        upstream_dependencies: upstream_caller_names.len(),
-        downstream_dependencies: downstream_callee_names.len(),
-        upstream_callers: upstream_caller_names,
-        downstream_callees: downstream_callee_names,
+        upstream_dependencies: deps.upstream_count,
+        downstream_dependencies: deps.downstream_count,
+        upstream_callers: deps.upstream_names,
+        downstream_callees: deps.downstream_names,
         // Spec 267: Separated production and test callers
-        upstream_production_callers: classified.production,
-        upstream_test_callers: classified.test,
-        production_blast_radius,
+        upstream_production_callers: deps.production_upstream_names,
+        upstream_test_callers: deps.test_upstream_names,
+        production_blast_radius: deps.production_blast_radius,
+        immediate_neighbor_count: deps.immediate_neighbor_count,
         nesting_depth: func.nesting,
         function_length: func.length,
         cyclomatic_complexity: func.cyclomatic,
@@ -422,62 +401,6 @@ fn calculate_coverage_data(
     })
 }
 
-// Pure function: Extract dependency metrics (spec 205: public for FunctionScoringContext)
-// Spec 267: Now includes production/test caller separation
-#[derive(Clone)]
-pub(crate) struct DependencyMetrics {
-    upstream_count: usize,
-    downstream_count: usize,
-    upstream_names: Vec<String>,
-    downstream_names: Vec<String>,
-    // Spec 267: Separated production and test callers
-    production_upstream_names: Vec<String>,
-    test_upstream_names: Vec<String>,
-    production_blast_radius: usize,
-}
-
-fn extract_dependency_metrics(
-    func: &FunctionMetrics,
-    func_id: &FunctionId,
-    call_graph: &CallGraph,
-) -> DependencyMetrics {
-    use crate::priority::caller_classification::{ClassifiedCallers, classify_callers};
-
-    // Use pre-populated call graph data from FunctionMetrics if available
-    let (upstream_names, downstream_names) =
-        if func.upstream_callers.is_some() || func.downstream_callees.is_some() {
-            (
-                func.upstream_callers.clone().unwrap_or_default(),
-                func.downstream_callees.clone().unwrap_or_default(),
-            )
-        } else {
-            // Fallback: query call graph directly
-            let upstream = call_graph.get_callers(func_id);
-            let downstream = call_graph.get_callees(func_id);
-            (
-                upstream.iter().map(|f| f.name.clone()).collect(),
-                downstream.iter().map(|f| f.name.clone()).collect(),
-            )
-        };
-
-    // Spec 267: Classify callers into production and test
-    let classified: ClassifiedCallers = classify_callers(upstream_names.iter(), Some(call_graph));
-
-    // Spec 267: Production blast radius = production_upstream_count + downstream_count
-    let production_blast_radius = classified.production_count + downstream_names.len();
-
-    DependencyMetrics {
-        upstream_count: upstream_names.len(),
-        downstream_count: downstream_names.len(),
-        upstream_names,
-        downstream_names,
-        // Spec 267: Separated callers
-        production_upstream_names: classified.production,
-        test_upstream_names: classified.test,
-        production_blast_radius,
-    }
-}
-
 // Apply exponential scaling, debt type multiplier, and risk boosting to a debt item (spec 171, spec 260)
 fn apply_score_scaling(mut item: UnifiedDebtItem) -> UnifiedDebtItem {
     use crate::priority::scoring::scaling::{ScalingConfig, calculate_final_score};
@@ -579,6 +502,7 @@ fn build_unified_debt_item_from_context(
         upstream_production_callers: ctx.deps.production_upstream_names.clone(),
         upstream_test_callers: ctx.deps.test_upstream_names.clone(),
         production_blast_radius: ctx.deps.production_blast_radius,
+        immediate_neighbor_count: ctx.deps.immediate_neighbor_count,
         nesting_depth: func.nesting,
         function_length: func.length,
         cyclomatic_complexity: func.cyclomatic,
@@ -802,22 +726,7 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
     let (context_multiplier, context_type) = calculate_context_multiplier(&func.file);
     unified_score = apply_context_multiplier_to_score(unified_score, context_multiplier);
 
-    // Pre-extract dependencies (shared across all debt items)
-    let (upstream_caller_names, downstream_callee_names) =
-        if func.upstream_callers.is_some() || func.downstream_callees.is_some() {
-            (
-                func.upstream_callers.clone().unwrap_or_default(),
-                func.downstream_callees.clone().unwrap_or_default(),
-            )
-        } else {
-            // Fallback: query call graph directly
-            let upstream = call_graph.get_callers(&func_id);
-            let downstream = call_graph.get_callees(&func_id);
-            (
-                upstream.iter().map(|f| f.name.clone()).collect(),
-                downstream.iter().map(|f| f.name.clone()).collect(),
-            )
-        };
+    let deps = extract_dependency_metrics(func, &func_id, call_graph);
 
     // Pre-calculate shared context data
     // Use global singleton to avoid repeated regex compilation
@@ -845,15 +754,6 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
     let entropy_analysis = calculate_entropy_analysis(func);
     // Look up file line count from cache (spec 195: O(1) lookup instead of file read)
     let file_line_count = get_file_line_count(&func.file, file_line_counts);
-
-    // Spec 267: Classify callers into production and test
-    let classified = crate::priority::caller_classification::classify_callers(
-        upstream_caller_names.iter(),
-        Some(call_graph),
-    );
-    let production_blast_radius = classified.production_count + downstream_callee_names.len();
-    let production_callers = classified.production.clone();
-    let test_callers = classified.test.clone();
 
     // Create one UnifiedDebtItem per debt type (spec 228)
     debt_types
@@ -884,14 +784,15 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
                 recommendation,
                 expected_impact,
                 transitive_coverage: transitive_coverage.clone(),
-                upstream_dependencies: upstream_caller_names.len(),
-                downstream_dependencies: downstream_callee_names.len(),
-                upstream_callers: upstream_caller_names.clone(),
-                downstream_callees: downstream_callee_names.clone(),
+                upstream_dependencies: deps.upstream_count,
+                downstream_dependencies: deps.downstream_count,
+                upstream_callers: deps.upstream_names.clone(),
+                downstream_callees: deps.downstream_names.clone(),
                 // Spec 267: Separated production and test callers
-                upstream_production_callers: production_callers.clone(),
-                upstream_test_callers: test_callers.clone(),
-                production_blast_radius,
+                upstream_production_callers: deps.production_upstream_names.clone(),
+                upstream_test_callers: deps.test_upstream_names.clone(),
+                production_blast_radius: deps.production_blast_radius,
+                immediate_neighbor_count: deps.immediate_neighbor_count,
                 nesting_depth: func.nesting,
                 function_length: func.length,
                 cyclomatic_complexity: func.cyclomatic,

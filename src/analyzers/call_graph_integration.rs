@@ -68,17 +68,8 @@ fn graph_dependencies_for_function(
     call_graph: &CallGraph,
     func_id: &FunctionId,
 ) -> (Vec<String>, Vec<String>) {
-    let exact_match = call_graph.get_function_info(func_id).is_some();
-    let callers = if exact_match {
-        call_graph.get_callers_exact(func_id)
-    } else {
-        call_graph.get_callers(func_id)
-    };
-    let callees = if exact_match {
-        call_graph.get_callees_exact(func_id)
-    } else {
-        call_graph.get_callees(func_id)
-    };
+    let callers = call_graph.external_callers(func_id);
+    let callees = call_graph.external_callees(func_id);
 
     (
         callers

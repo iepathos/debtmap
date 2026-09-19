@@ -207,10 +207,12 @@ impl FunctionDebtItemOutput {
             dependencies: {
                 let upstream = item.upstream_dependencies;
                 let downstream = item.downstream_dependencies;
-                let blast_radius = upstream + downstream;
-                let critical_path = upstream > 5 || downstream > 10;
-                let instability = if blast_radius > 0 {
-                    Some(round_ratio(downstream as f64 / blast_radius as f64))
+                let blast_radius = item.immediate_neighbors();
+                // Degree alone does not establish an execution path.
+                let critical_path = false;
+                let degree = upstream + downstream;
+                let instability = if degree > 0 {
+                    Some(round_ratio(downstream as f64 / degree as f64))
                 } else {
                     None
                 };
