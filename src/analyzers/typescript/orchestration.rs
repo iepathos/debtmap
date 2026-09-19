@@ -78,6 +78,110 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
+    fn test_multiline_callable_bounds_include_signatures() {
+        let cases = [
+            (
+                "declared",
+                "function declared(\n value\n) {\n return value;\n}",
+                3,
+                7,
+            ),
+            (
+                "generated",
+                "function* generated(\n value\n) {\n yield value;\n}",
+                3,
+                7,
+            ),
+            (
+                "arrow",
+                "const arrow = (\n value\n) => {\n return value;\n};",
+                3,
+                7,
+            ),
+            (
+                "expressionArrow",
+                "const expressionArrow = (\n value\n) =>\n value + 1;",
+                3,
+                6,
+            ),
+            (
+                "expression",
+                "const expression = function(\n value\n) {\n return value;\n};",
+                3,
+                7,
+            ),
+            (
+                "Box::method",
+                "class Box {\n method(\n value\n) {\n return value;\n }\n}",
+                4,
+                8,
+            ),
+            (
+                "Box::field",
+                "class Box {\n field = (\n value\n) => {\n return value;\n };\n}",
+                4,
+                8,
+            ),
+            ("single", "function single(value) { return value; }", 3, 3),
+        ];
+        for variant in [JsLanguageVariant::JavaScript, JsLanguageVariant::TypeScript] {
+            for (name, snippet, start, end) in cases {
+                let source = format!("\n\n{snippet}\nfunction neighbor() {{}}\n");
+                let ast = parse_source(&source, &PathBuf::from("bounds.ts"), variant).unwrap();
+                let result =
+                    analyze_typescript_file(&ast, 10, &ComplexityThresholds::default(), false);
+                // Preserve the current JavaScript class-field display name.
+                let expected_name =
+                    if variant == JsLanguageVariant::JavaScript && name == "Box::field" {
+                        "<field>"
+                    } else {
+                        name
+                    };
+                let function = result
+                    .complexity
+                    .functions
+                    .iter()
+                    .find(|function| function.name == expected_name)
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "{variant:?}: missing {name}; extracted {:?}",
+                            result
+                                .complexity
+                                .functions
+                                .iter()
+                                .map(|function| &function.name)
+                                .collect::<Vec<_>>()
+                        )
+                    });
+                assert_eq!(
+                    (function.line, function.line + function.length - 1),
+                    (start, end),
+                    "{variant:?}: {name}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_typescript_multiline_return_type_is_in_function_bounds() {
+        let source = "\n\nfunction typed(\n value: number,\n):\n number {\n return value;\n}\nfunction neighbor() {}\n";
+        let ast = parse_source(
+            source,
+            &PathBuf::from("bounds.ts"),
+            JsLanguageVariant::TypeScript,
+        )
+        .unwrap();
+        let result = analyze_typescript_file(&ast, 10, &ComplexityThresholds::default(), false);
+        let function = result
+            .complexity
+            .functions
+            .iter()
+            .find(|function| function.name == "typed")
+            .unwrap();
+        assert_eq!((function.line, function.line + function.length - 1), (3, 8));
+    }
+
+    #[test]
     fn test_analyze_simple_function() {
         let source = r#"
 function hello(name) {
