@@ -8,7 +8,7 @@ impl DataFlowGraph {
         if id.column.is_some() || self.call_graph.is_empty() {
             Some(id.clone())
         } else {
-            self.call_graph.find_function(id)
+            self.call_graph.find_exact_or_unique_legacy(id)
         }
     }
 
@@ -16,16 +16,28 @@ impl DataFlowGraph {
         if id.column.is_some() || self.call_graph.is_empty() {
             id
         } else {
-            self.call_graph.find_function(&id).unwrap_or(id)
+            self.call_graph
+                .find_exact_or_unique_legacy(&id)
+                .unwrap_or(id)
         }
     }
 
-    pub(super) fn identity_candidates(&self, id: &FunctionId) -> Option<[Option<FunctionId>; 3]> {
+    pub(super) fn identity_candidates(&self, id: &FunctionId) -> Option<[Option<FunctionId>; 4]> {
         let canonical = self.canonical_identity(id)?;
         let legacy = canonical.clone().with_column(None);
-        let legacy =
-            (self.call_graph.find_function(&legacy).as_ref() == Some(&canonical)).then_some(legacy);
-        Some([Some(canonical), Some(id.clone()), legacy])
+        let mut without_module = legacy.clone();
+        without_module.module_path.clear();
+        let unique = |legacy: FunctionId| {
+            (self
+                .call_graph
+                .find_exact_or_unique_legacy(&legacy)
+                .as_ref()
+                == Some(&canonical))
+            .then_some(legacy)
+        };
+        let legacy = unique(legacy);
+        let without_module = unique(without_module);
+        Some([Some(canonical), Some(id.clone()), legacy, without_module])
     }
 
     pub(super) fn identity_lookup<'a, T>(

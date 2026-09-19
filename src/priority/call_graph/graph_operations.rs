@@ -544,6 +544,26 @@ impl CallGraph {
         self.nodes.is_empty()
     }
 
+    /// Bridge legacy records only when the exact source identity is unique.
+    /// Unlike `find_function`, this never uses proximity or cross-file matching.
+    pub(crate) fn find_exact_or_unique_legacy(&self, query: &FunctionId) -> Option<FunctionId> {
+        if query.column.is_some() {
+            return self.nodes.contains_key(query).then(|| query.clone());
+        }
+        let mut matches = self
+            .fuzzy_index
+            .get(&query.fuzzy_key())?
+            .iter()
+            .filter(|id| {
+                id.file == query.file
+                    && id.name == query.name
+                    && id.line == query.line
+                    && (query.module_path.is_empty() || id.module_path == query.module_path)
+            });
+        let candidate = matches.next()?;
+        matches.next().is_none().then(|| candidate.clone())
+    }
+
     /// Find a function using fallback matching strategies
     /// Tries exact match first, then fuzzy match, then name-only match
     pub fn find_function(&self, query: &FunctionId) -> Option<FunctionId> {

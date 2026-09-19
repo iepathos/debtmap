@@ -120,3 +120,48 @@ fn appending_io_to_legacy_json_retains_existing_operations() {
     assert_eq!(flow.get_io_operations(&id(Some(3))).unwrap().len(), 2);
     assert_eq!(flow.get_io_operations(&id(None)).unwrap().len(), 2);
 }
+
+#[test]
+fn legacy_module_metadata_must_agree_when_present() {
+    let mut canonical = id(Some(3));
+    canonical.module_path = "owner".into();
+    for module in ["", "owner", "other"] {
+        let mut calls = CallGraph::new();
+        calls.add_function(canonical.clone(), false, false, 1, 1);
+        let mut flow = DataFlowGraph::from_call_graph(calls);
+        let mut legacy = id(None);
+        legacy.module_path = module.into();
+        flow.set_purity_info(legacy.clone(), purity());
+        assert_eq!(
+            flow.get_purity_info(&canonical).is_some(),
+            module != "other"
+        );
+        if module != "other" {
+            assert!(flow.get_purity_info(&legacy).is_some());
+        }
+    }
+}
+
+#[test]
+fn a_legacy_node_does_not_override_a_same_line_identity_tie() {
+    let mut calls = CallGraph::new();
+    for column in [None, Some(3)] {
+        calls.add_function(id(column), false, false, 1, 1);
+    }
+    let mut flow = DataFlowGraph::from_call_graph(calls);
+    flow.set_purity_info(id(None), purity());
+    assert!(flow.get_purity_info(&id(None)).is_none());
+    assert!(flow.get_purity_info(&id(Some(3))).is_none());
+}
+
+#[test]
+fn old_json_without_module_metadata_is_read_by_a_unique_exact_id() {
+    let mut canonical = id(Some(3));
+    canonical.module_path = "owner".into();
+    let mut calls = CallGraph::new();
+    calls.add_function(canonical.clone(), false, false, 1, 1);
+    let mut json = serde_json::to_value(DataFlowGraph::from_call_graph(calls)).unwrap();
+    json["purity_analysis"] = serde_json::json!({"src/lib.rs:work:1": purity()});
+    let flow: DataFlowGraph = serde_json::from_value(json).unwrap();
+    assert!(flow.get_purity_info(&canonical).is_some());
+}
