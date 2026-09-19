@@ -209,3 +209,25 @@ and the CI integration job. The fast suite remains selected; use the integration
 gate to exercise the complete matrix. The existing solver limits above remain
 in effect. Performance results are recorded separately in the
 [repair benchmark report](benchmarks/rust-resolution-gap-repairs.md).
+
+## Constructor diagnostic regression specification, 2026-09-19
+
+A subsequent review found an uncovered combination: a known tuple constructor
+and an unresolved explicit import with the same name. Added an active regression
+test requiring exactly one `AmbiguousDeclaration` call record with no known
+targets. It also requires a nested argument call to resolve exactly once.
+A companion control requires two known explicit constructor bindings to omit
+constructor diagnostics while still visiting the argument once.
+
+Both use the existing six-path harness, exact source identities, metadata parity,
+and repeated merges. These deliberately conflicting/incomplete sources are
+parse-only specifications, separate from the compiler-classified matrix rows.
+No production behavior changed. The original 39 namespace rows still pass; the
+namespace target now has five passing tests and one expected regression failure.
+The failure is the missing call record in every path, not a wrong target or
+duplicate argument visit. The failing test is neither ignored nor inverted and
+is already included in the local and CI integration gates.
+
+```sh
+cargo test --offline --test rust_resolution_namespace_matrix
+```

@@ -87,3 +87,44 @@ fn mixed_function_constructor_results_retain_every_admissible_owner() {
     )
     .expect("all invocation alternatives constrain the propagated result");
 }
+
+#[test]
+fn unresolved_explicit_import_keeps_constructor_call_uncertain() {
+    use debtmap::priority::call_graph::UncertaintyReason;
+    use support::Expectation as E;
+    // Deliberately incomplete source: the competing binding cannot be classified.
+    let source = "mod left { pub struct Item(pub u32); }
+        use left::Item; use missing::Item;
+        /*@argument*/ fn argument() -> u32 { 1 }
+        /*@caller*/ fn caller() { let _ = /*#constructor*/ Item(/*#argument_call*/ argument()); }";
+    verify(
+        "unresolved_explicit_constructor_competitor",
+        source,
+        &[
+            E::uncertain("constructor", "Item(", &[])
+                .reason(UncertaintyReason::AmbiguousDeclaration),
+            E::resolved("argument_call", "argument(", &["argument"]),
+        ],
+    )
+    .expect("an unavailable competing binding must retain one uncertain call site");
+}
+
+#[test]
+fn known_explicit_constructor_conflicts_do_not_invent_call_diagnostics() {
+    use support::Expectation as E;
+    // Both conflicting bindings are known constructors without callable bodies.
+    let source = "mod left { pub struct Item(pub u32); }
+        mod right { pub struct Item(pub u32); }
+        use left::Item; use right::Item;
+        /*@argument*/ fn argument() -> u32 { 1 }
+        /*@caller*/ fn caller() { let _ = /*#constructor*/ Item(/*#argument_call*/ argument()); }";
+    verify(
+        "known_explicit_constructor_competitors",
+        source,
+        &[
+            E::absent("constructor", "Item("),
+            E::resolved("argument_call", "argument(", &["argument"]),
+        ],
+    )
+    .expect("fully known constructor conflicts omit diagnostics and visit arguments once");
+}
