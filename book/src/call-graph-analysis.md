@@ -175,10 +175,15 @@ general `?`/wrapper inference, and const-generic evaluation remain unsupported.
 Block-local item declarations and imports are not indexed as independent lexical
 module contexts; calls requiring those contexts remain uncertain. Receiver checks
 respect those block-local shadows in qualified types and trait bounds inside
-`dyn T`, excluding unrelated module-level targets. Generic arguments
+`dyn T`, excluding unrelated module-level targets. Reference projection preserves
+these constraints; associated-call owner and trait arguments use the same lexical
+type lowering. Alias bodies, fields and returns retain their declaration context.
+Generic arguments
 are not inferred from arbitrary argument constraints, including tuple-constructor
 arguments. Constructors supply a nominal type without manufacturing a callable node.
-Renamed free-function imports retain the existing basename lookup restriction.
+Value lookup considers functions, constructors and constants together, so mixed
+glob bindings remain ambiguous even when only one has a callable body. Renamed
+free-function imports retain their resolved declaration identity.
 Loop analysis does not compute a fixed point. Alias and substitution
 expansion stops at 32 levels; recursive aliases and other incomplete facts remain
 uncertain instead of triggering a name-only guess.
@@ -212,6 +217,13 @@ records five warmed debug runs on identical frozen repository and synthetic inpu
 including context/LCOV, phase timings, peak memory, and the full CLI commands with
 the interactive explorer disabled. Fixture and boundary benchmarks do not establish
 repository-scale performance.
+
+The [systematic gap matrix](../../docs/rust-resolution-gap-test-matrix.md) adds
+451 identity, expression and namespace cases, plus independent compiler
+classifications and harness rejection checks. These targets run in
+`just test-integration`; the selected fast `just test` suite alone does not run
+them. The [follow-up performance report](../../docs/benchmarks/rust-resolution-gap-repairs.md)
+records the comparison against the committed matrix baseline.
 
 ### Parallel Construction
 

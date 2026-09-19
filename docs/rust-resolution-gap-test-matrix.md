@@ -179,3 +179,33 @@ preserving positive controls and the existing regressions. Any necessary change
 to an expectation must explain the semantic reason independently of current
 implementation behavior. Solution design and production changes follow this
 baseline as a separate step.
+
+## Repair validation, 2026-09-19
+
+The original **451 cells now pass**; all 63 baseline failures are closed without
+ignores or weakened expectations. The baseline census above is retained as the
+historical reproduction. Twenty additional tests cover the new helper contracts,
+legacy module metadata, value-result propagation, constructor argument visits,
+and downstream liveness exclusions.
+
+The repairs share exact legacy identity matching, structural body-scoped type
+lowering, fact-based associated lookup and complete value-binding collection.
+Unsupported type syntax and dynamic-bound arguments retain their previous
+shadow exclusions. Alias, field and return expansion keeps declaration scope.
+The previously unspecified module-metadata contract now has explicit tests:
+missing metadata permits a unique exact source match, populated metadata must
+agree, and unmatched records keep their original storage identity.
+
+Final validation: `just fmt`; strict offline all-target/all-feature Clippy;
+`CARGO_NET_OFFLINE=true just test` (6,154 pass, 10 existing skips); expanded
+`just test-integration` (531 pass, one existing skip); and 169 targeted
+compatibility/consumer regressions across 23 binaries. Integration validation
+includes all 113 compiler classifications, five harness rejection tests and
+eight layout/order variants. A duplicated internal test-module inclusion and
+unused internal AST adapters were corrected before the final clean gates.
+
+The six matrix/oracle targets are now included in the local integration recipe
+and the CI integration job. The fast suite remains selected; use the integration
+gate to exercise the complete matrix. The existing solver limits above remain
+in effect. Performance results are recorded separately in the
+[repair benchmark report](benchmarks/rust-resolution-gap-repairs.md).

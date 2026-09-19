@@ -14,3 +14,13 @@ so module-level namesakes cannot become resolved or possible targets. Explicit
 `crate::` qualification continues to select the module-level declaration.
 `tests/rust_method_resolution_review_followup.rs` covers these cases and controls
 through direct, cached, enhanced, sequential, parallel and repeated-merge paths.
+
+Structural lowering now preserves references and generic positions around a
+shadowed leaf. Associated-call syntax uses the same body-scoped owner and trait
+facts for lookup and return propagation; declaration expansion never inherits a
+caller's block shadows. Value lookup collects functions, constructors and
+constants/statics together after precedence, retains ambiguity before checking
+invocation shape, and projects both call candidates and result facts from that
+complete set. Constructors introduce no callable nodes, and calls inside their
+arguments are still visited once. See the systematic gap matrix for exact
+positive and forbidden target sets.

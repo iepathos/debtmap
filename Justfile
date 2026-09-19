@@ -94,6 +94,9 @@ test-integration:
         --test false_positive_reproduction_tests --test fast_unit_tests \
         --test field_access_chain_test --test io_walker_tests --test json_serialization_test \
         --test language_tests --test python_complexity_tests --test python_extraction_test \
+        --test data_flow_identity_matrix --test rust_resolution_constraint_matrix \
+        --test rust_resolution_namespace_matrix --test rust_resolution_matrix_oracles \
+        --test rust_resolution_matrix_invariants --test rust_resolution_matrix_assertions \
         --test solidity_analyzer_tests --test suppression_tests --test token_classification_tests \
         --test validate_improvement_integration_test
 
