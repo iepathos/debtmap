@@ -11,6 +11,7 @@ use crate::priority::context::{ContextConfig, generate_context_suggestion};
 
 use crate::complexity::EntropyAnalysis;
 use crate::priority::scoring::ContextRecommendationEngine;
+use crate::priority::scoring::trace::{ScoreOperation, ScoreStep};
 use crate::priority::unified_scorer::{
     calculate_unified_priority, calculate_unified_priority_with_data_flow_and_role,
     calculate_unified_priority_with_role,
@@ -73,6 +74,12 @@ fn calculate_context_multiplier(file_path: &Path) -> (f64, FileType) {
 
 /// Apply context multiplier to a UnifiedScore (spec 191)
 fn apply_context_multiplier_to_score(mut score: UnifiedScore, multiplier: f64) -> UnifiedScore {
+    score.score_trace.push(ScoreStep::new(
+        "File context",
+        score.final_score,
+        ScoreOperation::Multiply(multiplier),
+        score.final_score * multiplier,
+    ));
     // Apply multiplier to final_score and all contributing factors
     score.final_score *= multiplier;
     score.complexity_factor *= multiplier;
@@ -120,6 +127,20 @@ pub fn apply_contextual_risk_to_score(
 
     // Apply multiplier to final_score (floored at 0)
     let adjusted_final = pre_ctx_score * risk_multiplier;
+    score.score_trace.push(ScoreStep::new(
+        "Contextual risk",
+        pre_ctx_score,
+        ScoreOperation::Multiply(risk_multiplier),
+        adjusted_final,
+    ));
+    if adjusted_final < 0.0 {
+        score.score_trace.push(ScoreStep::new(
+            "Nonnegative floor",
+            adjusted_final,
+            ScoreOperation::Floor(0.0),
+            adjusted_final.max(0.0),
+        ));
+    }
     score.final_score = adjusted_final.max(0.0);
 
     // Record the pre-contextual score in base_score if not already set
@@ -411,6 +432,35 @@ fn apply_score_scaling(mut item: UnifiedDebtItem) -> UnifiedDebtItem {
     // Calculate final score with scaling and debt type multiplier
     let (final_score, exponent, boost, debt_multiplier) =
         calculate_final_score(base_score, &item.debt_type, &item, &config);
+    let trace = &mut item.unified_score.score_trace;
+    let safe_base = base_score.max(1.0);
+    if safe_base != base_score {
+        trace.push(ScoreStep::new(
+            "Scaling minimum",
+            base_score,
+            ScoreOperation::Floor(1.0),
+            safe_base,
+        ));
+    }
+    let scaled = safe_base.powf(exponent);
+    trace.push(ScoreStep::new(
+        "Severity exponent",
+        safe_base,
+        ScoreOperation::Power(exponent),
+        scaled,
+    ));
+    trace.push(ScoreStep::new(
+        "Debt-type severity",
+        scaled,
+        ScoreOperation::Multiply(debt_multiplier),
+        scaled * debt_multiplier,
+    ));
+    trace.push(ScoreStep::new(
+        "Risk boosts",
+        scaled * debt_multiplier,
+        ScoreOperation::Multiply(boost),
+        final_score,
+    ));
 
     // Update the unified score with scaling information
     item.unified_score.base_score = Some(base_score);
@@ -839,6 +889,66 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
+    fn scoring_trace_survives_context_scaling_and_output_conversion() {
+        let func: FunctionMetrics = serde_json::from_value(serde_json::json!({
+            "name": "business_logic", "file": "src/business.rs", "line": 1,
+            "cyclomatic": 20, "cognitive": 30, "nesting": 4, "length": 50,
+            "is_test": false, "is_trait_method": false, "in_test_module": false
+        }))
+        .unwrap();
+        let mut item =
+            create_unified_debt_item_enhanced(&func, &CallGraph::new(), None, None).unwrap();
+        item.debt_type = DebtType::ComplexityHotspot {
+            cyclomatic: 20,
+            cognitive: 30,
+        };
+        for base in [0.0, 20.0, 150.0] {
+            item.unified_score.final_score = base;
+            item.unified_score.score_trace.clear();
+            let context = crate::risk::context::ContextualRisk {
+                base_risk: 1.0,
+                contextual_risk: 1.4,
+                contexts: vec![],
+                explanation: String::new(),
+            };
+            item.unified_score =
+                apply_contextual_risk_to_score(item.unified_score.clone(), &context);
+            let scored = apply_score_scaling(item.clone());
+            let trace = &scored.unified_score.score_trace;
+            for step in trace {
+                assert!(
+                    (step.calculated_output() - step.output).abs() < 1e-9,
+                    "{step}"
+                );
+            }
+            for pair in trace.windows(2) {
+                assert!((pair[0].output - pair[1].input).abs() < 1e-9);
+            }
+            assert_eq!(
+                trace.last().unwrap().output,
+                scored.unified_score.final_score
+            );
+            let output =
+                crate::output::unified::FunctionDebtItemOutput::from_function_item(&scored, true);
+            let details = output.scoring_details.unwrap();
+            assert_eq!(details.base_score, base * 1.4);
+            assert_eq!(details.score_trace, *trace);
+            let rendered = crate::io::writers::llm_markdown::format::scoring(
+                Some(&details),
+                &scored.function_role,
+            )
+            .unwrap();
+            assert!(rendered.contains("Severity exponent"));
+            assert!(rendered.contains("Debt-type severity"));
+            assert!(rendered.contains("Risk boosts"));
+            assert!(!rendered.contains("clamped to"));
+            if base == 150.0 {
+                assert!(scored.unified_score.final_score > 100.0);
+            }
+        }
+    }
+
+    #[test]
     fn test_calculate_context_multiplier_for_example() {
         // Context dampening is now opt-in (default disabled)
         // File type is still detected, but multiplier defaults to 1.0
@@ -912,6 +1022,7 @@ mod tests {
             contextual_risk_multiplier: None,
             pre_contextual_score: None,
             debt_type_multiplier: None,
+            score_trace: Vec::new(),
         };
 
         let adjusted = apply_context_multiplier_to_score(original_score, 0.1);
@@ -951,6 +1062,7 @@ mod tests {
             contextual_risk_multiplier: None,
             pre_contextual_score: None,
             debt_type_multiplier: None,
+            score_trace: Vec::new(),
         };
 
         // Test with all file types

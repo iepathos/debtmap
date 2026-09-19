@@ -255,13 +255,14 @@ impl FunctionDebtItemOutput {
             },
             scoring_details: if include_scoring_details {
                 Some(FunctionScoringDetails {
+                    score_trace: item.unified_score.score_trace.clone(),
                     coverage_score: round_score(item.unified_score.coverage_factor),
                     complexity_score: round_score(item.unified_score.complexity_factor),
                     dependency_score: round_score(item.unified_score.dependency_factor),
                     base_score: round_score(
-                        item.unified_score.complexity_factor
-                            + item.unified_score.coverage_factor
-                            + item.unified_score.dependency_factor,
+                        item.unified_score
+                            .base_score
+                            .unwrap_or(item.unified_score.final_score),
                     ),
                     entropy_dampening: item
                         .entropy_analysis
@@ -450,6 +451,9 @@ impl ContextualRiskImpactOutput {
 /// Function scoring details
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FunctionScoringDetails {
+    /// Transient arithmetic evidence; public JSON v3 keeps its existing fields.
+    #[serde(skip)]
+    pub score_trace: Vec<crate::priority::scoring::trace::ScoreStep>,
     pub coverage_score: f64,
     pub complexity_score: f64,
     pub dependency_score: f64,

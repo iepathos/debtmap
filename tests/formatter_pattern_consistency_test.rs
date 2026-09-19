@@ -57,6 +57,7 @@ fn create_test_item_with_state_machine() -> UnifiedDebtItem {
             contextual_risk_multiplier: None,
             pre_contextual_score: None,
             debt_type_multiplier: None,
+            score_trace: Vec::new(),
         },
         expected_impact: ImpactMetrics {
             coverage_improvement: 0.0,
@@ -153,6 +154,7 @@ fn create_test_item_with_coordinator() -> UnifiedDebtItem {
             contextual_risk_multiplier: None,
             pre_contextual_score: None,
             debt_type_multiplier: None,
+            score_trace: Vec::new(),
         },
         expected_impact: ImpactMetrics {
             coverage_improvement: 0.0,

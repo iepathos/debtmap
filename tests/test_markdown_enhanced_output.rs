@@ -42,6 +42,7 @@ fn create_sample_unified_item() -> UnifiedDebtItem {
             contextual_risk_multiplier: None,
             pre_contextual_score: None,
             debt_type_multiplier: None,
+            score_trace: Vec::new(),
         },
         function_role: FunctionRole::PureLogic,
         recommendation: debtmap::priority::ActionableRecommendation {

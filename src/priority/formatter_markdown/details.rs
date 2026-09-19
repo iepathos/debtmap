@@ -248,79 +248,12 @@ fn format_context_suggestion(
 
 pub(crate) fn format_score_breakdown_with_coverage(
     unified_score: &crate::priority::UnifiedScore,
-    transitive_coverage: Option<&crate::priority::coverage_propagation::TransitiveCoverage>,
+    _transitive_coverage: Option<&crate::priority::coverage_propagation::TransitiveCoverage>,
 ) -> String {
-    let weights = crate::config::get_scoring_weights();
-    let mut output = String::new();
-
-    writeln!(&mut output, "\n#### Score Calculation\n").unwrap();
-    writeln!(
-        &mut output,
-        "| Component | Value | Weight | Contribution | Details |"
-    )
-    .unwrap();
-    writeln!(
-        &mut output,
-        "|-----------|-------|--------|--------------|----------|"
-    )
-    .unwrap();
-    writeln!(
-        &mut output,
-        "| Complexity | {:.1} | {:.0}% | {:.2} | |",
-        unified_score.complexity_factor,
-        weights.complexity * 100.0,
-        unified_score.complexity_factor * weights.complexity
-    )
-    .unwrap();
-
-    // Add coverage details if available
-    let coverage_details = if let Some(trans_cov) = transitive_coverage {
-        format!("Line: {:.2}%", trans_cov.direct * 100.0)
-    } else {
-        "No data".to_string()
-    };
-    writeln!(
-        &mut output,
-        "| Coverage | {:.1} | {:.0}% | {:.2} | {} |",
-        unified_score.coverage_factor,
-        weights.coverage * 100.0,
-        unified_score.coverage_factor * weights.coverage,
-        coverage_details
-    )
-    .unwrap();
-    // Semantic and ROI factors removed per spec 55 and 58
-    writeln!(
-        &mut output,
-        "| Dependency | {:.1} | {:.0}% | {:.2} | |",
-        unified_score.dependency_factor,
-        weights.dependency * 100.0,
-        unified_score.dependency_factor * weights.dependency
-    )
-    .unwrap();
-
-    // Organization factor removed per spec 58 - redundant with complexity factor
-
-    // New weights after removing security: complexity, coverage, dependency
-    let base_score = unified_score.complexity_factor * weights.complexity
-        + unified_score.coverage_factor * weights.coverage
-        + unified_score.dependency_factor * weights.dependency;
-
-    writeln!(&mut output).unwrap();
-    writeln!(&mut output, "- **Base Score:** {:.2}", base_score).unwrap();
-    writeln!(
-        &mut output,
-        "- **Role Adjustment:** ×{:.2}",
-        unified_score.role_multiplier
-    )
-    .unwrap();
-    writeln!(
-        &mut output,
-        "- **Final Score:** {:.2}",
-        unified_score.final_score
-    )
-    .unwrap();
-    writeln!(&mut output).unwrap();
-
+    let mut output = String::from("\n#### Score Calculation\n\n");
+    for line in crate::priority::scoring::trace::explanation_lines(unified_score) {
+        writeln!(output, "- {line}").unwrap();
+    }
     output
 }
 
@@ -328,7 +261,6 @@ pub(crate) fn format_score_breakdown_with_coverage(
 fn coverage_factor(
     transitive_coverage: Option<&crate::priority::coverage_propagation::TransitiveCoverage>,
     coverage_factor_score: f64,
-    coverage_weight: f64,
 ) -> Option<String> {
     match transitive_coverage {
         Some(trans_cov) => {
@@ -338,30 +270,20 @@ fn coverage_factor(
             } else if pct >= 80.0 {
                 Some(format!("Good coverage {:.1}%", pct))
             } else if coverage_factor_score > 3.0 {
-                Some(format!(
-                    "Line coverage {:.1}% (weight: {:.0}%)",
-                    pct,
-                    coverage_weight * 100.0
-                ))
+                Some(format!("Line coverage {:.1}%", pct))
             } else {
                 None
             }
         }
-        None if coverage_factor_score > 3.0 => Some(format!(
-            "No coverage data (weight: {:.0}%)",
-            coverage_weight * 100.0
-        )),
+        None if coverage_factor_score > 3.0 => Some("No coverage data".to_string()),
         None => None,
     }
 }
 
 /// Extract complexity factor description based on score threshold.
-fn complexity_factor(complexity_score: f64, complexity_weight: f64) -> Option<String> {
+fn complexity_factor(complexity_score: f64) -> Option<String> {
     if complexity_score > 5.0 {
-        Some(format!(
-            "Complexity (weight: {:.0}%)",
-            complexity_weight * 100.0
-        ))
+        Some("Complexity".to_string())
     } else if complexity_score > 3.0 {
         Some("Moderate complexity".to_string())
     } else {
@@ -370,12 +292,9 @@ fn complexity_factor(complexity_score: f64, complexity_weight: f64) -> Option<St
 }
 
 /// Extract dependency factor description based on score threshold.
-fn dependency_factor(dependency_score: f64, dependency_weight: f64) -> Option<String> {
+fn dependency_factor(dependency_score: f64) -> Option<String> {
     if dependency_score > 5.0 {
-        Some(format!(
-            "Critical path (weight: {:.0}%)",
-            dependency_weight * 100.0
-        ))
+        Some("Caller coupling".to_string())
     } else {
         None
     }
@@ -411,16 +330,10 @@ pub(crate) fn format_main_factors_with_coverage(
     debt_type: &crate::priority::DebtType,
     transitive_coverage: Option<&crate::priority::coverage_propagation::TransitiveCoverage>,
 ) -> String {
-    let weights = crate::config::get_scoring_weights();
-
     let factors: Vec<String> = [
-        coverage_factor(
-            transitive_coverage,
-            unified_score.coverage_factor,
-            weights.coverage,
-        ),
-        complexity_factor(unified_score.complexity_factor, weights.complexity),
-        dependency_factor(unified_score.dependency_factor, weights.dependency),
+        coverage_factor(transitive_coverage, unified_score.coverage_factor),
+        complexity_factor(unified_score.complexity_factor),
+        dependency_factor(unified_score.dependency_factor),
     ]
     .into_iter()
     .flatten()

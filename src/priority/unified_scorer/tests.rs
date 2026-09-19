@@ -39,6 +39,41 @@ fn create_test_metrics() -> FunctionMetrics {
 }
 
 #[test]
+fn score_trace_records_custom_data_flow_weights_and_continuous_arithmetic() {
+    let func = create_test_metrics();
+    let graph = CallGraph::new();
+    let data_flow = DataFlowGraph::from_call_graph(graph.clone());
+    for weights in [[0.2, 0.5, 0.3], [0.0, 0.0, 0.0]] {
+        let config = DataFlowScoringConfig {
+            enabled: true,
+            purity_weight: weights[0],
+            refactorability_weight: weights[1],
+            pattern_weight: weights[2],
+        };
+        let score = calculate_unified_priority_with_data_flow(
+            &func, &graph, &data_flow, None, None, None, &config,
+        );
+        assert!(!score.score_trace.is_empty());
+        for pair in score.score_trace.windows(2) {
+            assert!((pair[0].output - pair[1].input).abs() < 1e-10);
+        }
+        for step in &score.score_trace {
+            assert!(
+                (step.calculated_output() - step.output).abs() < 1e-10,
+                "{step}"
+            );
+        }
+        let last = score.score_trace.last().unwrap();
+        assert_eq!(last.output, score.final_score);
+        assert!(
+            matches!(last.operation, ScoreOperation::WeightedBlend { weights: actual, .. } if actual == weights)
+        );
+        let json = serde_json::to_value(&score).unwrap();
+        assert!(json.get("score_trace").is_none());
+    }
+}
+
+#[test]
 fn test_unified_scoring() {
     let func = create_test_metrics();
     let graph = CallGraph::new();

@@ -18,6 +18,7 @@ pub mod orchestration_adjustment;
 pub mod rebalanced; // Spec 136: Rebalanced debt scoring algorithm
 pub mod scaling; // Spec 171: Exponential scaling and risk boosting
 pub mod test_calculation;
+pub mod trace;
 pub mod validation;
 
 // Spec 262: The following recommendation modules have been removed:

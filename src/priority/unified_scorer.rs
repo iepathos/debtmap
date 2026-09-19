@@ -1,6 +1,7 @@
 use crate::core::{FunctionMetrics, PurityLevel};
 use crate::data_flow::DataFlowGraph;
 use crate::organization::GodObjectAnalysis;
+use crate::priority::scoring::trace::{ScoreOperation, ScoreStep};
 use crate::priority::{
     ActionableRecommendation, DebtType, FunctionAnalysis, ImpactMetrics,
     call_graph::{CallGraph, FunctionId},
@@ -95,9 +96,12 @@ impl PuritySpectrum {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UnifiedScore {
-    pub complexity_factor: f64, // 0-10, configurable weight (default 35%)
-    pub coverage_factor: f64,   // 0-10, configurable weight (default 40%)
-    pub dependency_factor: f64, // 0-10, configurable weight (default 20%)
+    /// Arithmetic evidence for human explanations, excluded from record formats.
+    #[serde(skip)]
+    pub score_trace: Vec<crate::priority::scoring::trace::ScoreStep>,
+    pub complexity_factor: f64, // Complexity indicator used in the weighted base
+    pub coverage_factor: f64,   // Displayed uncovered fraction × 10, not an additive score
+    pub dependency_factor: f64, // External production caller contribution
     pub role_multiplier: f64,   // 0.1-1.5x based on function role
     pub final_score: f64,       // Computed composite score (with scaling applied)
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -311,6 +315,13 @@ pub fn calculate_unified_score_with_patterns(
         1.0
     };
 
+    let mut score_trace = base_score.score_trace.clone();
+    score_trace.push(ScoreStep::new(
+        "God-object context",
+        base_score.final_score,
+        ScoreOperation::Multiply(god_object_multiplier),
+        base_score.final_score.max(0.0) * god_object_multiplier,
+    ));
     UnifiedScore {
         complexity_factor: base_score.complexity_factor * god_object_multiplier,
         coverage_factor: base_score.coverage_factor,
@@ -333,6 +344,7 @@ pub fn calculate_unified_score_with_patterns(
         contextual_risk_multiplier: base_score.contextual_risk_multiplier,
         pre_contextual_score: base_score.pre_contextual_score,
         debt_type_multiplier: base_score.debt_type_multiplier,
+        score_trace,
     }
 }
 
@@ -415,6 +427,7 @@ pub fn calculate_unified_priority_with_role(
             contextual_risk_multiplier: None,
             pre_contextual_score: None,
             debt_type_multiplier: None,
+            score_trace: Vec::new(),
         };
     }
 
@@ -451,7 +464,7 @@ pub fn calculate_unified_priority_with_role(
     let coverage_weight = get_role_coverage_weight(role);
 
     // Calculate base score
-    let base_score = calculate_base_score(
+    let (base_score, mut score_trace) = calculate_base_score(
         has_coverage_data,
         func.is_test,
         coverage_pct,
@@ -479,6 +492,12 @@ pub fn calculate_unified_priority_with_role(
         role_multiplier
     };
     let role_adjusted_score = base_score * clamped_role_multiplier;
+    score_trace.push(ScoreStep::new(
+        "Role (after configured clamp)",
+        base_score,
+        ScoreOperation::Multiply(clamped_role_multiplier),
+        role_adjusted_score,
+    ));
 
     // Apply structural quality adjustment based on nesting/cyclomatic ratio
     // High ratio = deeply nested relative to branches = bad structure = boost score
@@ -486,14 +505,36 @@ pub fn calculate_unified_priority_with_role(
     let structural_multiplier =
         calculate_structural_quality_multiplier(func.nesting, func.cyclomatic);
     let structure_adjusted_score = role_adjusted_score * structural_multiplier;
+    score_trace.push(ScoreStep::new(
+        "Structure",
+        role_adjusted_score,
+        ScoreOperation::Multiply(structural_multiplier),
+        structure_adjusted_score,
+    ));
 
     // Add debt-based adjustments with detailed breakdown (spec 260)
     let (debt_adjustment, debt_details) =
         calculate_debt_adjustment_with_details(func, debt_aggregator);
     let debt_adjusted_score = structure_adjusted_score + debt_adjustment;
+    if debt_adjustment != 0.0 {
+        score_trace.push(ScoreStep::new(
+            "Debt adjustment",
+            structure_adjusted_score,
+            ScoreOperation::Add(debt_adjustment),
+            debt_adjusted_score,
+        ));
+    }
 
     // Floor negative scores to 0 (no upper bound - spec 261)
     let floored_score = debt_adjusted_score.max(0.0);
+    if debt_adjusted_score < 0.0 {
+        score_trace.push(ScoreStep::new(
+            "Nonnegative floor",
+            debt_adjusted_score,
+            ScoreOperation::Floor(0.0),
+            floored_score,
+        ));
+    }
 
     // Track if negative clamping occurred for transparency (spec 260)
     let pre_normalization_score = if debt_adjusted_score < 0.0 {
@@ -511,6 +552,14 @@ pub fn calculate_unified_priority_with_role(
         call_graph,
         &role,
     );
+    if adjustment.is_some() {
+        score_trace.push(ScoreStep::new(
+            "Orchestration adjustment",
+            floored_score,
+            ScoreOperation::Adjustment,
+            final_normalized_score,
+        ));
+    }
 
     // Always store debt adjustment details for transparency (spec 260)
     // Even small adjustments help explain score differences in the TUI
@@ -542,6 +591,7 @@ pub fn calculate_unified_priority_with_role(
         contextual_risk_multiplier: None, // Set by apply_contextual_risk_to_score
         pre_contextual_score: None,       // Set by apply_contextual_risk_to_score
         debt_type_multiplier: None,       // Set by apply_score_scaling
+        score_trace,
     }
 }
 
@@ -713,8 +763,18 @@ fn calculate_base_score(
     coverage_weight: f64,
     complexity_factor: f64,
     dependency_factor: f64,
-) -> f64 {
-    if has_coverage_data {
+) -> (f64, Vec<ScoreStep>) {
+    let raw_base = calculate_base_score_no_coverage(complexity_factor, dependency_factor);
+    let mut trace = vec![ScoreStep::new(
+        "Weighted complexity and dependencies",
+        0.0,
+        ScoreOperation::WeightedBase {
+            complexity: complexity_factor,
+            dependency: dependency_factor,
+        },
+        raw_base,
+    )];
+    let score = if has_coverage_data {
         // With coverage: use multiplier approach (coverage dampens complexity+deps score)
         let coverage_multiplier = if is_test {
             0.0 // Test functions get maximum dampening (near-zero score)
@@ -723,15 +783,23 @@ fn calculate_base_score(
             let adjusted_coverage_pct = 1.0 - ((1.0 - coverage_pct) * coverage_weight);
             calculate_coverage_multiplier(adjusted_coverage_pct)
         };
-        calculate_base_score_with_coverage_multiplier(
+        let score = calculate_base_score_with_coverage_multiplier(
             coverage_multiplier,
             complexity_factor,
             dependency_factor,
-        )
+        );
+        trace.push(ScoreStep::new(
+            "Coverage (role-adjusted uncovered fraction)",
+            raw_base,
+            ScoreOperation::Multiply(coverage_multiplier),
+            score,
+        ));
+        score
     } else {
         // Without coverage: adjusted weights (50% complexity, 25% deps, 25% debt)
-        calculate_base_score_no_coverage(complexity_factor, dependency_factor)
-    }
+        raw_base
+    };
+    (score, trace)
 }
 
 /// Calculate debt-based adjustment to the score with detailed breakdown (spec 260).
@@ -1136,6 +1204,19 @@ pub fn calculate_unified_priority_with_data_flow_and_role(
 
     // Apply adjustment to final score
     let adjusted_score = base_score.final_score * combined_adjustment;
+    base_score.score_trace.push(ScoreStep::new(
+        "Data-flow weighted blend",
+        base_score.final_score,
+        ScoreOperation::WeightedBlend {
+            factors: [purity_factor, refactorability_factor, pattern_factor],
+            weights: [
+                config.purity_weight,
+                config.refactorability_weight,
+                config.pattern_weight,
+            ],
+        },
+        adjusted_score,
+    ));
 
     // Update score with data flow factors
     base_score.final_score = adjusted_score;

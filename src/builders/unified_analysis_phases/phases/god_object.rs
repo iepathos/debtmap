@@ -62,6 +62,14 @@ pub fn create_god_object_debt_item(
     let mut unified_score = calculate_god_object_score(god_analysis, &aggregated_metrics);
     let score_multiplier = coupling_classification.score_multiplier();
     if score_multiplier < 1.0 {
+        unified_score
+            .score_trace
+            .push(crate::priority::scoring::trace::ScoreStep::new(
+                "Architectural coupling",
+                unified_score.final_score,
+                crate::priority::scoring::trace::ScoreOperation::Multiply(score_multiplier),
+                unified_score.final_score * score_multiplier,
+            ));
         // Apply dampening for stable/well-tested cores (spec 269)
         unified_score.final_score *= score_multiplier;
     }
@@ -186,6 +194,7 @@ fn calculate_god_object_score(
         contextual_risk_multiplier: None,
         pre_contextual_score: None,
         debt_type_multiplier: None,
+        score_trace: Vec::new(),
     };
 
     // Apply contextual risk to score if available

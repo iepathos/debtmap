@@ -223,6 +223,10 @@ impl UnifiedAnalysisUtils for UnifiedAnalysis {
 
                     // Create a new item with the adjusted score and file context
                     let mut adjusted_item = item.clone();
+                    adjusted_item.unified_score.score_trace.push(crate::priority::scoring::trace::ScoreStep::new(
+                        "File classification", item.unified_score.final_score,
+                        crate::priority::scoring::trace::ScoreOperation::Multiply(crate::priority::scoring::file_context_scoring::context_reduction_factor(context)), adjusted_score,
+                    ));
                     adjusted_item.unified_score.final_score = adjusted_score.max(0.0);
                     adjusted_item.file_context = Some(context.clone());
                     adjusted_item
@@ -283,6 +287,7 @@ mod tests {
                 contextual_risk_multiplier: None,
                 pre_contextual_score: None,
                 debt_type_multiplier: None,
+                score_trace: Vec::new(),
             },
             cyclomatic_complexity: 65,
             cognitive_complexity: 6,

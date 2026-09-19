@@ -335,6 +335,7 @@ mod tests {
                 contextual_risk_multiplier: None,
                 pre_contextual_score: None,
                 debt_type_multiplier: None,
+                score_trace: Vec::new(),
             },
             debt_type: DebtType::ComplexityHotspot {
                 cyclomatic: 15,
@@ -493,6 +494,7 @@ mod tests {
             contextual_risk_multiplier: None,
             pre_contextual_score: None,
             debt_type_multiplier: None,
+            score_trace: Vec::new(),
         };
 
         let result = format_score_factors(&score);
@@ -602,6 +604,7 @@ mod tests {
             contextual_risk_multiplier: None,
             pre_contextual_score: None,
             debt_type_multiplier: None,
+            score_trace: Vec::new(),
         };
 
         let result = format_score_factors(&score);

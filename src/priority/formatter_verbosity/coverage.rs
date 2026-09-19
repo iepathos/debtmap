@@ -218,29 +218,23 @@ pub fn format_coverage_factor_description(
         let coverage_pct = trans_cov.direct * 100.0;
         let level = CoverageLevel::from_percentage(coverage_pct);
         match level {
-            CoverageLevel::Untested => Some("[UNTESTED] (0% coverage, weight: 50%)".to_string()),
-            CoverageLevel::Low => Some(format!(
-                "[WARN LOW COVERAGE] ({:.1}%, weight: 50%)",
-                coverage_pct
-            )),
-            CoverageLevel::Partial => Some(format!(
-                "[WARN PARTIAL COVERAGE] ({:.1}%, weight: 50%)",
-                coverage_pct
-            )),
+            CoverageLevel::Untested => Some("[UNTESTED] (0% coverage)".to_string()),
+            CoverageLevel::Low => Some(format!("[WARN LOW COVERAGE] ({:.1}%)", coverage_pct)),
+            CoverageLevel::Partial => {
+                Some(format!("[WARN PARTIAL COVERAGE] ({:.1}%)", coverage_pct))
+            }
             CoverageLevel::Excellent => Some(format!("Excellent coverage {:.1}%", coverage_pct)),
             CoverageLevel::Good => Some(format!("Good coverage {:.1}%", coverage_pct)),
             CoverageLevel::Moderate => {
                 if item.unified_score.coverage_factor > 3.0 {
-                    Some(format!("Line coverage {:.1}% (weight: 50%)", coverage_pct))
+                    Some(format!("Line coverage {:.1}%", coverage_pct))
                 } else {
                     None
                 }
             }
         }
-    } else if item.unified_score.coverage_factor >= 10.0 {
-        Some("[UNTESTED] (no coverage data, weight: 50%)".to_string())
     } else if item.unified_score.coverage_factor > 3.0 {
-        Some("No coverage data (weight: 50%)".to_string())
+        Some("Coverage data unavailable".to_string())
     } else {
         None
     }

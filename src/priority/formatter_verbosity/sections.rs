@@ -1,4 +1,3 @@
-use crate::complexity::EntropyAnalysis;
 use crate::priority::UnifiedDebtItem;
 use colored::*;
 use std::fmt::Write;
@@ -6,7 +5,7 @@ use std::fmt::Write;
 /// Pure function to classify dependency contribution
 pub fn classify_dependency_contribution(dependency_factor: f64) -> &'static str {
     match dependency_factor {
-        d if d > 10.0 => "CRITICAL PATH",
+        d if d > 10.0 => "VERY HIGH",
         d if d > 5.0 => "HIGH",
         d if d > 2.0 => "MEDIUM",
         _ => "LOW",
@@ -39,155 +38,18 @@ pub fn format_callees_display(callees: &[String], max_display: usize) -> String 
     }
 }
 
-/// Pure function to calculate score factors
-pub struct ScoreFactors {
-    pub coverage_gap: f64,
-    pub coverage_pct: f64,
-    pub coverage_factor: f64,
-    pub complexity_factor: f64,
-    pub dependency_factor: f64,
-}
-
-pub fn calculate_score_factors(item: &UnifiedDebtItem) -> ScoreFactors {
-    let (coverage_gap, coverage_pct) = if let Some(ref trans_cov) = item.transitive_coverage {
-        let pct = trans_cov.direct;
-        (1.0 - pct, pct)
-    } else {
-        (1.0, 0.0)
-    };
-
-    ScoreFactors {
-        coverage_gap,
-        coverage_pct,
-        coverage_factor: (coverage_gap.powf(1.5) + 0.1).max(0.1),
-        complexity_factor: item.unified_score.complexity_factor,
-        dependency_factor: ((item.unified_score.dependency_factor + 1.0).sqrt() / 2.0).min(1.0),
-    }
-}
-
-/// Pure function to format coverage detail string
-pub fn format_coverage_detail(has_coverage: bool, gap: f64, pct: f64) -> String {
-    if has_coverage {
-        format!(" (gap: {:.1}%, coverage: {:.1}%)", gap * 100.0, pct * 100.0)
-    } else {
-        " (no coverage data)".to_string()
-    }
-}
-
-/// Pure function to format complexity detail
-pub fn format_complexity_detail(entropy: &Option<EntropyAnalysis>) -> String {
-    if let Some(e) = entropy {
-        format!(" (entropy-adjusted from {})", e.original_complexity)
-    } else {
-        String::new()
-    }
-}
-
-/// Format score calculation section for verbosity >= 2
+/// Format recorded score arithmetic for verbosity >= 2.
 pub fn format_score_calculation_section(
     item: &UnifiedDebtItem,
     _formatter: &crate::formatting::ColoredFormatter,
 ) -> Vec<String> {
-    let mut lines = Vec::new();
-    let tree_branch = "-";
-    let tree_sub_branch = "  -";
-    let tree_pipe = " ";
-
-    lines.push(format!(
-        "{} {}",
-        tree_branch,
-        "SCORE CALCULATION:".bright_blue()
-    ));
-    lines.push(format!("{} Weighted Sum Model:", tree_sub_branch));
-
-    // Calculate multiplicative factors for display
-    let factors = calculate_score_factors(item);
-    let coverage_detail = format_coverage_detail(
-        item.transitive_coverage.is_some(),
-        factors.coverage_gap,
-        factors.coverage_pct,
-    );
-
-    // Add role-based coverage adjustment indicator for entry points
-    let role_coverage_indicator = if matches!(
-        item.function_role,
-        crate::priority::FunctionRole::EntryPoint
-    ) {
-        " (entry point - integration tested, lower unit coverage expected)"
-    } else {
-        ""
-    };
-
-    lines.push(format!(
-        "{}  {} Coverage Score: {:.1} × 40% = {:.2}{}{}",
-        tree_pipe,
-        "-",
-        factors.coverage_factor * 10.0, // Convert to 0-100 scale
-        factors.coverage_factor * 10.0 * 0.4,
-        coverage_detail,
-        role_coverage_indicator
-    ));
-
-    // Show complexity score
-    let complexity_detail = format_complexity_detail(&item.entropy_analysis);
-    lines.push(format!(
-        "{}  {} Complexity Score: {:.1} × 40% = {:.2}{}",
-        tree_pipe,
-        "-",
-        factors.complexity_factor * 10.0, // Convert to 0-100 scale
-        factors.complexity_factor * 10.0 * 0.40,
-        complexity_detail
-    ));
-
-    // Show dependency score
-    lines.push(format!(
-        "{}  {} Dependency Score: {:.1} × 20% = {:.2} ({} callers)",
-        tree_pipe,
-        "-",
-        factors.dependency_factor * 10.0, // Convert to 0-100 scale
-        factors.dependency_factor * 10.0 * 0.20,
-        item.upstream_callers.len() // Display actual caller count, not normalized score
-    ));
-
-    // Calculate weighted sum base score
-    let coverage_contribution = factors.coverage_factor * 10.0 * 0.4;
-    let complexity_contribution = factors.complexity_factor * 10.0 * 0.4;
-    let dependency_contribution = factors.dependency_factor * 10.0 * 0.2;
-    let base_score = coverage_contribution + complexity_contribution + dependency_contribution;
-
-    lines.push(format!(
-        "{}  {} Base Score: {:.2} + {:.2} + {:.2} = {:.2}",
-        tree_pipe,
-        "-",
-        coverage_contribution,
-        complexity_contribution,
-        dependency_contribution,
-        base_score
-    ));
-
-    // Show entropy impact if present
-    if let Some(ref entropy) = item.entropy_analysis {
-        lines.push(format!(
-            "{}  {} Entropy Impact: {:.0}% dampening (entropy: {:.2}, repetition: {:.0}%)",
-            tree_pipe,
-            "-",
-            (1.0 - entropy.dampening_factor) * 100.0,
-            entropy.entropy_score,
-            entropy.pattern_repetition * 100.0
-        ));
-    }
-
-    lines.push(format!(
-        "{}  {} Role Adjustment: ×{:.2}",
-        tree_pipe, "-", item.unified_score.role_multiplier
-    ));
-
-    lines.push(format!(
-        "{}  {} Final Score: {:.2}",
-        tree_pipe, "-", item.unified_score.final_score
-    ));
-
-    lines
+    std::iter::once("- SCORE CALCULATION:".to_string())
+        .chain(
+            crate::priority::scoring::trace::explanation_lines(&item.unified_score)
+                .into_iter()
+                .map(|line| format!("  - {line}")),
+        )
+        .collect()
 }
 
 /// Format call graph section for verbosity >= 2
@@ -436,8 +298,8 @@ mod tests {
 
     #[test]
     fn test_classify_dependency_contribution() {
-        assert_eq!(classify_dependency_contribution(15.0), "CRITICAL PATH");
-        assert_eq!(classify_dependency_contribution(10.1), "CRITICAL PATH");
+        assert_eq!(classify_dependency_contribution(15.0), "VERY HIGH");
+        assert_eq!(classify_dependency_contribution(10.1), "VERY HIGH");
         assert_eq!(classify_dependency_contribution(10.0), "HIGH");
         assert_eq!(classify_dependency_contribution(7.0), "HIGH");
         assert_eq!(classify_dependency_contribution(5.1), "HIGH");

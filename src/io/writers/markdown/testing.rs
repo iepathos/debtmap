@@ -104,6 +104,7 @@ mod tests {
                 contextual_risk_multiplier: None,
                 pre_contextual_score: None,
                 debt_type_multiplier: None,
+                score_trace: Vec::new(),
             },
             debt_type: DebtType::TestingGap {
                 coverage,
@@ -191,6 +192,7 @@ mod tests {
                 contextual_risk_multiplier: None,
                 pre_contextual_score: None,
                 debt_type_multiplier: None,
+                score_trace: Vec::new(),
             },
             debt_type: DebtType::ComplexityHotspot {
                 cyclomatic: 15,

@@ -1857,19 +1857,57 @@ pub fn build_combined_reference_line(
 
 /// Build all page lines for text extraction (pure)
 pub fn build_page_lines(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> Vec<Line<'static>> {
+    if !item.unified_score.score_trace.is_empty() {
+        return [
+            build_final_score_section(item, theme, width),
+            build_raw_inputs_section(item, theme, width),
+            build_recorded_trace_section(item, theme),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+    }
     [
         build_final_score_section(item, theme, width),
         build_raw_inputs_section(item, theme, width),
-        build_score_factors_section(item, theme, width),
-        build_multipliers_section(item, theme, width),
-        build_scaling_pipeline_section(item, theme, width),
-        build_god_object_impact_section(item, theme, width),
-        build_orchestration_section(item, theme, width),
-        build_calculation_summary_section(item, theme, width),
+        build_unavailable_trace_section(item, theme, width),
     ]
     .into_iter()
     .flatten()
     .collect()
+}
+
+fn build_unavailable_trace_section(
+    item: &UnifiedDebtItem,
+    theme: &Theme,
+    width: u16,
+) -> Vec<Line<'static>> {
+    let mut lines = Vec::new();
+    add_section_header(&mut lines, "recorded score factors", theme);
+    lines.push(Line::from(
+        "Arithmetic trace unavailable; recorded factors do not reconstruct the final score.",
+    ));
+    for (label, value) in [
+        ("complexity", item.unified_score.complexity_factor),
+        ("coverage gap indicator", item.unified_score.coverage_factor),
+        ("dependencies", item.unified_score.dependency_factor),
+    ] {
+        add_label_value(&mut lines, label, format!("{value:.4}"), theme, width);
+    }
+    lines
+}
+
+fn build_recorded_trace_section(item: &UnifiedDebtItem, theme: &Theme) -> Vec<Line<'static>> {
+    let mut lines = Vec::new();
+    add_section_header(&mut lines, "recorded calculation steps", theme);
+    lines.extend(
+        item.unified_score
+            .score_trace
+            .iter()
+            .map(|step| Line::from(step.to_string())),
+    );
+    add_blank_line(&mut lines);
+    lines
 }
 
 /// Build all page lines with multi-item context (pure) - spec 267
@@ -1894,14 +1932,7 @@ pub fn build_page_lines_with_context(
     }
 
     // Add standard sections
-    result.extend(build_final_score_section(item, theme, width));
-    result.extend(build_raw_inputs_section(item, theme, width));
-    result.extend(build_score_factors_section(item, theme, width));
-    result.extend(build_multipliers_section(item, theme, width));
-    result.extend(build_scaling_pipeline_section(item, theme, width));
-    result.extend(build_god_object_impact_section(item, theme, width));
-    result.extend(build_orchestration_section(item, theme, width));
-    result.extend(build_calculation_summary_section(item, theme, width));
+    result.extend(build_page_lines(item, theme, width));
 
     // Add combined reference at end if multiple items at location
     if location_items.len() > 1 {
@@ -1991,6 +2022,7 @@ mod tests {
                 contextual_risk_multiplier: None,
                 pre_contextual_score: None,
                 debt_type_multiplier: None,
+                score_trace: Vec::new(),
             },
             debt_type,
             function_role: FunctionRole::PureLogic,
@@ -2195,6 +2227,46 @@ mod tests {
 
         // Should have lines from multiple sections
         assert!(lines.len() > 10);
+    }
+
+    #[test]
+    fn score_pages_use_recorded_operands_and_do_not_reconstruct_missing_traces() {
+        let mut item = create_test_item(
+            16.3,
+            DebtType::ComplexityHotspot {
+                cyclomatic: 17,
+                cognitive: 6,
+            },
+        );
+        let theme = Theme::default();
+        let text = |lines: Vec<Line<'static>>| {
+            lines
+                .into_iter()
+                .flat_map(|line| line.spans.into_iter().map(|span| span.content.into_owned()))
+                .collect::<String>()
+        };
+        let legacy = text(build_page_lines(&item, &theme, 100));
+        assert!(legacy.contains("Arithmetic trace unavailable"));
+        assert!(!legacy.contains("score formula (simplified)"));
+        item.unified_score.score_trace = vec![crate::priority::scoring::trace::ScoreStep::new(
+            "Actual configured weights",
+            20.0,
+            crate::priority::scoring::trace::ScoreOperation::WeightedBlend {
+                factors: [0.3, 1.0, 0.85],
+                weights: [0.2, 0.5, 0.3],
+            },
+            16.3,
+        )];
+        for lines in [
+            build_page_lines(&item, &theme, 100),
+            build_page_lines_with_context(&item, &[&item], 0, &theme, 100),
+        ] {
+            let rendered = text(lines);
+            assert!(rendered.contains("purity 0.3000 × 0.2000"));
+            assert!(rendered.contains("16.3000"));
+            assert!(!rendered.contains("Arithmetic trace unavailable"));
+            assert!(!rendered.contains("score formula (simplified)"));
+        }
     }
 
     #[test]

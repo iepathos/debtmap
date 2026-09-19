@@ -326,25 +326,22 @@ pub mod format {
         let s = scoring?;
         let mut out = String::new();
         write_section_heading(&mut out, "Scoring Breakdown");
-        writeln!(out, "- Base Score: {:.2}", s.base_score).unwrap();
+        if !s.score_trace.is_empty() {
+            for step in &s.score_trace {
+                writeln!(out, "- {step}").unwrap();
+            }
+            writeln!(out, "- Final Score: {:.2}", s.final_score).unwrap();
+            return Some(out);
+        }
         writeln!(
             out,
-            "- Complexity Factor: {:.2} (weight: 0.4)",
-            s.complexity_score
+            "- Arithmetic trace unavailable; recorded factors do not reconstruct the final score."
         )
         .unwrap();
-        writeln!(
-            out,
-            "- Coverage Factor: {:.2} (weight: 0.3)",
-            s.coverage_score
-        )
-        .unwrap();
-        writeln!(
-            out,
-            "- Dependency Factor: {:.2} (weight: 0.2)",
-            s.dependency_score
-        )
-        .unwrap();
+        writeln!(out, "- Recorded Base Score: {:.2}", s.base_score).unwrap();
+        writeln!(out, "- Complexity Factor: {:.2}", s.complexity_score).unwrap();
+        writeln!(out, "- Coverage Gap Indicator: {:.2}", s.coverage_score).unwrap();
+        writeln!(out, "- Dependency Factor: {:.2}", s.dependency_score).unwrap();
         writeln!(
             out,
             "- Role Multiplier: {:.2} ({:?})",
@@ -362,7 +359,7 @@ pub mod format {
         );
 
         if let Some(pf) = s.purity_factor {
-            writeln!(out, "- Purity Factor: {:.2}", pf).unwrap();
+            writeln!(out, "- Purity Blend Input: {:.2}", pf).unwrap();
         }
         format_optional_multiplier(&mut out, "Refactorability Factor", s.refactorability_factor);
         format_optional_multiplier(&mut out, "Pattern Factor", s.pattern_factor);
@@ -371,12 +368,7 @@ pub mod format {
         if let Some(pre) = s.pre_normalization_score
             && (pre - s.final_score).abs() > 0.1
         {
-            writeln!(
-                out,
-                "- Pre-normalization Score: {:.2} (clamped to {:.2})",
-                pre, s.final_score
-            )
-            .unwrap();
+            writeln!(out, "- Recorded Pre-normalization Score: {:.2}", pre).unwrap();
         }
         writeln!(out, "- Final Score: {:.2}", s.final_score).unwrap();
         Some(out)
@@ -1130,6 +1122,7 @@ mod tests {
                 risk_reduction: 0.15,
             },
             scoring_details: Some(FunctionScoringDetails {
+                score_trace: Vec::new(),
                 coverage_score: 5.0,
                 complexity_score: 8.0,
                 dependency_score: 3.0,
@@ -1179,13 +1172,36 @@ mod tests {
             "Should show refactorability factor"
         );
         assert!(
-            markdown.contains("Pre-normalization Score: 150.00 (clamped to 100.00)"),
-            "Should show pre-normalization score when clamped"
+            markdown.contains("Recorded Pre-normalization Score: 150.00"),
+            "Should show the recorded value without inventing a clamp"
         );
         assert!(
             markdown.contains("Final Score: 100.00"),
             "Should show final score"
         );
+        assert!(!markdown.contains("weight: 0."));
+        assert!(!markdown.contains("clamped to"));
+        assert!(markdown.contains("Arithmetic trace unavailable"));
+
+        let mut details = item.scoring_details.unwrap();
+        details.score_trace = vec![crate::priority::scoring::trace::ScoreStep::new(
+            "Configured blend",
+            20.0,
+            crate::priority::scoring::trace::ScoreOperation::WeightedBlend {
+                factors: [0.3, 1.0, 0.85],
+                weights: [0.2, 0.5, 0.3],
+            },
+            16.3,
+        )];
+        let traced = format::scoring(Some(&details), &FunctionRole::Unknown).unwrap();
+        assert!(traced.contains("Configured blend: 20.0000"));
+        assert!(traced.contains("purity 0.3000 × 0.2000"));
+        assert!(!traced.contains("Recorded Base Score"));
+        assert!(!traced.contains("Arithmetic trace unavailable"));
+        let json = serde_json::to_value(&details).unwrap();
+        assert!(json.get("score_trace").is_none());
+        let restored: FunctionScoringDetails = serde_json::from_value(json).unwrap();
+        assert!(restored.score_trace.is_empty());
     }
 
     #[test]

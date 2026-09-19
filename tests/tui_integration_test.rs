@@ -399,6 +399,7 @@ fn create_test_unified_debt_item(
             contextual_risk_multiplier: None,
             pre_contextual_score: None,
             debt_type_multiplier: None,
+            score_trace: Vec::new(),
         },
         function_role: FunctionRole::Unknown,
         recommendation: ActionableRecommendation {
