@@ -63,12 +63,12 @@ pub struct FunctionHistory {
 }
 
 impl FunctionHistory {
-    /// Calculate bug density for this function
+    /// Calculate this function's fix-labelled modification commit ratio.
     ///
     /// Pure function: returns 0.0 if function was never modified after introduction
     pub fn bug_density(&self) -> f64 {
         if self.total_commits == 0 {
-            return 0.0; // Never modified = no bugs
+            return 0.0; // No observed modifications; this does not establish absence of defects.
         }
         self.bug_fix_count as f64 / self.total_commits as f64
     }

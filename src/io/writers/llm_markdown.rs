@@ -439,25 +439,29 @@ pub mod format {
             g.total_commits, commit_label, g.change_frequency
         )
         .unwrap();
-        // Show fix rate as "N fixes / M changes" for clarity
-        let changes = g.total_commits.saturating_sub(1);
-        if changes == 0 {
-            writeln!(out, "- Bug Density: 0%").unwrap();
-        } else {
-            writeln!(
-                out,
-                "- Bug Density: {:.0}% ({} fix{} / {} change{})",
-                g.bug_density * 100.0,
-                g.bug_fix_count,
-                if g.bug_fix_count == 1 { "" } else { "es" },
-                changes,
-                if changes == 1 { "" } else { "s" }
-            )
-            .unwrap();
-        }
+        // Function and file histories have different introduction conventions;
+        // the public record does not identify which denominator was used.
+        writeln!(
+            out,
+            "- Fix-labelled commit ratio: {:.0}% ({} labelled commit{})",
+            g.bug_density * 100.0,
+            g.bug_fix_count,
+            if g.bug_fix_count == 1 { "" } else { "s" },
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "- History signal: commit-message labels, not confirmed defects"
+        )
+        .unwrap();
         writeln!(out, "- Age: {} days", g.age_days).unwrap();
         writeln!(out, "- Authors: {}", g.author_count).unwrap();
-        writeln!(out, "- Stability: {}", g.stability).unwrap();
+        let stability = match g.stability.as_str() {
+            "Bug Prone" => "Frequent fix labels",
+            "Highly Unstable" => "High history activity",
+            value => value,
+        };
+        writeln!(out, "- Stability: {} (history heuristic)", stability).unwrap();
         Some(out)
     }
 
@@ -1205,6 +1209,33 @@ mod tests {
     }
 
     #[test]
+    fn test_git_history_uses_recorded_ratio_without_assuming_introduction() {
+        use crate::output::unified::GitHistoryOutput;
+        for (total_commits, bug_density, bug_fix_count, expected) in [
+            (0, 0.0, 0, "0% (0 labelled commits)"),
+            (2, 1.0, 1, "100% (1 labelled commit)"),
+            (2, 0.5, 1, "50% (1 labelled commit)"),
+        ] {
+            let history = GitHistoryOutput {
+                total_commits,
+                bug_density,
+                bug_fix_count,
+                change_frequency: 0.0,
+                age_days: 0,
+                author_count: 0,
+                stability: "Bug Prone".to_string(),
+            };
+            let text = format::git_history(Some(&history)).unwrap();
+            assert!(text.contains(expected));
+            assert!(text.contains("commit-message labels, not confirmed defects"));
+            assert!(!text.contains("Bug Density"));
+            assert!(!text.contains("Bug Prone"));
+            assert!(text.contains("Frequent fix labels (history heuristic)"));
+            assert!(!text.contains(" / "));
+        }
+    }
+
+    #[test]
     fn test_llm_markdown_outputs_git_history() {
         use crate::output::unified::{
             Dependencies, FunctionDebtItemOutput, FunctionImpactOutput, FunctionMetricsOutput,
@@ -1282,8 +1313,8 @@ mod tests {
             markdown
         );
         assert!(
-            markdown.contains("Bug Density: 25% (5 fixes / 20 changes)"),
-            "Should show bug density with fix counts: {}",
+            markdown.contains("Fix-labelled commit ratio: 25% (5 labelled commits)"),
+            "Should show the observed fix-labelled ratio and count: {}",
             markdown
         );
         assert!(

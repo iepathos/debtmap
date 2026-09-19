@@ -102,7 +102,7 @@ fn format_context_contributions(ctx_risk: &super::context::ContextualRisk) -> St
                 } = &context.details
             {
                 output.push_str(&format!(
-                    "         (changes/mo: {:.1}, bug density: {:.1}%, age: {}d, authors: {})\n",
+                    "         (changes/mo: {:.1}, fix-labelled commit ratio: {:.1}%, age: {}d, authors: {})\n",
                     change_frequency,
                     bug_density * 100.0,
                     age_days,

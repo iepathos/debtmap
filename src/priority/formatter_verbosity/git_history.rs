@@ -99,7 +99,7 @@ impl GitHistoryData {
 pub fn format_git_history_line(output: &mut String, data: &GitHistoryData) {
     writeln!(
         output,
-        "├─ {} {:.1} changes/month, {:.1}% bugs, {} days old, {} authors",
+        "├─ {} {:.1} changes/month, {:.1}% fix-labelled commit ratio, {} days old, {} authors",
         "GIT HISTORY:".bright_blue(),
         data.change_frequency,
         data.bug_density * 100.0,
@@ -167,7 +167,7 @@ fn format_provider_contribution(
         .unwrap();
         writeln!(
             output,
-            "│     - Bug density: {:.1}% ({})",
+            "│     - Fix-labelled commit ratio: {:.1}% ({})",
             bug_density * 100.0,
             bug_desc
         )
@@ -287,7 +287,7 @@ mod tests {
 
         assert!(output.contains("GIT HISTORY:"));
         assert!(output.contains("3.5 changes/month"));
-        assert!(output.contains("15.0% bugs"));
+        assert!(output.contains("15.0% fix-labelled commit ratio"));
         assert!(output.contains("100 days old"));
         assert!(output.contains("5 authors"));
 

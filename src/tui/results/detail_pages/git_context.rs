@@ -32,7 +32,7 @@ pub fn build_page_lines(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> Ve
         if let Some(ctx) = git_context
             && let ContextDetails::Historical {
                 change_frequency,
-                bug_density: _,
+                bug_density,
                 age_days,
                 author_count,
                 total_commits,
@@ -59,21 +59,13 @@ pub fn build_page_lines(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> Ve
             let stability = classify_stability(*change_frequency);
             add_label_value(&mut lines, "stability", stability.to_string(), theme, width);
 
-            // Show bug fixes as "N fixes / M changes" for clarity
-            // Changes = total_commits - 1 (excluding introduction)
-            let changes = total_commits.saturating_sub(1);
-            let fix_display = if changes == 0 {
-                "no changes since intro".to_string()
-            } else {
-                format!(
-                    "{} fix{} / {} change{}",
-                    bug_fix_count,
-                    if *bug_fix_count == 1 { "" } else { "es" },
-                    changes,
-                    if changes == 1 { "" } else { "s" }
-                )
-            };
-            add_label_value(&mut lines, "fix rate", fix_display, theme, width);
+            let fix_display = format!(
+                "{:.0}% ({} labelled commit{})",
+                bug_density * 100.0,
+                bug_fix_count,
+                if *bug_fix_count == 1 { "" } else { "s" }
+            );
+            add_label_value(&mut lines, "fix-labelled ratio", fix_display, theme, width);
             add_label_value(
                 &mut lines,
                 "age",
@@ -432,10 +424,9 @@ mod tests {
             text.contains("Moderately Unstable"),
             "Should classify as moderately unstable"
         );
-        // New format shows "N fixes / M changes" instead of percentage
         assert!(
-            text.contains("fix") && text.contains("change"),
-            "Should show fix rate as 'N fixes / M changes': got {}",
+            text.contains("fix-labelled ratio") && text.contains("15% (1 labelled commit)"),
+            "Should display observed ratio without inferring a denominator: got {}",
             text
         );
         assert!(text.contains("100 days"), "Should show age in days");
