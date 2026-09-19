@@ -795,14 +795,15 @@ pub fn aggregate_coverage_from_raw_metrics(
     let mut coverage_data: Vec<(f64, usize, Vec<usize>)> = Vec::with_capacity(functions.len());
 
     for func in functions {
-        let end_line = func.line + func.length.saturating_sub(1);
+        let end_line = func.line.saturating_add(func.length.saturating_sub(1));
         // Use get_function_coverage_with_bounds for accurate AST-based matching
         let direct_coverage = coverage
             .get_function_coverage_with_bounds(&func.file, &func.name, func.line, end_line)
             .unwrap_or(0.0);
 
         let uncovered = coverage
-            .get_function_uncovered_lines(&func.file, &func.name, func.line)
+            .get_function_uncovered_lines_with_bounds(&func.file, func.line, end_line)
+            .or_else(|| coverage.get_function_uncovered_lines(&func.file, &func.name, func.line))
             .unwrap_or_default();
 
         coverage_data.push((direct_coverage, func.length, uncovered));

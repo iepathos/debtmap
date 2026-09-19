@@ -154,6 +154,32 @@ pub fn calculate_transitive_coverage(
     let direct = get_function_coverage(func_id, coverage);
     let uncovered_lines = get_uncovered_lines(func_id, coverage);
 
+    propagate_coverage(func_id, call_graph, coverage, direct, uncovered_lines)
+}
+
+/// Calculate direct coverage from inclusive source bounds before propagation.
+pub fn calculate_transitive_coverage_with_bounds(
+    func_id: &FunctionId,
+    end_line: usize,
+    call_graph: &CallGraph,
+    coverage: &LcovData,
+) -> TransitiveCoverage {
+    let direct = coverage
+        .get_function_coverage_with_bounds(&func_id.file, &func_id.name, func_id.line, end_line)
+        .unwrap_or(0.0);
+    let uncovered = coverage
+        .get_function_uncovered_lines_with_bounds(&func_id.file, func_id.line, end_line)
+        .unwrap_or_else(|| get_uncovered_lines(func_id, coverage));
+    propagate_coverage(func_id, call_graph, coverage, direct, uncovered)
+}
+
+fn propagate_coverage(
+    func_id: &FunctionId,
+    call_graph: &CallGraph,
+    coverage: &LcovData,
+    direct: f64,
+    uncovered_lines: Vec<usize>,
+) -> TransitiveCoverage {
     // If function has direct coverage, no need to calculate transitive
     if direct > 0.0 {
         return TransitiveCoverage {

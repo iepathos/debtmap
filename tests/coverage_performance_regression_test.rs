@@ -132,6 +132,31 @@ fn test_indexed_lookup_is_fast() {
 }
 
 #[test]
+fn bounded_lookup_is_indexed_and_correct_for_absolute_source_paths() {
+    let fixture = create_test_lcov_file(100, 20);
+    let data = parse_lcov_file(fixture.path()).unwrap();
+    let start = Instant::now();
+    for file in 0..100 {
+        let path = PathBuf::from(format!(
+            "/workspace/src/module_{}/file_{}.rs",
+            file / 10,
+            file
+        ));
+        for function in 0..20 {
+            let line = function * 15 + 10;
+            assert_eq!(
+                data.get_function_coverage_with_bounds(&path, "f", line, line + 9),
+                Some(0.7)
+            );
+        }
+    }
+    assert!(
+        start.elapsed().as_millis() < 200,
+        "bounded queries should use the path/line index"
+    );
+}
+
+#[test]
 fn test_line_based_lookup_with_tolerance() {
     const NUM_FILES: usize = 100;
     const FUNCS_PER_FILE: usize = 20;

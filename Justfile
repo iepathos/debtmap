@@ -132,7 +132,11 @@ coverage-fast:
         --test risk_analysis_tests --test integrated_analysis \
         --test validate_improvement_integration_test --test output_validation_test \
         --test solidity_analyzer_tests --test python_extraction_test \
-        --test risk_context_tests -- --quiet
+        --test risk_context_tests \
+        --test data_flow_identity_matrix --test rust_resolution_constraint_matrix \
+        --test rust_resolution_namespace_matrix --test rust_resolution_matrix_oracles \
+        --test rust_resolution_matrix_invariants --test rust_resolution_matrix_assertions \
+        -- --quiet
     echo "Coverage report generated at target/coverage/html/index.html"
 
 # Run tests with coverage (lcov format)
@@ -159,7 +163,11 @@ coverage-fast-lcov:
         --test risk_analysis_tests --test integrated_analysis \
         --test validate_improvement_integration_test --test output_validation_test \
         --test solidity_analyzer_tests --test python_extraction_test \
-        --test risk_context_tests -- --quiet
+        --test risk_context_tests \
+        --test data_flow_identity_matrix --test rust_resolution_constraint_matrix \
+        --test rust_resolution_namespace_matrix --test rust_resolution_matrix_oracles \
+        --test rust_resolution_matrix_invariants --test rust_resolution_matrix_assertions \
+        -- --quiet
     echo "Coverage report generated at target/coverage/lcov.info"
     # Verify the file was actually created
     if [ ! -f target/coverage/lcov.info ]; then

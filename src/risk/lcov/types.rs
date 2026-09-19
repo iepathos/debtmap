@@ -175,6 +175,8 @@ pub struct LcovData {
     /// Pre-built index for O(1) function coverage lookups,
     /// wrapped in Arc for lock-free sharing across threads
     pub(crate) coverage_index: Arc<CoverageIndex>,
+    pub(crate) line_coverage: Arc<super::lines::LineCoverageIndex>,
+    pub(crate) ast_bounds: Arc<super::ast_bounds::AstBounds>,
 }
 
 impl Default for LcovData {
@@ -200,6 +202,16 @@ impl LcovData {
             lines_hit: 0,
             loc_counter: None,
             coverage_index: Arc::new(CoverageIndex::empty()),
+            line_coverage: Arc::default(),
+            ast_bounds: Arc::default(),
+        }
+    }
+
+    /// Bind an immutable metrics workspace once before sequential/parallel scoring.
+    pub fn with_function_bounds(&self, metrics: &[crate::core::FunctionMetrics]) -> Self {
+        Self {
+            ast_bounds: Arc::new(super::ast_bounds::AstBounds::from_metrics(metrics)),
+            ..self.clone()
         }
     }
 
@@ -208,6 +220,17 @@ impl LcovData {
     /// This should be called after modifying the functions HashMap
     /// to ensure the index is up to date for O(1) lookups.
     pub fn build_index(&mut self) {
+        Arc::make_mut(&mut self.line_coverage).build_aliases();
+        if !self.line_coverage.is_empty() {
+            (self.total_lines, self.lines_hit) = self.line_coverage.totals();
+        }
+        for (path, functions) in &mut self.functions {
+            if let Some(source) = self.line_coverage.get(path)
+                && !source.lines.is_empty()
+            {
+                super::coverage::update_function_coverage(functions.iter_mut(), &source.lines);
+            }
+        }
         self.coverage_index = Arc::new(CoverageIndex::from_coverage(self));
     }
 }

@@ -543,8 +543,13 @@ fn get_function_coverage(func: &FunctionMetrics, coverage: Option<&LcovData>) ->
     if func.is_test {
         1.0 // Test functions have 100% coverage by definition
     } else if let Some(cov) = coverage {
-        cov.get_function_coverage(&func.file, &func.name)
-            .unwrap_or(0.0)
+        cov.get_function_coverage_with_bounds(
+            &func.file,
+            &func.name,
+            func.line,
+            func.line.saturating_add(func.length.saturating_sub(1)),
+        )
+        .unwrap_or(0.0)
     } else {
         0.0 // No coverage data - assume worst case
     }

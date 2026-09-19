@@ -23,7 +23,6 @@
 //! - `handle_lines_hit` - LH: records
 //! - `handle_end_of_record` - end_of_record markers
 
-use super::coverage::process_function_coverage_parallel;
 use super::demangle::demangle_function_name;
 use super::normalize::normalize_demangled_name;
 use super::types::{FunctionCoverage, LcovData, NormalizedFunctionName};
@@ -129,6 +128,7 @@ pub fn finalize_file_functions(
 /// * `state` - The parser state to modify
 /// * `path` - The path of the new source file
 pub(crate) fn handle_source_file(state: &mut LcovParserState, path: PathBuf) {
+    retain_source_lines(state);
     // Save previous file's data if any
     if let Some(file) = state.current_file.take()
         && !state.file_functions.is_empty()
@@ -232,7 +232,11 @@ pub(crate) fn handle_function_data(state: &mut LcovParserState, name: String, co
 /// * `line` - The line number
 /// * `count` - The execution count
 pub(crate) fn handle_line_data(state: &mut LcovParserState, line: u32, count: u64) {
-    state.file_lines.insert(line as usize, count);
+    state
+        .file_lines
+        .entry(line as usize)
+        .and_modify(|old| *old = (*old).max(count))
+        .or_insert(count);
 }
 
 /// Handle LinesFound record - update total line count.
@@ -246,6 +250,13 @@ pub(crate) fn handle_line_data(state: &mut LcovParserState, line: u32, count: u6
 /// * `found` - The number of executable lines found
 pub(crate) fn handle_lines_found(state: &mut LcovParserState, found: u32) {
     state.data.total_lines += found as usize;
+    if let Some(path) = &state.current_file {
+        std::sync::Arc::make_mut(&mut state.data.line_coverage).record_summary(
+            path,
+            Some(found as usize),
+            None,
+        );
+    }
 }
 
 /// Handle LinesHit record - update hit line count.
@@ -259,6 +270,13 @@ pub(crate) fn handle_lines_found(state: &mut LcovParserState, found: u32) {
 /// * `hit` - The number of lines that were executed
 pub(crate) fn handle_lines_hit(state: &mut LcovParserState, hit: u32) {
     state.data.lines_hit += hit as usize;
+    if let Some(path) = &state.current_file {
+        std::sync::Arc::make_mut(&mut state.data.line_coverage).record_summary(
+            path,
+            None,
+            Some(hit as usize),
+        );
+    }
 }
 
 /// Handle EndOfRecord - finalize current file's coverage data.
@@ -271,8 +289,8 @@ pub(crate) fn handle_lines_hit(state: &mut LcovParserState, hit: u32) {
 ///
 /// * `state` - The parser state to modify
 pub(crate) fn handle_end_of_record(state: &mut LcovParserState) {
-    // Use parallel processing for function coverage calculation
-    process_function_coverage_parallel(&mut state.file_functions, &state.file_lines);
+    retain_source_lines(state);
+    // Coverage is computed once after all records have been merged in build_index.
 
     // Save the file's data
     if let Some(file) = state.current_file.take()
@@ -316,6 +334,7 @@ pub(crate) fn handle_end_of_record(state: &mut LcovParserState) {
 ///
 /// * `state` - The parser state to modify
 pub(crate) fn handle_incomplete_file(state: &mut LcovParserState) {
+    retain_source_lines(state);
     if let Some(file) = state.current_file.take()
         && !state.file_functions.is_empty()
     {
@@ -341,6 +360,12 @@ pub(crate) fn handle_incomplete_file(state: &mut LcovParserState) {
         } else {
             state.data.functions.insert(file, funcs);
         }
+    }
+}
+
+fn retain_source_lines(state: &mut LcovParserState) {
+    if let Some(path) = &state.current_file {
+        std::sync::Arc::make_mut(&mut state.data.line_coverage).merge(path, &state.file_lines);
     }
 }
 

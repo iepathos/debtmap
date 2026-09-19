@@ -250,6 +250,11 @@ impl LcovData {
         function_name: &str,
         line: usize,
     ) -> Option<f64> {
+        if let Some(end) = self.ast_bounds.get(file, function_name, line) {
+            return end.and_then(|end| {
+                self.get_function_coverage_with_bounds(file, function_name, line, end)
+            });
+        }
         self.coverage_index
             .get_function_coverage_with_line(file, function_name, line)
     }
@@ -270,8 +275,8 @@ impl LcovData {
     ///
     /// * `file` - Path to the source file
     /// * `function_name` - Name of the function
-    /// * `_start_line` - Start line (reserved for future use)
-    /// * `_end_line` - End line (reserved for future use)
+    /// * `start_line` - First source line, inclusive
+    /// * `end_line` - Last source line, inclusive
     ///
     /// # Returns
     ///
@@ -281,9 +286,22 @@ impl LcovData {
         &self,
         file: &Path,
         function_name: &str,
-        _start_line: usize,
-        _end_line: usize,
+        start_line: usize,
+        end_line: usize,
     ) -> Option<f64> {
+        if start_line == 0 || end_line < start_line {
+            return None;
+        }
+        if self.ast_bounds.get(file, function_name, start_line) == Some(None) {
+            return None;
+        }
+        if let Some(source) = self.line_coverage.get(file) {
+            if !source.lines.is_empty() {
+                return Some(source.fraction(start_line, end_line));
+            }
+        } else if !self.line_coverage.is_empty() {
+            return None;
+        }
         let debug_mode = coverage_debug_mode();
         track_coverage_attempt(debug_mode);
 
@@ -315,6 +333,20 @@ impl LcovData {
         Some(coverage)
     }
 
+    /// Unexecuted executable lines inside inclusive AST source bounds.
+    pub fn get_function_uncovered_lines_with_bounds(
+        &self,
+        file: &Path,
+        start_line: usize,
+        end_line: usize,
+    ) -> Option<Vec<usize>> {
+        if start_line == 0 || end_line < start_line {
+            return None;
+        }
+        let source = self.line_coverage.get(file)?;
+        (!source.lines.is_empty()).then(|| source.uncovered(start_line, end_line))
+    }
+
     /// Get overall coverage percentage.
     ///
     /// # Returns
@@ -338,6 +370,11 @@ impl LcovData {
     ///
     /// Coverage as a fraction (0.0 to 1.0), or None if file not found.
     pub fn get_file_coverage(&self, file: &Path) -> Option<f64> {
+        if let Some(source) = self.line_coverage.get(file)
+            && !source.lines.is_empty()
+        {
+            return Some(source.fraction(0, usize::MAX));
+        }
         self.functions.get(file).map(|funcs| {
             if funcs.is_empty() {
                 0.0
@@ -366,6 +403,12 @@ impl LcovData {
         function_name: &str,
         line: usize,
     ) -> Option<Vec<usize>> {
+        if let Some(end) = self.ast_bounds.get(file, function_name, line) {
+            let end = end?;
+            if let Some(lines) = self.get_function_uncovered_lines_with_bounds(file, line, end) {
+                return Some(lines);
+            }
+        }
         self.coverage_index
             .get_function_uncovered_lines(file, function_name, line)
     }
@@ -459,6 +502,8 @@ mod tests {
             lines_hit: 5,
             loc_counter: None,
             coverage_index: Arc::new(crate::risk::coverage_index::CoverageIndex::empty()),
+            line_coverage: Arc::default(),
+            ast_bounds: Arc::default(),
         };
 
         data.build_index();

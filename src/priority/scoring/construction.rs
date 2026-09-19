@@ -19,7 +19,7 @@ use crate::priority::{
     ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location, TransitiveCoverage,
     UnifiedDebtItem, UnifiedScore,
     call_graph::{CallGraph, FunctionId},
-    coverage_propagation::calculate_transitive_coverage,
+    coverage_propagation::calculate_transitive_coverage_with_bounds,
     debt_aggregator::DebtAggregator,
     scoring::debt_item::{
         calculate_entropy_analysis, calculate_expected_impact, classify_all_debt_types_with_role,
@@ -154,8 +154,7 @@ pub fn create_unified_debt_item_enhanced(
 
     let role = classify_function_role(func, &func_id, call_graph);
 
-    let transitive_coverage =
-        coverage.map(|cov| calculate_transitive_coverage(&func_id, call_graph, cov));
+    let transitive_coverage = calculate_coverage_data(&func_id, func, call_graph, coverage);
 
     // Use enhanced debt type classification
     let debt_type = classify_debt_type_enhanced(func, call_graph, &func_id);
@@ -418,11 +417,8 @@ fn calculate_coverage_data(
     coverage: Option<&LcovData>,
 ) -> Option<TransitiveCoverage> {
     coverage.map(|lcov| {
-        let end_line = func.line + func.length.saturating_sub(1);
-        // get_function_coverage_with_bounds now returns Some(0.0) when not found
-        let _direct_coverage =
-            lcov.get_function_coverage_with_bounds(&func.file, &func.name, func.line, end_line);
-        calculate_transitive_coverage(func_id, call_graph, lcov)
+        let end_line = func.line.saturating_add(func.length.saturating_sub(1));
+        calculate_transitive_coverage_with_bounds(func_id, end_line, call_graph, lcov)
     })
 }
 
@@ -712,7 +708,12 @@ pub fn create_unified_debt_item_with_aggregator_and_data_flow(
             if let Some(analyzer) = risk_analyzer {
                 let complexity_metrics = crate::core::ComplexityMetrics::from_function(func);
                 let func_coverage = coverage.and_then(|cov| {
-                    cov.get_function_coverage_with_line(&func.file, &func.name, func.line)
+                    cov.get_function_coverage_with_bounds(
+                        &func.file,
+                        &func.name,
+                        func.line,
+                        func.line.saturating_add(func.length.saturating_sub(1)),
+                    )
                 });
 
                 let (_, contextual_risk) = analyzer.analyze_function_with_context(
@@ -778,14 +779,7 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
     // Calculate transitive coverage if coverage file is provided (Spec 203)
     // Use exact AST boundaries for more accurate coverage matching
     // ALWAYS return Some when coverage is provided, never None (eliminates Cov:N/A)
-    let transitive_coverage = coverage.map(|lcov| {
-        let end_line = func.line + func.length.saturating_sub(1);
-        // get_function_coverage_with_bounds now returns Some(0.0) when not found
-        // So we always get a value, even if it's 0%
-        let _direct_coverage =
-            lcov.get_function_coverage_with_bounds(&func.file, &func.name, func.line, end_line);
-        calculate_transitive_coverage(&func_id, call_graph, lcov)
-    });
+    let transitive_coverage = calculate_coverage_data(&func_id, func, call_graph, coverage);
 
     // Use the enhanced debt type classification with framework exclusions (spec 228)
     // Use precomputed role to avoid redundant computation

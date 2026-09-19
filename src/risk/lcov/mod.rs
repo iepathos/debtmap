@@ -90,10 +90,12 @@
 //! ```
 
 // Module declarations
+mod ast_bounds;
 pub mod coverage;
 pub mod demangle;
 pub mod diagnostics;
 pub mod handlers;
+mod lines;
 pub mod normalize;
 pub mod parser;
 pub mod query;
@@ -104,6 +106,9 @@ pub use diagnostics::print_coverage_statistics;
 pub use normalize::{normalize_demangled_name, strip_trailing_generics};
 pub use parser::{parse_lcov_file, parse_lcov_file_with_callback, parse_lcov_file_with_progress};
 pub use types::{CoverageProgress, FunctionCoverage, LcovData, NormalizedFunctionName};
+
+#[cfg(test)]
+mod bounds_tests;
 
 #[cfg(test)]
 mod tests {
