@@ -203,3 +203,33 @@ suite counts were respectively 6,160, 6,175, 6,175, 6,180 and 6,184, each with
 dependency revision passed 17 recursion/output tests; and the explanation
 revision passed 23 output/formatter tests. The reconstructed source, tests and
 configuration match the combined verified implementation exactly.
+
+## Direct coverage output correction (2026-09-19)
+
+The unified function conversion incorrectly populated both `metrics.coverage`
+(direct coverage) and `metrics.transitive_coverage` from the transitive value.
+The conversion now names and maps each value explicitly. Existing JSON keys
+remain unchanged. Field and propagation documentation distinguish measured line
+execution from the fallback estimate based on well-covered callees; neither
+requires a test to call the function directly.
+
+A regression parses LCOV for an uncovered caller with five well-covered helpers
+out of six, constructs the scored debt item, then checks JSON serialization,
+deserialization and Markdown rendering. It failed before the correction because
+`metrics.coverage` was 0.8333 instead of 0. The test also checks the actual scoring
+coverage multiplier remains 1.0. Additional cases cover zero, partial and full
+measured coverage and absent LCOV.
+
+Using the existing LCOV snapshot, this debug CLI command reports
+`CallResolver::resolve_call_outcome` with direct coverage 0%, transitive coverage
+83%, and unchanged score 34.91:
+
+```sh
+target/debug/debtmap analyze src/analyzers/call_graph/call_resolution.rs \
+  --lcov target/coverage/lcov.info --format markdown --min-score 0 \
+  --no-tui --no-context-aware \
+  --output /tmp/debtmap-call-resolution-coverage-fixed.md
+```
+
+This verifies the output correction against existing measurements; it is not a
+fresh coverage collection or a full-repository ranking comparison.

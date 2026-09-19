@@ -173,11 +173,16 @@ pub mod format {
         }
         let mut out = String::new();
         write_section_heading(&mut out, "Coverage");
-        if let Some(cov) = m.coverage {
-            writeln!(out, "- Direct Coverage: {:.0}%", cov * 100.0).unwrap();
+        if let Some(direct_coverage) = m.coverage {
+            writeln!(out, "- Direct Coverage: {:.0}%", direct_coverage * 100.0).unwrap();
         }
-        if let Some(trans) = m.transitive_coverage {
-            writeln!(out, "- Transitive Coverage: {:.0}%", trans * 100.0).unwrap();
+        if let Some(transitive_coverage) = m.transitive_coverage {
+            writeln!(
+                out,
+                "- Transitive Coverage: {:.0}%",
+                transitive_coverage * 100.0
+            )
+            .unwrap();
         }
         Some(out)
     }

@@ -132,8 +132,12 @@ impl FunctionDebtItemOutput {
         let (pattern_type, pattern_confidence, pattern_details) =
             extract_pattern_data(&item.language_specific);
 
-        // Round coverage and entropy if present
-        let rounded_coverage = item
+        // Keep measured execution separate from the callee-based estimate.
+        let direct_coverage = item
+            .transitive_coverage
+            .as_ref()
+            .map(|c| round_ratio(c.direct));
+        let transitive_coverage = item
             .transitive_coverage
             .as_ref()
             .map(|c| round_ratio(c.transitive));
@@ -175,7 +179,7 @@ impl FunctionDebtItemOutput {
                 cognitive_complexity: item.cognitive_complexity,
                 length: item.function_length,
                 nesting_depth: item.nesting_depth,
-                coverage: rounded_coverage,
+                coverage: direct_coverage,
                 uncovered_lines: None, // Not currently tracked
                 entropy_score: rounded_entropy,
                 pattern_repetition,
@@ -184,10 +188,7 @@ impl FunctionDebtItemOutput {
                     .entropy_analysis
                     .as_ref()
                     .map(|e| e.adjusted_complexity),
-                transitive_coverage: item
-                    .transitive_coverage
-                    .as_ref()
-                    .map(|c| round_ratio(c.transitive)),
+                transitive_coverage,
             },
             debt_type: item.debt_type.clone(),
             function_role: item.function_role,
@@ -397,6 +398,8 @@ pub struct FunctionMetricsOutput {
     pub cognitive_complexity: u32,
     pub length: usize,
     pub nesting_depth: u32,
+    /// Measured direct line coverage (0.0–1.0), regardless of which test executed it.
+    /// The existing JSON key `coverage` is retained for compatibility.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub coverage: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -412,7 +415,8 @@ pub struct FunctionMetricsOutput {
     /// Entropy-adjusted cognitive complexity (Spec 264)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub entropy_adjusted_cognitive: Option<u32>,
-    /// Transitive coverage from callers (Spec 264)
+    /// Direct coverage when positive; otherwise the fraction of well-covered callees.
+    /// This fallback is an estimate, not evidence that this function executed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transitive_coverage: Option<f64>,
 }

@@ -3,6 +3,10 @@
 //! This module implements algorithms to detect functions that are indirectly covered
 //! through their well-tested callers, reducing false positives in testing gap detection.
 //!
+//! Separately, `TransitiveCoverage` retains measured direct coverage and supplies a
+//! callee-based estimate when direct coverage is zero. That estimate does not prove
+//! execution of the function and must not be displayed as direct coverage.
+//!
 //! # Algorithm Overview
 //!
 //! The indirect coverage algorithm propagates test coverage from well-tested functions
@@ -11,7 +15,7 @@
 //!
 //! ## Key Concepts
 //!
-//! - **Direct Coverage**: Coverage from tests directly targeting a function
+//! - **Direct Coverage**: Measured execution of a function's lines, regardless of test entry point
 //! - **Indirect Coverage**: Coverage from tests targeting functions that call this function
 //! - **Effective Coverage**: Maximum of direct and indirect coverage
 //! - **Distance Discount**: 70% per hop (e.g., 2 hops = 0.7² = 49% of caller's coverage)
@@ -105,10 +109,16 @@ use crate::risk::lcov::LcovData;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet as StdHashSet;
 
+/// Measured coverage and a separate callee-based fallback estimate.
+/// Unlike `CompleteCoverage`, this record does not propagate from callers.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransitiveCoverage {
+    /// Fraction of this function's executable lines observed as covered in LCOV.
     pub direct: f64,
+    /// Direct coverage when positive; otherwise the fraction of callees with >80% coverage.
+    /// Covered callees do not establish that this function executed.
     pub transitive: f64,
+    /// Well-covered callees contributing to the fallback estimate.
     pub propagated_from: Vec<FunctionId>,
     pub uncovered_lines: Vec<usize>,
 }
