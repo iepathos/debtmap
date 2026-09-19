@@ -14,12 +14,6 @@ use std::path::Path;
 fn test_axum_handler_detection() {
     let config_path = Path::new("framework_patterns.toml");
 
-    // Skip if config doesn't exist (for CI environments)
-    if !config_path.exists() {
-        eprintln!("Skipping test: framework_patterns.toml not found");
-        return;
-    }
-
     let detector = FrameworkDetector::from_config(config_path)
         .expect("Failed to load framework patterns config");
 
@@ -46,11 +40,6 @@ fn test_axum_handler_detection() {
 fn test_pytest_fixture_detection() {
     let config_path = Path::new("framework_patterns.toml");
 
-    if !config_path.exists() {
-        eprintln!("Skipping test: framework_patterns.toml not found");
-        return;
-    }
-
     let detector = FrameworkDetector::from_config(config_path)
         .expect("Failed to load framework patterns config");
 
@@ -72,11 +61,6 @@ fn test_pytest_fixture_detection() {
 fn test_rust_test_detection() {
     let config_path = Path::new("framework_patterns.toml");
 
-    if !config_path.exists() {
-        eprintln!("Skipping test: framework_patterns.toml not found");
-        return;
-    }
-
     let detector = FrameworkDetector::from_config(config_path)
         .expect("Failed to load framework patterns config");
 
@@ -97,11 +81,6 @@ fn test_rust_test_detection() {
 fn test_clap_cli_parser_detection() {
     let config_path = Path::new("framework_patterns.toml");
 
-    if !config_path.exists() {
-        eprintln!("Skipping test: framework_patterns.toml not found");
-        return;
-    }
-
     let detector = FrameworkDetector::from_config(config_path)
         .expect("Failed to load framework patterns config");
 
@@ -120,11 +99,6 @@ fn test_clap_cli_parser_detection() {
 #[test]
 fn test_fastapi_handler_detection() {
     let config_path = Path::new("framework_patterns.toml");
-
-    if !config_path.exists() {
-        eprintln!("Skipping test: framework_patterns.toml not found");
-        return;
-    }
 
     let detector = FrameworkDetector::from_config(config_path)
         .expect("Failed to load framework patterns config");
@@ -147,11 +121,6 @@ fn test_fastapi_handler_detection() {
 fn test_diesel_query_detection() {
     let config_path = Path::new("framework_patterns.toml");
 
-    if !config_path.exists() {
-        eprintln!("Skipping test: framework_patterns.toml not found");
-        return;
-    }
-
     let detector = FrameworkDetector::from_config(config_path)
         .expect("Failed to load framework patterns config");
 
@@ -172,11 +141,6 @@ fn test_diesel_query_detection() {
 #[test]
 fn test_confidence_calculation() {
     let config_path = Path::new("framework_patterns.toml");
-
-    if !config_path.exists() {
-        eprintln!("Skipping test: framework_patterns.toml not found");
-        return;
-    }
 
     let detector = FrameworkDetector::from_config(config_path)
         .expect("Failed to load framework patterns config");
@@ -203,11 +167,6 @@ fn test_confidence_calculation() {
 #[test]
 fn test_no_false_positives() {
     let config_path = Path::new("framework_patterns.toml");
-
-    if !config_path.exists() {
-        eprintln!("Skipping test: framework_patterns.toml not found");
-        return;
-    }
 
     let detector = FrameworkDetector::from_config(config_path)
         .expect("Failed to load framework patterns config");

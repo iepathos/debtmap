@@ -53,7 +53,9 @@ just test              # Run the fast cross-platform smoke suite
 just test-integration  # Run bounded cross-module regressions
 just test-cli          # Run CLI and output-format regressions
 just test-verbose      # Run tests with output
-just coverage          # Generate coverage report
+just coverage          # Generate HTML coverage from all ordinary test targets
+just coverage-lcov     # Generate representative LCOV for debt ranking
+just coverage-fast     # Library-only feedback, with separate artifacts
 just analyze-self      # Analyze debtmap with coverage
 
 # Code Quality
@@ -65,6 +67,10 @@ just check          # Quick syntax check
 just ci             # Run all CI checks locally
 just pre-commit     # Run pre-commit checks
 ```
+
+Coverage defaults and CI share automatic Cargo test discovery. See the
+[coverage policy](docs/coverage-policy.md) for scope, report reuse, timing checks
+and the distinction between representative and fast coverage.
 
 ### Feature Branch Workflow
 
