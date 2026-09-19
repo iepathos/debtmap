@@ -128,3 +128,50 @@ fn known_explicit_constructor_conflicts_do_not_invent_call_diagnostics() {
     )
     .expect("fully known constructor conflicts omit diagnostics and visit arguments once");
 }
+
+#[test]
+fn glob_fed_constructor_alias_does_not_turn_search_misses_into_bindings() {
+    use support::Expectation as E;
+    let source = "mod left { pub struct Item(pub u32); }
+        use left::*; use Item as Alias;
+        /*@caller*/ fn caller() { let _ = /*#constructor*/ Alias(1); }";
+    verify(
+        "glob_fed_constructor_alias",
+        source,
+        &[E::absent("constructor", "Alias(")],
+    )
+    .expect("an unbound local search path does not compete with the known constructor");
+}
+
+#[test]
+fn unresolved_constructor_competitor_survives_an_explicit_reexport() {
+    use debtmap::priority::call_graph::UncertaintyReason;
+    use support::Expectation as E;
+    let source = "mod left { pub struct Item(pub u32); }
+        mod export { pub use crate::left::Item; pub use missing::Item; }
+        use export::Item;
+        /*@caller*/ fn caller() { let _ = /*#constructor*/ Item(1); }";
+    verify(
+        "reexported_unresolved_constructor_competitor",
+        source,
+        &[E::uncertain("constructor", "Item(", &[])
+            .reason(UncertaintyReason::AmbiguousDeclaration)],
+    )
+    .expect("reexport expansion cannot hide an unavailable competing binding");
+}
+
+#[test]
+fn cyclic_explicit_import_does_not_erase_constructor_call_uncertainty() {
+    use debtmap::priority::call_graph::UncertaintyReason;
+    use support::Expectation as E;
+    let source = "mod left { pub struct Item(pub u32); }
+        use left::Item; use A as Item; use B as A; use A as B;
+        /*@caller*/ fn caller() { let _ = /*#constructor*/ Item(1); }";
+    verify(
+        "cyclic_explicit_constructor_competitor",
+        source,
+        &[E::uncertain("constructor", "Item(", &[])
+            .reason(UncertaintyReason::AmbiguousDeclaration)],
+    )
+    .expect("an exhausted import search does not establish constructor-only bindings");
+}

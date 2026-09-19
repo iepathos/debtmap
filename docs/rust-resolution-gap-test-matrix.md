@@ -231,3 +231,26 @@ is already included in the local and CI integration gates.
 ```sh
 cargo test --offline --test rust_resolution_namespace_matrix
 ```
+
+### Constructor diagnostic repair
+
+The formerly failing regression now passes. Constructor classification checks
+explicit import bindings before suppressing a call record. Alternative search
+paths for one import are evaluated together, so a glob-fed alias does not turn
+an unbound local search path into a competing binding. Separate unresolved
+imports remain visible through reexports; known type-only imports remain outside
+the value namespace. The additional import walk is bounded and runs only when
+the indexed candidates would otherwise be classified as constructor-only.
+
+Added an eight-case unit table and end-to-end controls for a glob-fed alias,
+an unresolved reexport competitor, and cyclic imports. The valid glob-alias
+fixture also passed standalone Rust metadata compilation. All nine namespace
+tests pass, including the original 39 rows, exact diagnostic reasons, nested
+argument visits, metadata parity and repeated merges.
+
+Validation: `just fmt`, offline `just test` (6,155 passed, 10 existing skips),
+offline `just test-integration` (536 passed, one existing skip), strict offline
+all-target/all-feature Clippy, and all eight existing Criterion workspace cases
+in debug `--test` mode. These are benchmark execution checks, not a new
+repository timing comparison; the earlier measurements remain tied to their
+recorded revision. Public extraction APIs and JSON v3 are unchanged.

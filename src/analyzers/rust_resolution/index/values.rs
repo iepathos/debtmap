@@ -7,15 +7,20 @@ struct ValueBindings<'a> {
     constructors: Vec<&'a TypeDeclaration>,
     values: Vec<&'a ValueDeclaration>,
     explicit_conflict: bool,
+    unresolved_competitor: bool,
 }
 
 impl ValueBindings<'_> {
     fn constructor_only(&self) -> bool {
-        !self.constructors.is_empty() && self.functions.is_empty() && self.values.is_empty()
+        !self.unresolved_competitor
+            && !self.constructors.is_empty()
+            && self.functions.is_empty()
+            && self.values.is_empty()
     }
 
     fn ambiguous(&self) -> bool {
         self.explicit_conflict
+            || self.unresolved_competitor
             || self.functions.len() + self.constructors.len() + self.values.len() > 1
     }
 
@@ -52,7 +57,11 @@ impl WorkspaceIndex {
                 .filter(|value| self.same_workspace(&context.file, &value.context.file))
                 .collect(),
             explicit_conflict: self.value_path_conflicts(&segments, context),
+            unresolved_competitor: false,
         };
+        // Only otherwise-constructor-only bindings could discard the call record.
+        bindings.unresolved_competitor = bindings.constructor_only()
+            && self.value_path_has_unresolved_import(&segments, context);
         bindings.functions.sort_by_key(|callable| &callable.id);
         bindings
             .functions

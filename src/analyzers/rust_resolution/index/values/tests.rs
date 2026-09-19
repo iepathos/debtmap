@@ -104,3 +104,30 @@ fn renamed_free_function_keeps_its_declaration_identity() {
     assert!(lookup.justified);
     assert_eq!(lookup.candidates[0].id.name, "left::original");
 }
+
+#[test]
+fn constructor_suppression_requires_all_explicit_competitors_to_be_known() {
+    let declarations = "mod left { pub struct Item(pub u32); }
+        mod right { pub struct Item(pub u32); } mod empty {}
+        mod types { pub type Item = u32; }
+        mod type_export { pub use crate::types::Item; }
+        mod incomplete { pub use crate::left::Item; pub use missing::Item; }";
+    for (imports, query, constructor_only) in [
+        ("use left::Item; use missing::Item;", "Item", false),
+        ("use left::Item; use right::Item;", "Item", true),
+        ("use left::Item; use left::Item;", "Item", true),
+        ("use left::*; use empty::*;", "Item", true),
+        ("use left::*; use right::*;", "Item", true),
+        ("use left::*; use Item as Alias;", "Alias", true),
+        ("use incomplete::Item;", "Item", false),
+        ("use left::Item; use type_export::Item;", "Item", true),
+    ] {
+        let (index, context) = fixture(&format!("{declarations} {imports}"));
+        let path = syn::parse_str(query).expect("valid path");
+        assert_eq!(
+            index.value_call_lookup(&path, &context).1,
+            constructor_only,
+            "{imports}"
+        );
+    }
+}

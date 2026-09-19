@@ -1,5 +1,7 @@
 //! Lexical declaration paths and namespace-specific import precedence.
 use super::*;
+#[path = "path_availability.rs"]
+mod availability;
 #[path = "path_conflicts.rs"]
 mod conflicts;
 #[path = "path_namespaces.rs"]
