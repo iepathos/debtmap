@@ -95,6 +95,31 @@ strict offline all-target/all-feature Clippy in debug builds. Regressions cover
 the reported inputs, disabled/missing entropy, legacy purity, configured and
 orchestrator weights, clamping, trace continuity and human metric labels.
 
+The subsequent purity repair makes both analysis paths apply the propagated
+level, strict-purity boolean, confidence and reason together. Previously
+`matches_pattern` acquired `is_pure = false` from its impure `regex_match`
+dependency but retained `StrictlyPure`, allowing a 0.70 complexity multiplier.
+Regressions using the actual detector source now establish `Impure`/false for
+both methods, a 1.00 purity complexity multiplier, and consistent data-flow
+facts. The stale level also no longer allows the default `PureLogic` role.
+
+Intrinsic `LocallyPure` and `ReadOnly` classifications are preserved when
+seeding propagation. The boolean continues to mean strictly pure, so false is
+valid for those two levels. Pure dependencies cannot erase a function's local
+mutation or external-read evidence. Legacy metrics without a level retain
+their boolean/confidence fallback; contradictory strict-purity fields are
+handled conservatively.
+
+This fixes propagation consistency, not general proof of functional purity.
+Known-name matching, conservative treatment of non-strict callees and recursive
+inference retain their existing limitations. Public record shapes are unchanged.
+
+Purity follow-up validation passed formatting, 6,197 required tests (ten
+existing skips), 67 targeted purity/data-flow/parallel/scoring/JSON integration
+tests (three existing skips), and strict offline all-target/all-feature Clippy.
+The source regressions cover both propagation paths and the actual detector;
+they do not claim a measured final rank from a new full-repository analysis.
+
 Neither legacy JSON v3 nor the existing receipt-bearing v4 gains fields. The arithmetic trace and exact immediate-neighbor
 count are internal and excluded from serialization. No older unversioned binary
 migration is claimed.

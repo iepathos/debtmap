@@ -18,6 +18,7 @@
 mod cache;
 mod call_graph_adapter;
 mod known_pure_functions;
+mod metrics;
 
 pub use cache::PurityCache;
 pub use call_graph_adapter::PurityCallGraphAdapter;
@@ -139,26 +140,21 @@ impl PurityPropagator {
 
     /// Analyze intrinsic purity using existing PurityAnalyzer
     fn analyze_intrinsic_purity(&self, func: &FunctionMetrics) -> Result<PurityResult> {
-        // For now, use existing purity information if available
-        if let (Some(is_pure), Some(confidence)) = (func.is_pure, func.purity_confidence) {
-            let level = if is_pure {
-                PurityLevel::StrictlyPure
-            } else {
-                PurityLevel::Impure
-            };
-            return Ok(PurityResult {
-                level,
-                confidence: confidence as f64,
-                reason: PurityReason::Intrinsic,
-            });
-        }
+        Ok(metrics::intrinsic_purity(func))
+    }
 
-        // Default to impure with low confidence if no information available
-        Ok(PurityResult {
-            level: PurityLevel::Impure,
-            confidence: 0.3,
-            reason: PurityReason::UnknownDeps { count: 0 },
-        })
+    /// Apply each definition's complete purity fact without losing refined levels.
+    pub(crate) fn apply_results(&self, metrics: &[FunctionMetrics]) -> Vec<FunctionMetrics> {
+        metrics
+            .iter()
+            .map(|metric| {
+                let id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line)
+                    .with_column(metric.column);
+                self.get_result(&id)
+                    .map(|result| result.apply_to_metric(metric))
+                    .unwrap_or_else(|| metric.clone())
+            })
+            .collect()
     }
 
     /// Propagate purity for a single function
@@ -289,7 +285,7 @@ fn propagated_pure_result(
     let depth = summary.max_depth + 1;
     let depth_confidence = 0.9_f64.powi(depth as i32);
 
-    result.level = PurityLevel::StrictlyPure;
+    // Pure dependencies do not erase intrinsic local mutation or external reads.
     result.reason = PurityReason::PropagatedFromDeps { depth };
     result.confidence =
         (result.confidence.min(summary.aggregated_confidence) * depth_confidence).clamp(0.5, 1.0);
@@ -384,12 +380,85 @@ mod tests {
             summary(true, 0.9, Vec::new(), 2, 0),
         );
 
-        assert_eq!(propagated.level, PurityLevel::StrictlyPure);
+        assert_eq!(propagated.level, PurityLevel::LocallyPure);
         assert_eq!(
             propagated.reason,
             PurityReason::PropagatedFromDeps { depth: 3 }
         );
         assert!(propagated.confidence < 0.95);
+    }
+
+    #[test]
+    fn pure_dependencies_preserve_external_reads() {
+        let propagated = propagate_dependency_result(
+            result(PurityLevel::ReadOnly, 0.9),
+            summary(true, 0.9, Vec::new(), 0, 0),
+        );
+        assert_eq!(propagated.level, PurityLevel::ReadOnly);
+    }
+
+    #[test]
+    fn intrinsic_refined_levels_survive_metric_propagation() {
+        for level in [
+            crate::core::PurityLevel::StrictlyPure,
+            crate::core::PurityLevel::LocallyPure,
+            crate::core::PurityLevel::ReadOnly,
+            crate::core::PurityLevel::Impure,
+        ] {
+            let mut metric = FunctionMetrics::new("leaf".into(), "leaf.rs".into(), 1);
+            metric.purity_level = Some(level);
+            metric.is_pure = Some(level == crate::core::PurityLevel::StrictlyPure);
+            metric.purity_confidence = Some(0.9);
+            let graph = crate::priority::call_graph::CallGraph::new();
+            let metrics =
+                crate::builders::unified_analysis_phases::orchestration::run_purity_propagation(
+                    &[metric],
+                    &graph,
+                );
+            assert_eq!(metrics[0].purity_level, Some(level));
+            assert_eq!(
+                metrics[0].is_pure,
+                Some(level == crate::core::PurityLevel::StrictlyPure)
+            );
+            // A second pass must not erase the refined result either.
+            let repeated =
+                crate::builders::unified_analysis_phases::orchestration::run_purity_propagation(
+                    &metrics, &graph,
+                );
+            assert_eq!(repeated[0].purity_level, Some(level));
+        }
+    }
+
+    #[test]
+    fn applying_results_preserves_same_line_definition_identity() {
+        let mut first = FunctionMetrics::new("method".into(), "same_line.rs".into(), 1);
+        first.column = Some(5);
+        first.purity_level = Some(crate::core::PurityLevel::StrictlyPure);
+        first.is_pure = Some(true);
+        first.purity_confidence = Some(0.9);
+        let second = FunctionMetrics {
+            column: Some(40),
+            purity_level: Some(crate::core::PurityLevel::Impure),
+            is_pure: Some(false),
+            ..first.clone()
+        };
+        let propagated =
+            crate::builders::unified_analysis_phases::orchestration::run_purity_propagation(
+                &[first, second],
+                &crate::priority::call_graph::CallGraph::new(),
+            );
+        assert_eq!(propagated[0].column, Some(5));
+        assert_eq!(propagated[0].is_pure, Some(true));
+        assert_eq!(
+            propagated[0].purity_level,
+            Some(crate::core::PurityLevel::StrictlyPure)
+        );
+        assert_eq!(propagated[1].column, Some(40));
+        assert_eq!(propagated[1].is_pure, Some(false));
+        assert_eq!(
+            propagated[1].purity_level,
+            Some(crate::core::PurityLevel::Impure)
+        );
     }
 
     #[test]

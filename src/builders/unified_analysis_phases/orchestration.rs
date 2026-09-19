@@ -74,26 +74,7 @@ pub fn run_purity_propagation(
         return metrics.to_vec();
     }
 
-    // Apply results to metrics
-    metrics
-        .iter()
-        .map(|metric| {
-            let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line)
-                .with_column(metric.column);
-
-            if let Some(result) = propagator.get_result(&func_id) {
-                let mut updated = metric.clone();
-                updated.is_pure = Some(
-                    result.level == crate::analysis::purity_analysis::PurityLevel::StrictlyPure,
-                );
-                updated.purity_confidence = Some(result.confidence as f32);
-                updated.purity_reason = Some(format!("{:?}", result.reason));
-                updated
-            } else {
-                metric.clone()
-            }
-        })
-        .collect()
+    propagator.apply_results(metrics)
 }
 
 /// Create unified analysis from analysis results (orchestrates pure functions).
