@@ -3,24 +3,6 @@
 use super::*;
 
 impl WorkspaceIndex {
-    pub fn type_from_syn(
-        &self,
-        ty: &syn::Type,
-        context: &Context,
-        substitutions: &Substitutions,
-    ) -> TypeFact {
-        self.expand_type(ty, context, substitutions, 0)
-    }
-
-    pub fn type_from_path(
-        &self,
-        path: &syn::Path,
-        context: &Context,
-        substitutions: &Substitutions,
-    ) -> TypeFact {
-        self.expand_path(path, context, substitutions, 0)
-    }
-
     pub fn type_from_owned(
         &self,
         ty: &TypeSyntax,
@@ -30,24 +12,21 @@ impl WorkspaceIndex {
         self.expand_owned(ty, context, substitutions, 0)
     }
 
-    pub(super) fn expand_type(
-        &self,
-        ty: &syn::Type,
-        context: &Context,
-        substitutions: &Substitutions,
-        depth: usize,
-    ) -> TypeFact {
-        self.expand_owned(&TypeSyntax::from_syn(ty), context, substitutions, depth)
-    }
-
-    pub(super) fn expand_path(
+    /// Expand a path whose arguments were already lowered in the caller's scope.
+    pub(in crate::analyzers::rust_resolution) fn type_from_path_arguments(
         &self,
         path: &syn::Path,
+        arguments: Vec<TypeFact>,
         context: &Context,
         substitutions: &Substitutions,
-        depth: usize,
     ) -> TypeFact {
-        self.expand_owned(&TypeSyntax::from_path(path), context, substitutions, depth)
+        self.expand_path_arguments(
+            &resolution_segments(path),
+            arguments,
+            context,
+            substitutions,
+            0,
+        )
     }
 
     fn expand_owned(
@@ -94,6 +73,21 @@ impl WorkspaceIndex {
         substitutions: &Substitutions,
         depth: usize,
     ) -> TypeFact {
+        let arguments = arguments
+            .iter()
+            .map(|ty| self.expand_owned(ty, context, substitutions, depth + 1))
+            .collect();
+        self.expand_path_arguments(segments, arguments, context, substitutions, depth)
+    }
+
+    fn expand_path_arguments(
+        &self,
+        segments: &[String],
+        arguments: Vec<TypeFact>,
+        context: &Context,
+        substitutions: &Substitutions,
+        depth: usize,
+    ) -> TypeFact {
         if depth >= EXPANSION_LIMIT {
             return TypeFact::Unknown(UnknownReason::AnalysisLimit);
         }
@@ -109,10 +103,6 @@ impl WorkspaceIndex {
             }
         }
         let candidates = self.type_candidates(segments, context);
-        let arguments = arguments
-            .iter()
-            .map(|ty| self.expand_owned(ty, context, substitutions, depth + 1))
-            .collect();
         match candidates.as_slice() {
             [] => self.unavailable_type(segments, context),
             [declaration] => {

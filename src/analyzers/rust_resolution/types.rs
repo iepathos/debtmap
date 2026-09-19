@@ -3,6 +3,8 @@
 use std::path::PathBuf;
 
 mod primitives;
+#[cfg(test)]
+mod tests;
 pub use primitives::PrimitiveType;
 
 /// A declaration is identified by its source location and lexical module.
@@ -92,6 +94,22 @@ pub enum FactOrigin {
 }
 
 impl TypeFact {
+    /// Project one explicit reference without discarding its candidate constraints.
+    pub fn dereferenced(self) -> Self {
+        match self {
+            Self::Reference { inner, .. } => *inner,
+            Self::Uncertain { constraint, reason } => Self::Uncertain {
+                constraint: Box::new(constraint.dereferenced()),
+                reason,
+            },
+            Self::Ambiguous(candidates) => {
+                Self::Ambiguous(candidates.into_iter().map(Self::dereferenced).collect())
+            }
+            Self::UnavailablePath(_) => self,
+            _ => Self::Unknown(UnknownReason::UnsupportedTypeOperation),
+        }
+    }
+
     pub fn unknown() -> Self {
         Self::Unknown(UnknownReason::UnknownReceiver)
     }

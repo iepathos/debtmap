@@ -7,6 +7,9 @@ use quote::ToTokens;
 
 #[path = "index/adjustments.rs"]
 mod adjustments;
+#[path = "index/associated.rs"]
+mod associated;
+pub(super) use associated::AssociatedQuery;
 #[path = "index/bounds.rs"]
 mod bounds;
 #[path = "index/syntax.rs"]
@@ -32,6 +35,9 @@ mod modules;
 mod paths;
 #[path = "index/propagation.rs"]
 mod propagation;
+#[cfg(test)]
+#[path = "index/test_adapters.rs"]
+mod test_adapters;
 #[cfg(test)]
 #[path = "index/tests.rs"]
 mod tests;

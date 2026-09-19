@@ -82,3 +82,35 @@ fn impossible_receivers_gain_no_liveness_or_coverage_after_enhancement_and_merge
         }
     }
 }
+
+#[test]
+fn dereferenced_local_shadows_cannot_protect_global_methods() {
+    let source = r#"
+struct A;
+impl A { fn run(&self) {} } // global namesake
+struct B;
+impl B { fn run(&self) {} } // unavailable alias target
+#[test]
+fn root() { type A = B; let x: &A = &B; (*x).run(); }
+"#;
+    for graph in graphs(source) {
+        let forbidden = ["global namesake", "unavailable alias target"]
+            .map(|marker| definition(&graph, source, marker));
+        let mut builder = RustCallGraphBuilder::from_base_graph(graph);
+        builder
+            .analyze_trait_dispatch(Path::new("src/lib.rs"), &syn::parse_file(source).unwrap())
+            .unwrap();
+        let mut enhanced = builder.build();
+        enhanced.base_graph.merge(enhanced.base_graph.clone());
+        let dead = enhanced.get_potential_dead_code();
+        for target in forbidden {
+            assert!(enhanced.base_graph.get_possible_callers(&target).is_empty());
+            assert_eq!(enhanced.base_graph.get_dependency_count(&target), 0);
+            assert!(dead.contains(&target));
+            assert!(!enhanced.get_live_functions().contains(&target));
+            let coverage =
+                calculate_indirect_coverage(&target, &enhanced.base_graph, &LcovData::default());
+            assert!(coverage.coverage_sources.is_empty());
+        }
+    }
+}

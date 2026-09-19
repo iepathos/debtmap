@@ -9,6 +9,7 @@ use crate::priority::call_graph::{
 use std::collections::HashMap;
 use syn::{spanned::Spanned, visit::Visit};
 
+mod scoped_types;
 mod type_shadows;
 
 pub(super) struct Body<'a> {
@@ -71,21 +72,6 @@ impl<'a> Body<'a> {
         } else {
             owner
         }
-    }
-
-    pub fn declared_type(&self, ty: &syn::Type) -> TypeFact {
-        if let Some(path) = self.shadowed_type(ty) {
-            return TypeFact::Uncertain {
-                constraint: Box::new(TypeFact::UnavailablePath(path)),
-                reason: UnknownReason::UnsupportedTypeOperation,
-            };
-        }
-        self.index
-            .type_from_syn(ty, &self.callable.context, &self.substitutions)
-    }
-
-    pub fn shadowed_type(&self, ty: &syn::Type) -> Option<Vec<String>> {
-        type_shadows::find(&self.bindings, ty)
     }
 
     pub fn record(

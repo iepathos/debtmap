@@ -1,4 +1,4 @@
-//! Detect unindexed block declarations in nominal types and trait bounds alike.
+//! Conservative shadow detection for syntax the structured lowerer cannot represent.
 use super::Bindings;
 use syn::visit::Visit;
 
@@ -8,6 +8,16 @@ pub(super) fn find(bindings: &Bindings, ty: &syn::Type) -> Option<Vec<String>> {
         found: None,
     };
     shadow.visit_type(ty);
+    shadow.found
+}
+
+pub(super) fn find_path(bindings: &Bindings, path: &syn::Path) -> Option<Vec<String>> {
+    let mut shadow = TypeShadows {
+        bindings,
+        found: None,
+    };
+    shadow.check_path(path);
+    shadow.visit_path(path);
     shadow.found
 }
 
@@ -22,9 +32,14 @@ impl TypeShadows<'_> {
             && path
                 .segments
                 .first()
-                .is_some_and(|s| self.bindings.type_shadowed(&s.ident.to_string()))
+                .is_some_and(|segment| self.bindings.type_shadowed(&segment.ident.to_string()))
         {
-            self.found = Some(path.segments.iter().map(|s| s.ident.to_string()).collect());
+            self.found = Some(
+                path.segments
+                    .iter()
+                    .map(|segment| segment.ident.to_string())
+                    .collect(),
+            );
         }
     }
 }

@@ -2,7 +2,7 @@
 use super::body::{Body, unknown};
 use super::index::Lookup;
 use super::types::{PrimitiveType, TypeFact, UnknownReason};
-use syn::{Expr, GenericArgument, PathArguments};
+use syn::{Expr, PathArguments};
 
 impl<'a> Body<'a> {
     pub(super) fn infer(&self, expr: &Expr) -> TypeFact {
@@ -24,10 +24,7 @@ impl<'a> Body<'a> {
             Expr::Paren(p) => self.infer_at(&p.expr, depth + 1),
             Expr::Group(g) => self.infer_at(&g.expr, depth + 1),
             Expr::Unary(u) if matches!(u.op, syn::UnOp::Deref(_)) => {
-                match self.infer_at(&u.expr, depth + 1) {
-                    TypeFact::Reference { inner, .. } => *inner,
-                    _ => unknown(),
-                }
+                self.infer_at(&u.expr, depth + 1).dereferenced()
             }
             Expr::Tuple(t) => TypeFact::Tuple(
                 t.elems
@@ -75,33 +72,28 @@ impl<'a> Body<'a> {
         let Expr::Path(path) = &*call.func else {
             return unknown();
         };
-        let lookup = self.lookup_path(path);
-        if lookup.candidates.is_empty()
-            && let Some(fact) = self.constructor_result(call)
-        {
-            return fact;
+        if self.path_shadowed(&path.path) {
+            return unknown();
         }
-        let owner = self.call_owner(path);
+        if let Some(query) = self.associated_query(path) {
+            let lookup = self
+                .index
+                .lookup_associated_query(&query, &self.callable.context);
+            return self.lookup_result(lookup, Some(&query.owner), &query.arguments);
+        }
         let args = path
             .path
             .segments
             .last()
             .map(|s| self.arguments(&s.arguments))
             .unwrap_or_default();
-        self.lookup_result(lookup, owner.as_ref(), &args)
-    }
-
-    fn call_owner(&self, path: &syn::ExprPath) -> Option<TypeFact> {
-        if let Some(qself) = &path.qself {
-            return Some(self.declared_type(&qself.ty));
+        let lookup = self.lookup_path(path);
+        if lookup.candidates.is_empty()
+            && let Some(fact) = self.constructor_result(call)
+        {
+            return fact;
         }
-        let mut owner = path.path.clone();
-        owner.segments.pop();
-        if owner.segments.is_empty() {
-            return None;
-        }
-        owner.segments.pop_punct();
-        Some(self.path_type(&owner))
+        self.lookup_result(lookup, None, &args)
     }
 
     fn method_result(&self, method: &syn::ExprMethodCall, depth: usize) -> TypeFact {
@@ -131,21 +123,8 @@ impl<'a> Body<'a> {
         }
     }
 
-    fn arguments(&self, arguments: &PathArguments) -> Vec<TypeFact> {
-        match arguments {
-            PathArguments::AngleBracketed(a) => a
-                .args
-                .iter()
-                .filter_map(|a| match a {
-                    GenericArgument::Type(t) => Some(self.declared_type(t)),
-                    GenericArgument::Const(c) => {
-                        Some(TypeFact::Const(quote::quote!(#c).to_string()))
-                    }
-                    _ => None,
-                })
-                .collect(),
-            _ => Vec::new(),
-        }
+    pub(super) fn arguments(&self, arguments: &PathArguments) -> Vec<TypeFact> {
+        self.scoped_arguments(arguments, 0)
     }
 
     fn block_result(&self, block: &syn::Block, depth: usize) -> TypeFact {

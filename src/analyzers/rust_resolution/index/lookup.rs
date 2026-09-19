@@ -90,15 +90,6 @@ impl WorkspaceIndex {
         ) && self.trait_in_scope(call, context)
     }
 
-    fn has_same_trait_candidate(&self, candidates: &[&TypeDeclaration], call: &Callable) -> bool {
-        match (candidates, call.trait_candidates.as_slice()) {
-            ([candidate], [position]) => {
-                candidate.is_trait && candidate.id == self.declarations[*position].id
-            }
-            _ => false,
-        }
-    }
-
     pub(super) fn trait_in_scope(&self, call: &Callable, context: &Context) -> bool {
         if call.trait_path.is_none() {
             return true;
@@ -124,37 +115,15 @@ impl WorkspaceIndex {
         })
     }
 
-    pub fn lookup_call(
+    pub(in crate::analyzers::rust_resolution) fn lookup_free_value(
         &self,
         path: &syn::Path,
-        qself: Option<&syn::QSelf>,
         context: &Context,
     ) -> Lookup<'_> {
-        self.lookup_call_with_substitutions(path, qself, context, &Substitutions::new())
-    }
-
-    pub fn lookup_call_with_substitutions(
-        &self,
-        path: &syn::Path,
-        qself: Option<&syn::QSelf>,
-        context: &Context,
-        substitutions: &Substitutions,
-    ) -> Lookup<'_> {
-        if let Some(qself) = qself {
-            return self.lookup_qualified(path, qself, context, substitutions);
-        }
         if self.declared_value_type(path, context).is_some() {
             return Lookup::default();
         }
         let segments = resolution_segments(path);
-        if segments.len() > 1 {
-            let mut owner_path = path.clone();
-            owner_path.segments.pop();
-            let owner = self.type_from_path(&owner_path, context, substitutions);
-            if owner.has_nominal_candidates() || owner.has_receiver_identity() {
-                return self.lookup_associated(&owner, &segments[segments.len() - 1], context);
-            }
-        }
         let paths = self.resolve_value_paths(&segments, context);
         let candidates = self.free_candidates(
             &paths,
@@ -179,42 +148,26 @@ impl WorkspaceIndex {
         }
     }
 
-    pub(super) fn lookup_qualified(
+    pub(super) fn lookup_trait_associated(
         &self,
-        path: &syn::Path,
-        qself: &syn::QSelf,
-        context: &Context,
-        substitutions: &Substitutions,
+        owner: &TypeFact,
+        trait_type: &TypeFact,
+        name: &str,
     ) -> Lookup<'_> {
-        let owner = self.type_from_syn(&qself.ty, context, substitutions);
-        let segments = path_segments(path);
-        let Some(name) = segments.last() else {
-            return Lookup::default();
-        };
-        if qself.position == 0 {
-            return self.lookup_associated(&owner, name, context);
-        }
-        let trait_path = &segments[..qself.position];
-        let qualified_trait = syn::Path {
-            leading_colon: path.leading_colon,
-            segments: path.segments.iter().take(qself.position).cloned().collect(),
-        };
-        let trait_type = self.type_from_path(&qualified_trait, context, substitutions);
-        let trait_candidates = self.type_candidates(trait_path, context);
         let candidates = self
             .named_callables(name)
             .filter(|call| call.kind != CallableKind::TraitDeclaration)
             .filter(|call| {
                 call.trait_type
                     .as_ref()
-                    .is_some_and(|candidate| owner_compatible(candidate, &trait_type))
+                    .is_some_and(|candidate| owner_compatible(candidate, trait_type))
             })
             .filter(|call| {
                 call.owner
                     .as_ref()
-                    .is_some_and(|candidate| owner_compatible(candidate, &owner))
+                    .is_some_and(|candidate| owner_compatible(candidate, owner))
             })
-            .filter(|call| self.has_same_trait_candidate(&trait_candidates, call))
+            .filter(|call| self.has_same_trait_fact(trait_type, call))
             .collect::<Vec<_>>();
         let justified = candidates.len() == 1
             && owner.has_receiver_identity()
@@ -223,7 +176,7 @@ impl WorkspaceIndex {
             && candidates[0]
                 .owner
                 .as_ref()
-                .is_some_and(|candidate| owner_match_known(candidate, &owner));
+                .is_some_and(|candidate| owner_match_known(candidate, owner));
         Lookup {
             candidates,
             justified,
@@ -233,6 +186,16 @@ impl WorkspaceIndex {
                 Some(UnknownReason::AmbiguousDeclaration)
             )
             .then_some(UncertaintyReason::AmbiguousDeclaration),
+        }
+    }
+
+    fn has_same_trait_fact(&self, fact: &TypeFact, call: &Callable) -> bool {
+        match (fact.nominal(), call.trait_candidates.as_slice()) {
+            (Some((id, _)), [position]) => {
+                let candidate = &self.declarations[*position];
+                candidate.is_trait && candidate.id == *id
+            }
+            _ => false,
         }
     }
 }

@@ -4,7 +4,11 @@ use super::super::types::TraitBoundFact;
 use super::*;
 
 impl WorkspaceIndex {
-    pub(super) fn resolve_trait_bound(&self, path: &[String], context: &Context) -> TraitBoundFact {
+    pub(in crate::analyzers::rust_resolution) fn resolve_trait_bound(
+        &self,
+        path: &[String],
+        context: &Context,
+    ) -> TraitBoundFact {
         let candidates: Vec<_> = self
             .type_candidates(path, context)
             .into_iter()
