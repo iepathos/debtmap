@@ -39,6 +39,160 @@ fn create_test_metrics() -> FunctionMetrics {
 }
 
 #[test]
+fn complexity_trace_explains_actual_purity_and_entropy_inputs() {
+    let mut func = create_test_metrics();
+    func.cyclomatic = 23;
+    func.cognitive = 41;
+    func.purity_level = Some(PurityLevel::StrictlyPure);
+    func.purity_confidence = Some(0.95);
+    func.entropy_score = Some(crate::complexity::entropy_core::EntropyScore {
+        token_entropy: 0.24,
+        pattern_repetition: 0.89,
+        branch_similarity: 0.14,
+        effective_complexity: 0.0,
+        unique_variables: 8,
+        max_nesting: 3,
+        dampening_applied: 1.0,
+    });
+    let score = calculate_unified_priority(&func, &CallGraph::new(), None, None);
+    assert!((score.complexity_factor - 9.8).abs() < 1e-10);
+    let explanation = crate::priority::scoring::trace::explanation_lines(&score).join("\n");
+    assert!(
+        explanation.contains("Cyclomatic input (purity): trunc(23 × 0.7000) = 16"),
+        "{explanation}"
+    );
+    assert!(
+        explanation.contains("Cognitive input (entropy): trunc(41 × 0.5550) = 22"),
+        "{explanation}"
+    );
+    assert!(
+        explanation.contains("clamp((16 × 0.4000 + 22 × 0.6000) / 2, 0, 10) = 9.8000"),
+        "{explanation}"
+    );
+    for pair in score.score_trace.windows(2) {
+        assert!((pair[0].output - pair[1].input).abs() < 1e-10);
+    }
+    for step in &score.score_trace {
+        assert!(
+            (step.calculated_output() - step.output).abs() < 1e-10,
+            "{step}"
+        );
+    }
+}
+
+#[test]
+fn complexity_inputs_capture_entropy_selection_and_purity_fallback() {
+    let mut func = create_test_metrics();
+    func.cyclomatic = 23;
+    func.cognitive = 41;
+    func.entropy_score = Some(crate::complexity::entropy_core::EntropyScore {
+        token_entropy: 0.24,
+        pattern_repetition: 0.89,
+        branch_similarity: 0.14,
+        effective_complexity: 0.0,
+        unique_variables: 8,
+        max_nesting: 3,
+        dampening_applied: 1.0,
+    });
+    for (enabled, has_entropy, token_entropy, expected, cognitive_line) in [
+        (
+            true,
+            true,
+            0.24,
+            19.6,
+            "Cognitive input (entropy): trunc(41 × 0.5550) = 22",
+        ),
+        (
+            false,
+            true,
+            0.24,
+            23.2,
+            "Cognitive input (purity): trunc(41 × 0.7000) = 28",
+        ),
+        (
+            true,
+            false,
+            0.24,
+            23.2,
+            "Cognitive input (purity): trunc(41 × 0.7000) = 28",
+        ),
+        (
+            true,
+            true,
+            0.8,
+            31.0,
+            "Cognitive input (entropy): trunc(41 × 1.0000) = 41",
+        ),
+    ] {
+        let mut case = func.clone();
+        case.entropy_score.as_mut().unwrap().token_entropy = token_entropy;
+        if !has_entropy {
+            case.entropy_score = None;
+        }
+        let config = crate::config::DebtmapConfig {
+            entropy: Some(crate::config::EntropyConfig {
+                enabled,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let inputs = ComplexityInputs::for_function(&case, 0.7, false, &config);
+        assert!((inputs.weighted_complexity() - expected).abs() < 1e-10);
+        assert_eq!(inputs.preprocessing_lines()[1], cognitive_line);
+    }
+}
+
+#[test]
+fn complexity_inputs_capture_role_configured_weights_and_clamping() {
+    let mut func = create_test_metrics();
+    func.cyclomatic = 11;
+    func.cognitive = 17;
+    for (orchestrator, weights, expected) in [
+        (false, None, 4.7),
+        (true, None, 5.0),
+        (true, Some((0.8, 0.2)), 3.9),
+        (false, Some((0.8, 0.2)), 3.9),
+    ] {
+        let config = crate::config::DebtmapConfig {
+            complexity_weights: weights.map(|(cyclomatic, cognitive)| {
+                crate::config::ComplexityWeightsConfig {
+                    cyclomatic,
+                    cognitive,
+                    ..Default::default()
+                }
+            }),
+            ..Default::default()
+        };
+        let inputs = ComplexityInputs::for_function(&func, 0.7, orchestrator, &config);
+        assert!((inputs.factor() - expected).abs() < 1e-10);
+        let step = ScoreStep::new(
+            "Complexity factor",
+            0.0,
+            ScoreOperation::Complexity(inputs),
+            expected,
+        );
+        assert!((step.calculated_output() - expected).abs() < 1e-10);
+    }
+    for (raw, expected) in [(0, 0.0), (100, 10.0)] {
+        let inputs = ComplexityInputs::new([raw, raw], 1.0, None, [0.4, 0.6]);
+        assert_eq!(inputs.factor(), expected);
+        assert!(inputs.to_string().contains("/ 2, 0, 10)"));
+    }
+}
+
+#[test]
+fn complexity_trace_retains_legacy_purity_adjustment() {
+    let mut func = create_test_metrics();
+    func.is_pure = Some(true);
+    func.purity_confidence = Some(0.5);
+    let score = calculate_unified_priority(&func, &CallGraph::new(), None, None);
+    let explanation = crate::priority::scoring::trace::explanation_lines(&score).join("\n");
+    assert!(explanation.contains("Cyclomatic input (purity): trunc(5 × 0.8500) = 4"));
+    assert!(explanation.contains("Cognitive input (purity): trunc(8 × 0.8500) = 6"));
+    assert!((score.complexity_factor - 2.6).abs() < 1e-10);
+}
+
+#[test]
 fn score_trace_records_custom_data_flow_weights_and_continuous_arithmetic() {
     let func = create_test_metrics();
     let graph = CallGraph::new();

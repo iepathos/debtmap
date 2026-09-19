@@ -1,6 +1,7 @@
 use crate::core::{FunctionMetrics, PurityLevel};
 use crate::data_flow::DataFlowGraph;
 use crate::organization::GodObjectAnalysis;
+use crate::priority::scoring::complexity_inputs::ComplexityInputs;
 use crate::priority::scoring::trace::{ScoreOperation, ScoreStep};
 use crate::priority::{
     ActionableRecommendation, DebtType, FunctionAnalysis, ImpactMetrics,
@@ -9,8 +10,7 @@ use crate::priority::{
     debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId},
     scoring::calculation::{
         calculate_base_score_no_coverage, calculate_base_score_with_coverage_multiplier,
-        calculate_complexity_factor, calculate_coverage_factor, calculate_coverage_multiplier,
-        calculate_dependency_factor,
+        calculate_coverage_factor, calculate_coverage_multiplier, calculate_dependency_factor,
     },
     scoring::debt_item::{determine_visibility, is_dead_code},
     semantic_classifier::{FunctionRole, classify_function_role},
@@ -435,23 +435,16 @@ pub fn calculate_unified_priority_with_role(
     // Orchestrators typically have low cognitive complexity relative to cyclomatic
     let is_orchestrator_candidate = role == FunctionRole::Orchestrator;
 
-    // Calculate entropy analysis if available (Spec 218)
-    let entropy_analysis = crate::priority::scoring::computation::calculate_entropy_analysis(func);
-
-    // Calculate purity adjustment and apply to complexity metrics
-    let purity_bonus = calculate_purity_adjustment(func);
-    let (purity_adjusted_cyclomatic, purity_adjusted_cognitive) =
-        apply_purity_adjustment(func.cyclomatic, func.cognitive, purity_bonus);
-
-    let raw_complexity = normalize_complexity(
-        purity_adjusted_cyclomatic,
-        purity_adjusted_cognitive,
-        entropy_analysis.as_ref(),
+    let complexity_inputs = ComplexityInputs::for_function(
+        func,
+        calculate_purity_adjustment(func),
         is_orchestrator_candidate,
+        crate::config::get_config(),
     );
+    let raw_complexity = complexity_inputs.weighted_complexity();
 
     // Calculate complexity and dependency factors
-    let complexity_factor = calculate_complexity_factor(raw_complexity);
+    let complexity_factor = complexity_inputs.factor();
 
     // Spec 267: Use production callers only for scoring
     // Test callers don't increase change risk, so they shouldn't inflate the dependency factor
@@ -471,6 +464,15 @@ pub fn calculate_unified_priority_with_role(
         coverage_weight,
         complexity_factor,
         dependency_factor,
+    );
+    score_trace.insert(
+        0,
+        ScoreStep::new(
+            "Complexity factor",
+            0.0,
+            ScoreOperation::Complexity(complexity_inputs),
+            complexity_factor,
+        ),
     );
 
     // Store coverage_factor for display purposes (kept for backward compatibility)
@@ -682,16 +684,6 @@ fn calculate_purity_adjustment(func: &FunctionMetrics) -> f64 {
     }
 }
 
-/// Apply purity adjustment to complexity metrics.
-///
-/// Returns adjusted cyclomatic and cognitive complexity values.
-fn apply_purity_adjustment(cyclomatic: u32, cognitive: u32, adjustment: f64) -> (u32, u32) {
-    (
-        (cyclomatic as f64 * adjustment) as u32,
-        (cognitive as f64 * adjustment) as u32,
-    )
-}
-
 /// Calculate structural quality multiplier based on nesting/cyclomatic ratio.
 ///
 /// This captures how "deeply nested" code is relative to its branching complexity.
@@ -767,7 +759,7 @@ fn calculate_base_score(
     let raw_base = calculate_base_score_no_coverage(complexity_factor, dependency_factor);
     let mut trace = vec![ScoreStep::new(
         "Weighted complexity and dependencies",
-        0.0,
+        complexity_factor,
         ScoreOperation::WeightedBase {
             complexity: complexity_factor,
             dependency: dependency_factor,
@@ -882,59 +874,6 @@ fn apply_orchestration_adjustment(
         Some(normalized_score),
         Some(adjustment),
     )
-}
-
-/// Normalize complexity to 0-10 scale using weighted complexity (spec 121).
-///
-/// Uses configurable weights for cyclomatic and cognitive complexity.
-/// Default: 30% cyclomatic, 70% cognitive (research shows cognitive correlates better with bugs).
-/// For orchestrators, cognitive weight may be increased further.
-/// Calculate raw complexity from cyclomatic and cognitive metrics.
-///
-/// Uses raw cyclomatic (no dampening) and entropy-adjusted cognitive.
-/// Returns a weighted sum that feeds into calculate_complexity_factor.
-///
-/// Formula: cyclomatic * weight_cyc + cognitive_adjusted * weight_cog
-/// - Default weights: 40% cyclomatic, 60% cognitive
-/// - Orchestrators: 25% cyclomatic, 75% cognitive (cognitive matters more)
-fn normalize_complexity(
-    cyclomatic: u32,
-    cognitive: u32,
-    entropy_analysis: Option<&crate::complexity::EntropyAnalysis>,
-    is_orchestrator: bool,
-) -> f64 {
-    let entropy_config = crate::config::get_entropy_config();
-
-    // Use raw cyclomatic (no entropy dampening on cyclomatic)
-    let raw_cyclomatic = cyclomatic as f64;
-
-    // Use entropy-adjusted cognitive if available and enabled
-    let adjusted_cognitive = if let Some(entropy) = entropy_analysis {
-        if entropy_config.enabled {
-            entropy.adjusted_complexity as f64
-        } else {
-            cognitive as f64
-        }
-    } else {
-        cognitive as f64
-    };
-
-    // Get weights from configuration or use defaults
-    let config = crate::config::get_config();
-    let (cyc_weight, cog_weight) = if let Some(weights_config) = config.complexity_weights.as_ref()
-    {
-        (weights_config.cyclomatic, weights_config.cognitive)
-    } else if is_orchestrator {
-        // Orchestrators: cognitive complexity matters more
-        (0.25, 0.75)
-    } else {
-        // Default: 40% cyclomatic, 60% cognitive
-        (0.4, 0.6)
-    };
-
-    // Simple weighted sum - no complex normalization
-    // Result feeds into calculate_complexity_factor which divides by 2 and clamps to 0-10
-    raw_cyclomatic * cyc_weight + adjusted_cognitive * cog_weight
 }
 
 /// Count production callers from a list of function IDs (Spec 267).

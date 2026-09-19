@@ -15,13 +15,13 @@ pub fn format_complexity_summary(
         if let Some(ref entropy) = item.entropy_analysis {
             writeln!(
                 output,
-                "├─ {} cyclomatic={} (dampened: {}, factor: {:.2}), est_branches={}, cognitive={}, nesting={}, entropy={:.2}",
+                "├─ {} cyclomatic={}, est_branches={}, cognitive={} (entropy-adjusted: {}, factor: {:.2}), nesting={}, entropy={:.2}",
                 "COMPLEXITY:".bright_blue(),
                 cyclomatic.to_string().yellow(),
-                entropy.adjusted_complexity.to_string().yellow(),
-                entropy.dampening_factor,
                 branch_count.to_string().yellow(),
                 cognitive.to_string().yellow(),
+                entropy.adjusted_complexity.to_string().yellow(),
+                entropy.dampening_factor,
                 nesting.to_string().yellow(),
                 entropy.entropy_score
             )
@@ -81,27 +81,27 @@ pub fn format_complexity_details_section(
 
     lines.push(format!("{} {}", "-", "COMPLEXITY DETAILS:".bright_blue()));
 
-    // Format cyclomatic complexity with entropy dampening if available
+    lines.push(format!(
+        "{}  {} cyclomatic={}",
+        tree_pipe, "-", item.cyclomatic_complexity
+    ));
+
+    // Entropy adjusts cognitive complexity, not the structural path count.
     if let Some(ref entropy) = item.entropy_analysis {
         lines.push(format!(
-            "{}  {} cyclomatic={} (dampened: {}, factor: {:.2})",
+            "{}  {} cognitive={} (entropy-adjusted: {}, factor: {:.2})",
             tree_pipe,
             "-",
-            item.cyclomatic_complexity,
+            item.cognitive_complexity,
             entropy.adjusted_complexity,
             entropy.dampening_factor
         ));
     } else {
         lines.push(format!(
-            "{}  {} cyclomatic={}",
-            tree_pipe, "-", item.cyclomatic_complexity
+            "{}  {} cognitive={}",
+            tree_pipe, "-", item.cognitive_complexity
         ));
     }
-
-    lines.push(format!(
-        "{}  {} cognitive={}",
-        tree_pipe, "-", item.cognitive_complexity
-    ));
 
     lines.push(format!(
         "{}  {} Function Length: {} lines",

@@ -1904,7 +1904,8 @@ fn build_recorded_trace_section(item: &UnifiedDebtItem, theme: &Theme) -> Vec<Li
         item.unified_score
             .score_trace
             .iter()
-            .map(|step| Line::from(step.to_string())),
+            .flat_map(|step| step.explanation_lines())
+            .map(Line::from),
     );
     add_blank_line(&mut lines);
     lines
@@ -2267,6 +2268,22 @@ mod tests {
             assert!(!rendered.contains("Arithmetic trace unavailable"));
             assert!(!rendered.contains("score formula (simplified)"));
         }
+        let inputs = crate::priority::scoring::complexity_inputs::ComplexityInputs::new(
+            [23, 41],
+            0.7,
+            None,
+            [0.4, 0.6],
+        );
+        item.unified_score.score_trace = vec![crate::priority::scoring::trace::ScoreStep::new(
+            "Complexity factor",
+            0.0,
+            crate::priority::scoring::trace::ScoreOperation::Complexity(inputs),
+            inputs.factor(),
+        )];
+        let rendered = text(build_page_lines(&item, &theme, 100));
+        assert!(rendered.contains("Cyclomatic input (purity): trunc(23 × 0.7000) = 16"));
+        assert!(rendered.contains("Cognitive input (purity): trunc(41 × 0.7000) = 28"));
+        assert!(rendered.contains("clamp((16 × 0.4000 + 28 × 0.6000) / 2, 0, 10) = 10.0000"));
     }
 
     #[test]

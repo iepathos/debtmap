@@ -17,7 +17,11 @@ pub fn explanation_lines(score: &crate::priority::UnifiedScore) -> Vec<String> {
             format!("Recorded dependency factor: {:.4}", score.dependency_factor),
         ]
     } else {
-        score.score_trace.iter().map(ToString::to_string).collect()
+        score
+            .score_trace
+            .iter()
+            .flat_map(ScoreStep::explanation_lines)
+            .collect()
     };
     lines.push(format!("Final Score: {:.2}", score.final_score));
     lines
@@ -26,6 +30,7 @@ pub fn explanation_lines(score: &crate::priority::UnifiedScore) -> Vec<String> {
 /// One arithmetic operation, with the operands used during scoring.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ScoreOperation {
+    Complexity(super::complexity_inputs::ComplexityInputs),
     WeightedBase {
         complexity: f64,
         dependency: f64,
@@ -52,6 +57,16 @@ pub struct ScoreStep {
 }
 
 impl ScoreStep {
+    /// Include preprocessing operands before the scalar scoring operation.
+    pub fn explanation_lines(&self) -> Vec<String> {
+        let mut lines = match self.operation {
+            ScoreOperation::Complexity(inputs) => inputs.preprocessing_lines(),
+            _ => Vec::new(),
+        };
+        lines.push(self.to_string());
+        lines
+    }
+
     pub fn new(label: &'static str, input: f64, operation: ScoreOperation, output: f64) -> Self {
         Self {
             label,
@@ -64,6 +79,7 @@ impl ScoreStep {
     /// Re-evaluate a recorded operation for consistency checks.
     pub fn calculated_output(&self) -> f64 {
         match self.operation {
+            ScoreOperation::Complexity(inputs) => inputs.factor(),
             ScoreOperation::WeightedBase {
                 complexity,
                 dependency,
@@ -98,6 +114,7 @@ impl fmt::Display for ScoreStep {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}: ", self.label)?;
         match self.operation {
+            ScoreOperation::Complexity(inputs) => write!(f, "{inputs}")?,
             ScoreOperation::WeightedBase {
                 complexity,
                 dependency,

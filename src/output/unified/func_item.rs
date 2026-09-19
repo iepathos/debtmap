@@ -295,8 +295,8 @@ impl FunctionDebtItemOutput {
                 None
             },
             adjusted_complexity: item.entropy_analysis.as_ref().map(|e| AdjustedComplexity {
-                // Dampened cyclomatic = cyclomatic * dampening_factor (spec 232)
-                // When dampening_factor = 1.0, dampened_cyclomatic equals original cyclomatic
+                // Legacy descriptive field retained for JSON compatibility.
+                // Scoring applies entropy to cognitive complexity, not cyclomatic.
                 dampened_cyclomatic: round_score(
                     item.cyclomatic_complexity as f64 * e.dampening_factor,
                 ),
@@ -385,6 +385,7 @@ fn derive_coupling_classification(
 /// Adjusted complexity based on entropy analysis
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AdjustedComplexity {
+    /// Legacy descriptive product, not a complexity scoring operand.
     pub dampened_cyclomatic: f64,
     pub dampening_factor: f64,
 }

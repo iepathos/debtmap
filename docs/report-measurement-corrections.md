@@ -72,6 +72,29 @@ The existing JSON `base_score` now means the actual pre-scaling score, rather
 than the sum of display indicators. Records without a trace state that the
 available factors cannot reconstruct the final arithmetic.
 
+Complexity preprocessing is now part of that recorded evidence. For the
+`FrameworkDetector::matches_pattern` example, the score uses purity-adjusted
+cyclomatic `trunc(23 × 0.70) = 16` and entropy-adjusted cognitive
+`trunc(41 × 0.555) = 22`. The factor is
+`clamp((16 × 0.4 + 22 × 0.6) / 2, 0, 10) = 9.8`. The calculation and explanation
+share the captured inputs, including configured or role-default weights.
+Enabled entropy analysis selects cognitive complexity from the original metric;
+it replaces the purity adjustment for that operand. With entropy disabled or
+absent, cognitive complexity uses purity adjustment. This repair explains the
+existing policy without changing it or resolving inconsistent upstream purity
+classification.
+
+Human metrics no longer present entropy-dampened cyclomatic as a scoring input,
+and verbose summaries attach entropy adjustments to cognitive complexity.
+The legacy JSON `adjusted_complexity.dampened_cyclomatic` field remains a
+descriptive product for compatibility; it is not used by the scorer.
+
+The complexity follow-up passed `just fmt`, offline `just test` (6,190 passed,
+ten existing skips), 46 targeted scoring/output/JSON integration tests and
+strict offline all-target/all-feature Clippy in debug builds. Regressions cover
+the reported inputs, disabled/missing entropy, legacy purity, configured and
+orchestrator weights, clamping, trace continuity and human metric labels.
+
 Neither legacy JSON v3 nor the existing receipt-bearing v4 gains fields. The arithmetic trace and exact immediate-neighbor
 count are internal and excluded from serialization. No older unversioned binary
 migration is claimed.

@@ -156,11 +156,10 @@ pub mod format {
             writeln!(out, "- Branch Similarity: {:.2}", similarity).unwrap();
         }
         if let Some(adjusted) = adj {
-            writeln!(out, "- Dampening Factor: {:.2}", adjusted.dampening_factor).unwrap();
             writeln!(
                 out,
-                "- Dampened Cyclomatic: {:.1}",
-                adjusted.dampened_cyclomatic
+                "- Cognitive Entropy Dampening Factor (analysis): {:.2}",
+                adjusted.dampening_factor
             )
             .unwrap();
         }
@@ -327,8 +326,12 @@ pub mod format {
         let mut out = String::new();
         write_section_heading(&mut out, "Scoring Breakdown");
         if !s.score_trace.is_empty() {
-            for step in &s.score_trace {
-                writeln!(out, "- {step}").unwrap();
+            for line in s
+                .score_trace
+                .iter()
+                .flat_map(|step| step.explanation_lines())
+            {
+                writeln!(out, "- {line}").unwrap();
             }
             writeln!(out, "- Final Score: {:.2}", s.final_score).unwrap();
             return Some(out);
@@ -875,6 +878,26 @@ mod tests {
     use super::*;
 
     #[test]
+    fn metrics_do_not_present_entropy_dampened_cyclomatic_as_a_scoring_input() {
+        let metrics = FunctionMetricsOutput {
+            cyclomatic_complexity: 23,
+            cognitive_complexity: 41,
+            entropy_adjusted_cognitive: Some(22),
+            ..Default::default()
+        };
+        let adjusted = crate::output::unified::AdjustedComplexity {
+            dampened_cyclomatic: 12.7,
+            dampening_factor: 0.55,
+        };
+        let text = format::metrics(&metrics, Some(&adjusted));
+        assert!(text.contains("Cyclomatic Complexity: 23"));
+        assert!(text.contains("Cognitive Complexity: 41 → 22 (entropy-adjusted)"));
+        assert!(text.contains("Cognitive Entropy Dampening Factor (analysis): 0.55"));
+        assert!(!text.contains("Dampened Cyclomatic"));
+        assert!(!text.contains("12.7"));
+    }
+
+    #[test]
     fn test_generate_item_id() {
         assert_eq!(generate_item_id("src/main.rs", Some(42)), "src_main_rs_42");
         assert_eq!(generate_item_id("src/lib.rs", None), "src_lib_rs");
@@ -1206,6 +1229,23 @@ mod tests {
         assert!(json.get("score_trace").is_none());
         let restored: FunctionScoringDetails = serde_json::from_value(json).unwrap();
         assert!(restored.score_trace.is_empty());
+
+        let inputs = crate::priority::scoring::complexity_inputs::ComplexityInputs::new(
+            [23, 41],
+            0.7,
+            None,
+            [0.4, 0.6],
+        );
+        details.score_trace = vec![crate::priority::scoring::trace::ScoreStep::new(
+            "Complexity factor",
+            0.0,
+            crate::priority::scoring::trace::ScoreOperation::Complexity(inputs),
+            inputs.factor(),
+        )];
+        let rendered = format::scoring(Some(&details), &FunctionRole::Unknown).unwrap();
+        assert!(rendered.contains("- Cyclomatic input (purity): trunc(23 × 0.7000) = 16"));
+        assert!(rendered.contains("- Cognitive input (purity): trunc(41 × 0.7000) = 28"));
+        assert!(rendered.contains("clamp((16 × 0.4000 + 28 × 0.6000) / 2, 0, 10) = 10.0000"));
     }
 
     #[test]

@@ -328,6 +328,32 @@ mod tests {
         ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location, UnifiedScore,
     };
 
+    #[test]
+    fn complexity_section_assigns_entropy_adjustment_to_cognitive() {
+        colored::control::set_override(false);
+        let mut item = create_test_item(20.0);
+        item.cyclomatic_complexity = 23;
+        item.cognitive_complexity = 41;
+        item.entropy_analysis = Some(crate::complexity::EntropyAnalysis {
+            entropy_score: 0.24,
+            pattern_repetition: 0.89,
+            branch_similarity: 0.14,
+            dampening_factor: 0.555,
+            dampening_was_applied: true,
+            original_complexity: 41,
+            adjusted_complexity: 22,
+            reasoning: Vec::new(),
+        });
+        let context = create_format_context(1, &item, false);
+        let text = generate_formatted_sections(&context).complexity.unwrap();
+        assert!(text.contains("cyclomatic=23, est_branches=23"), "{text}");
+        assert!(
+            text.contains("cognitive=41 → 22 (entropy-adjusted, factor: 0.56)"),
+            "{text}"
+        );
+        assert!(!text.contains("cyclomatic=23 →"), "{text}");
+    }
+
     fn create_test_item(score: f64) -> UnifiedDebtItem {
         UnifiedDebtItem {
             location: Location {
