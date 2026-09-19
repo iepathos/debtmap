@@ -26,22 +26,33 @@ impl<'a> Body<'a> {
         if self.path_shadowed(path) {
             return unknown();
         }
+        let arguments = path
+            .segments
+            .last()
+            .map(|segment| self.arguments(&segment.arguments))
+            .unwrap_or_default();
         self.index
-            .value_from_path(path, &self.callable.context, &self.substitutions)
+            .value_from_path(path, &self.callable.context, &arguments)
             .unwrap_or_else(unknown)
     }
 
-    pub(super) fn lookup_path(&self, path: &syn::ExprPath) -> Lookup<'a> {
+    pub(super) fn lookup_invocation(&self, path: &syn::ExprPath) -> (Lookup<'a>, bool) {
         if self.path_shadowed(&path.path) {
-            return Lookup::default();
+            return (Lookup::default(), false);
         }
         if let Some(query) = self.associated_query(path) {
-            return self
-                .index
-                .lookup_associated_query(&query, &self.callable.context);
+            return (
+                self.index
+                    .lookup_associated_query(&query, &self.callable.context),
+                false,
+            );
         }
         self.index
-            .lookup_free_value(&path.path, &self.callable.context)
+            .value_call_lookup(&path.path, &self.callable.context)
+    }
+
+    pub(super) fn lookup_path(&self, path: &syn::ExprPath) -> Lookup<'a> {
+        self.lookup_invocation(path).0
     }
 
     pub(super) fn associated_query(&self, path: &syn::ExprPath) -> Option<AssociatedQuery> {

@@ -44,3 +44,46 @@ fn check_case(case: &Case) -> Option<String> {
         }
     }
 }
+
+#[test]
+fn ambiguous_constructor_arguments_record_each_nested_call_once() {
+    use support::Expectation as E;
+    let source = "mod left { pub struct Item(pub u32); impl Item { /*@left_hit*/ pub fn hit(&self) {} } }
+        mod right { pub struct Item(pub u32); impl Item { /*@right_hit*/ pub fn hit(&self) {} } }
+        struct Other; impl Other { /*@other_hit*/ fn hit(&self) {} }
+        use left::*; use right::*;
+        /*@argument*/ fn argument() -> u32 { 1 }
+        /*@caller*/ fn caller() { let x = /*#constructor*/ Item(/*#argument_call*/ argument()); /*#method*/ x.hit(); }";
+    verify(
+        "ambiguous_constructor_argument",
+        source,
+        &[
+            E::absent("constructor", "Item("),
+            E::resolved("argument_call", "argument(", &["argument"]),
+            E::uncertain("method", "hit(", &["left_hit", "right_hit"]),
+        ],
+    )
+    .expect("constructor arguments visit once without a constructor body diagnostic");
+}
+
+#[test]
+fn mixed_function_constructor_results_retain_every_admissible_owner() {
+    use support::Expectation as E;
+    let source = "mod left { pub struct Item(pub u32); impl Item { /*@left_hit*/ pub fn hit(&self) {} } }
+        struct Other; impl Other { /*@other_hit*/ fn hit(&self) {} }
+        struct Noise; impl Noise { /*@noise_hit*/ fn hit(&self) {} }
+        mod right { /*@function*/ pub fn Item(_: u32) -> crate::Other { crate::Other } }
+        use left::*; use right::*;
+        /*@argument*/ fn argument() -> u32 { 1 }
+        /*@caller*/ fn caller() { let x = /*#constructor*/ Item(/*#argument_call*/ argument()); /*#method*/ x.hit(); }";
+    verify(
+        "mixed_invocation_results",
+        source,
+        &[
+            E::uncertain("constructor", "Item(", &["function"]),
+            E::resolved("argument_call", "argument(", &["argument"]),
+            E::uncertain("method", "hit(", &["left_hit", "other_hit"]),
+        ],
+    )
+    .expect("all invocation alternatives constrain the propagated result");
+}

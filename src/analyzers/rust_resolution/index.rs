@@ -267,12 +267,7 @@ impl WorkspaceIndex {
             .map(|position| &self.callables[*position])
     }
 
-    fn free_candidates(
-        &self,
-        paths: &[Vec<String>],
-        context: &Context,
-        name: &str,
-    ) -> Vec<&Callable> {
+    fn free_candidates(&self, paths: &[Vec<String>], context: &Context) -> Vec<&Callable> {
         let mut positions: Vec<_> = paths
             .iter()
             .filter_map(|path| self.free_callable_paths.get(path))
@@ -284,10 +279,7 @@ impl WorkspaceIndex {
         positions
             .into_iter()
             .map(|position| &self.callables[position])
-            .filter(|call| {
-                call.signature.ident == name
-                    && self.same_workspace(&call.context.file, &context.file)
-            })
+            .filter(|call| self.same_workspace(&call.context.file, &context.file))
             .collect()
     }
 

@@ -115,39 +115,6 @@ impl WorkspaceIndex {
         })
     }
 
-    pub(in crate::analyzers::rust_resolution) fn lookup_free_value(
-        &self,
-        path: &syn::Path,
-        context: &Context,
-    ) -> Lookup<'_> {
-        if self.declared_value_type(path, context).is_some() {
-            return Lookup::default();
-        }
-        let segments = resolution_segments(path);
-        let paths = self.resolve_value_paths(&segments, context);
-        let candidates = self.free_candidates(
-            &paths,
-            context,
-            segments.last().map(String::as_str).unwrap_or_default(),
-        );
-        let ambiguous = candidates.len() == 1 && self.value_path_conflicts(&segments, context);
-        let justified = candidates.len() == 1 && !ambiguous;
-        let provenance = if candidates.first().is_some_and(|call| {
-            qualified(&call.context.module, &call.signature.ident.to_string())
-                != relative_path(&segments, &context.module)
-        }) {
-            CallEdgeProvenance::ImportResolution
-        } else {
-            CallEdgeProvenance::AstDirect
-        };
-        Lookup {
-            candidates,
-            justified,
-            provenance,
-            reason: ambiguous.then_some(UncertaintyReason::AmbiguousDeclaration),
-        }
-    }
-
     pub(super) fn lookup_trait_associated(
         &self,
         owner: &TypeFact,

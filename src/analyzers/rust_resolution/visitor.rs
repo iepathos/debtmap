@@ -78,8 +78,8 @@ impl<'ast> Visit<'ast> for Body<'_> {
 impl Body<'_> {
     fn visit_call(&mut self, call: &syn::ExprCall, expr: &Expr) {
         if let Expr::Path(path) = &*call.func {
-            let lookup = self.lookup_path(path);
-            if !lookup.candidates.is_empty() || self.constructor_result(call).is_none() {
+            let (lookup, constructor_only) = self.lookup_invocation(path);
+            if !constructor_only {
                 let query = quote::quote!(#path).to_string();
                 self.record(lookup, expr, query, None);
             }

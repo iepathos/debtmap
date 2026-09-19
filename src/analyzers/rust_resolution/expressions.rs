@@ -47,27 +47,6 @@ impl<'a> Body<'a> {
         }
     }
 
-    pub(super) fn constructor_result(&self, call: &syn::ExprCall) -> Option<TypeFact> {
-        let Expr::Path(path) = &*call.func else {
-            return None;
-        };
-        if path.qself.is_some() || self.path_shadowed(&path.path) {
-            return None;
-        }
-        let arguments = path
-            .path
-            .segments
-            .last()
-            .map(|segment| self.arguments(&segment.arguments))
-            .unwrap_or_default();
-        self.index.constructor_result(
-            &path.path,
-            call.args.len(),
-            &self.callable.context,
-            &arguments,
-        )
-    }
-
     fn call_result(&self, call: &syn::ExprCall) -> TypeFact {
         let Expr::Path(path) = &*call.func else {
             return unknown();
@@ -87,13 +66,9 @@ impl<'a> Body<'a> {
             .last()
             .map(|s| self.arguments(&s.arguments))
             .unwrap_or_default();
-        let lookup = self.lookup_path(path);
-        if lookup.candidates.is_empty()
-            && let Some(fact) = self.constructor_result(call)
-        {
-            return fact;
-        }
-        self.lookup_result(lookup, None, &args)
+        self.index
+            .value_call_result(&path.path, call.args.len(), &self.callable.context, &args)
+            .unwrap_or_else(unknown)
     }
 
     fn method_result(&self, method: &syn::ExprMethodCall, depth: usize) -> TypeFact {

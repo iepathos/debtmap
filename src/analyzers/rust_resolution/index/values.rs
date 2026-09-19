@@ -1,135 +1,168 @@
-//! Value-namespace declarations are independent of type aliases and enums.
+//! Value bindings are resolved together before projecting callable or type facts.
 
 use super::*;
 
+struct ValueBindings<'a> {
+    functions: Vec<&'a Callable>,
+    constructors: Vec<&'a TypeDeclaration>,
+    values: Vec<&'a ValueDeclaration>,
+    explicit_conflict: bool,
+}
+
+impl ValueBindings<'_> {
+    fn constructor_only(&self) -> bool {
+        !self.constructors.is_empty() && self.functions.is_empty() && self.values.is_empty()
+    }
+
+    fn ambiguous(&self) -> bool {
+        self.explicit_conflict
+            || self.functions.len() + self.constructors.len() + self.values.len() > 1
+    }
+
+    fn fact(&self, facts: impl IntoIterator<Item = TypeFact>) -> Option<TypeFact> {
+        let mut facts: Vec<_> = facts.into_iter().collect();
+        let fact = match facts.len() {
+            0 => return None,
+            1 => facts.pop()?,
+            _ => TypeFact::Ambiguous(facts),
+        };
+        Some(if self.ambiguous() {
+            with_uncertainty(fact, UnknownReason::AmbiguousDeclaration)
+        } else {
+            fact
+        })
+    }
+}
+
 impl WorkspaceIndex {
+    fn value_bindings(&self, path: &syn::Path, context: &Context) -> ValueBindings<'_> {
+        let segments = resolution_segments(path);
+        let paths = self.resolve_value_paths(&segments, context);
+        let mut bindings = ValueBindings {
+            functions: self.free_candidates(&paths, context),
+            constructors: indexed_positions(&paths, &self.type_paths)
+                .into_iter()
+                .map(|position| &self.declarations[position])
+                .filter(|declaration| declaration.unit || declaration.tuple_arity.is_some())
+                .filter(|declaration| self.same_workspace(&context.file, &declaration.id.file))
+                .collect(),
+            values: indexed_positions(&paths, &self.value_paths)
+                .into_iter()
+                .map(|position| &self.values[position])
+                .filter(|value| self.same_workspace(&context.file, &value.context.file))
+                .collect(),
+            explicit_conflict: self.value_path_conflicts(&segments, context),
+        };
+        bindings.functions.sort_by_key(|callable| &callable.id);
+        bindings
+            .functions
+            .dedup_by(|left, right| left.id == right.id);
+        bindings
+            .constructors
+            .sort_by_key(|declaration| &declaration.id);
+        bindings
+            .constructors
+            .dedup_by(|left, right| left.id == right.id);
+        bindings
+            .values
+            .sort_by_key(|value| (&value.context.file, value.line, value.column));
+        bindings.values.dedup_by(|left, right| {
+            left.context == right.context && left.line == right.line && left.column == right.column
+        });
+        bindings
+    }
+
+    #[cfg(test)]
+    pub(super) fn lookup_free_value(&self, path: &syn::Path, context: &Context) -> Lookup<'_> {
+        self.value_call_lookup(path, context).0
+    }
+
+    pub fn value_call_lookup(&self, path: &syn::Path, context: &Context) -> (Lookup<'_>, bool) {
+        let bindings = self.value_bindings(path, context);
+        let constructor_only = bindings.constructor_only();
+        let ambiguous = bindings.ambiguous();
+        let provenance = if bindings.functions.first().is_some_and(|call| {
+            qualified(&call.context.module, &call.signature.ident)
+                != relative_path(&resolution_segments(path), &context.module)
+        }) {
+            CallEdgeProvenance::ImportResolution
+        } else {
+            CallEdgeProvenance::AstDirect
+        };
+        (
+            Lookup {
+                justified: bindings.functions.len() == 1 && !ambiguous,
+                candidates: bindings.functions,
+                provenance,
+                reason: ambiguous.then_some(UncertaintyReason::AmbiguousDeclaration),
+            },
+            constructor_only,
+        )
+    }
+
     pub fn value_from_path(
         &self,
         path: &syn::Path,
         context: &Context,
-        substitutions: &Substitutions,
+        arguments: &[TypeFact],
     ) -> Option<TypeFact> {
-        if let Some(value) = self.declared_value_type(path, context) {
-            return Some(value);
-        }
-        let declarations = self.constructor_declarations(path, context);
-        match declarations.as_slice() {
-            [declaration] if declaration.unit => {
-                let fact = self.unit_constructor_fact(declaration, path, context, substitutions);
-                Some(
-                    if self.value_path_conflicts(&resolution_segments(path), context) {
-                        with_uncertainty(fact, UnknownReason::AmbiguousDeclaration)
-                    } else {
-                        fact
-                    },
-                )
-            }
-            _ => None,
-        }
-    }
-
-    fn unit_constructor_fact(
-        &self,
-        declaration: &TypeDeclaration,
-        path: &syn::Path,
-        context: &Context,
-        substitutions: &Substitutions,
-    ) -> TypeFact {
-        let arguments = path
-            .segments
-            .last()
-            .map(|segment| TypeSyntax::arguments(&segment.arguments))
-            .unwrap_or_default()
+        let bindings = self.value_bindings(path, context);
+        let values = bindings
+            .values
             .iter()
-            .map(|ty| self.type_from_owned(ty, context, substitutions))
-            .collect();
-        TypeFact::Nominal {
-            declaration: declaration.id.clone(),
-            arguments: complete_arguments(arguments, &declaration.generics),
-        }
+            .map(|value| self.type_from_owned(&value.ty, &value.context, &Substitutions::new()));
+        let constructors = bindings
+            .constructors
+            .iter()
+            .filter(|declaration| declaration.unit)
+            .map(|declaration| constructor_fact(declaration, arguments));
+        bindings.fact(values.chain(constructors))
     }
 
-    /// Tuple constructors provide a nominal result without being callable bodies.
-    pub fn constructor_result(
+    /// Invocation facts retain all represented alternatives, including constructors.
+    pub fn value_call_result(
         &self,
         path: &syn::Path,
         arity: usize,
         context: &Context,
         arguments: &[TypeFact],
     ) -> Option<TypeFact> {
-        if self.declared_value_type(path, context).is_some() {
-            return None;
-        }
-        let declarations = self.constructor_declarations(path, context);
-        match declarations.as_slice() {
-            [declaration]
-                if declaration.tuple_arity == Some(arity)
-                    && !self.value_path_conflicts(&resolution_segments(path), context) =>
-            {
-                Some(TypeFact::Nominal {
-                    declaration: declaration.id.clone(),
-                    arguments: complete_arguments(arguments.to_vec(), &declaration.generics),
-                })
-            }
-            _ => None,
-        }
-    }
-
-    fn constructor_declarations(
-        &self,
-        path: &syn::Path,
-        context: &Context,
-    ) -> Vec<&TypeDeclaration> {
-        let positions: HashSet<_> = self
-            .resolve_value_paths(&resolution_segments(path), context)
+        let bindings = self.value_bindings(path, context);
+        let functions = bindings
+            .functions
             .iter()
-            .filter_map(|path| self.type_paths.get(path))
-            .flatten()
-            .copied()
-            .collect();
-        positions
-            .into_iter()
-            .map(|position| &self.declarations[position])
-            .filter(|declaration| declaration.unit || declaration.tuple_arity.is_some())
-            .filter(|declaration| self.same_workspace(&context.file, &declaration.id.file))
-            .collect()
-    }
-
-    pub(super) fn declared_value_type(
-        &self,
-        path: &syn::Path,
-        context: &Context,
-    ) -> Option<TypeFact> {
-        let paths = self.resolve_value_paths(&resolution_segments(path), context);
-        let positions: HashSet<_> = paths
+            .map(|function| self.return_type(function, None, arguments));
+        let constructors = bindings
+            .constructors
             .iter()
-            .filter_map(|path| self.value_paths.get(path))
-            .flatten()
-            .copied()
-            .collect();
-        let mut values: Vec<_> = positions
-            .into_iter()
-            .map(|position| &self.values[position])
-            .filter(|value| self.same_workspace(&value.context.file, &context.file))
-            .collect();
-        values.sort_by_key(|value| (value.context.file.clone(), value.line, value.column));
-        let facts: Vec<_> = values
-            .iter()
-            .map(|value| self.type_from_owned(&value.ty, &value.context, &Substitutions::new()))
-            .collect();
-        match facts.as_slice() {
-            [] => None,
-            [fact] => Some(
-                if self.value_path_conflicts(&resolution_segments(path), context) {
-                    with_uncertainty(fact.clone(), UnknownReason::AmbiguousDeclaration)
-                } else {
-                    fact.clone()
-                },
-            ),
-            _ => Some(with_uncertainty(
-                TypeFact::Ambiguous(facts),
-                UnknownReason::AmbiguousDeclaration,
-            )),
-        }
+            .filter(|declaration| declaration.tuple_arity == Some(arity))
+            .map(|declaration| constructor_fact(declaration, arguments));
+        bindings.fact(functions.chain(constructors))
     }
 }
+
+fn constructor_fact(declaration: &TypeDeclaration, arguments: &[TypeFact]) -> TypeFact {
+    TypeFact::Nominal {
+        declaration: declaration.id.clone(),
+        arguments: complete_arguments(arguments.to_vec(), &declaration.generics),
+    }
+}
+
+fn indexed_positions(
+    paths: &[Vec<String>],
+    index: &HashMap<Vec<String>, Vec<usize>>,
+) -> Vec<usize> {
+    let mut positions: Vec<_> = paths
+        .iter()
+        .filter_map(|path| index.get(path))
+        .flatten()
+        .copied()
+        .collect();
+    positions.sort_unstable();
+    positions.dedup();
+    positions
+}
+
+#[cfg(test)]
+#[path = "values/tests.rs"]
+mod tests;
