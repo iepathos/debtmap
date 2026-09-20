@@ -61,6 +61,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Progress And Terminal Recovery** - Reports function-scoring progress and restores terminal state after editor-launch failures
 - **Documentation Accuracy** - Corrects Rust macro-expansion and Rust-only language-support claims
 - **Commit Validation CI** - Pins `crate-ci/committed` to `v1.1.11` instead of the unavailable `master` reference
+- **Coverage Test Stability** - Fixes an intermittent entropy-formatting assertion failure during parallel `just coverage-lcov` runs
+  - Removes the test's global color override and checks content independently of ANSI styling, with deterministic plain and colored regression cases
+  - Leaves production formatting and scoring unchanged
 
 ### Performance
 
