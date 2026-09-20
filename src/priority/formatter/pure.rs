@@ -330,7 +330,6 @@ mod tests {
 
     #[test]
     fn complexity_section_assigns_entropy_adjustment_to_cognitive() {
-        colored::control::set_override(false);
         let mut item = create_test_item(20.0);
         item.cyclomatic_complexity = 23;
         item.cognitive_complexity = 41;
@@ -346,6 +345,25 @@ mod tests {
         });
         let context = create_format_context(1, &item, false);
         let text = generate_formatted_sections(&context).complexity.unwrap();
+        assert_entropy_complexity_text(&text);
+    }
+
+    #[test]
+    fn entropy_complexity_assertions_accept_ansi_styling() {
+        for (start, end) in [("", ""), ("\x1b[33m", "\x1b[0m"), ("\x1b[1;92m", "\x1b[0m")] {
+            let text = format!(
+                "cyclomatic={start}23{end}, est_branches={start}23{end}, \
+                 cognitive={start}41{end} → {start}22{end} (entropy-adjusted, factor: 0.56)"
+            );
+            assert_entropy_complexity_text(&text);
+        }
+    }
+
+    fn assert_entropy_complexity_text(text: &str) {
+        // Other libtest threads can change colored's process-global override.
+        // Check content independently of presentation without changing that state.
+        let sgr = regex::Regex::new(r"\x1b\[[0-9;]*m").unwrap();
+        let text = sgr.replace_all(text, "");
         assert!(text.contains("cyclomatic=23, est_branches=23"), "{text}");
         assert!(
             text.contains("cognitive=41 → 22 (entropy-adjusted, factor: 0.56)"),
