@@ -42,7 +42,7 @@ jobs:
         cache-bin: "false"
 
     - name: Install cargo-nextest
-      uses: taiki-e/install-action@v2.87.0
+      uses: taiki-e/install-action@v2.87.14
       with:
         tool: cargo-nextest
 
@@ -103,7 +103,7 @@ jobs:
         cache-bin: "false"
 
     - name: Install cargo-nextest
-      uses: taiki-e/install-action@v2.87.0
+      uses: taiki-e/install-action@v2.87.14
       with:
         tool: cargo-nextest
 

@@ -38,7 +38,7 @@ jobs:
         cache-bin: "false"
 
     - name: Install coverage tools
-      uses: taiki-e/install-action@v2.87.0
+      uses: taiki-e/install-action@v2.87.14
       with:
         tool: cargo-llvm-cov,just
 
