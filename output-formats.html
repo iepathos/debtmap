@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-742af30f.js";
+            window.path_to_searchindex_js = "searchindex-dedc95d2.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-41409472.js"></script>
+        <script src="toc-94861fa4.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -902,10 +902,12 @@ Shows variable mutation patterns within functions:
 </code></pre>
 <p><strong>Purity Assessment:</strong></p>
 <ul>
-<li><strong>Is Pure:</strong> Boolean indicating if the function is pure (deterministic, no side effects)</li>
-<li><strong>Confidence Level:</strong> Percentage confidence in the assessment (0-100%)</li>
-<li><strong>Impurity Reasons:</strong> Specific reasons why the function is not pure</li>
+<li><strong>Is Pure:</strong> Compatibility boolean; only complete <code>StrictlyPure</code> evidence maps to true</li>
+<li><strong>Confidence Level:</strong> Supporting confidence, never a replacement for complete evidence</li>
+<li><strong>Observed Effects:</strong> Effects established by supported analysis or a reviewed model</li>
+<li><strong>Unresolved Behavior:</strong> Calls, receivers, callbacks, syntax, or bodies the analysis could not establish</li>
 </ul>
+<p>Human output reports unknown purity when evidence is incomplete. Existing JSON schemas do not add an <code>Unknown</code> enum value: optional purity fields are omitted instead. Older reports remain readable, but their legacy labels do not create effect provenance.</p>
 <p><strong>Common Impurity Reasons:</strong></p>
 <ul>
 <li>Mutates shared or global state</li>

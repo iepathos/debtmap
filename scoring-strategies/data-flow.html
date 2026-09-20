@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-742af30f.js";
+            window.path_to_searchindex_js = "../searchindex-dedc95d2.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-41409472.js"></script>
+        <script src="../toc-94861fa4.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -194,7 +194,7 @@ combined_adjustment = (purity_factor * purity_weight
 <p>Each factor ranges from 0.0 to 1.0, where lower values reduce the final priority score.</p>
 <p><strong>Source</strong>: <code>src/priority/unified_scorer.rs:1058-1075</code></p>
 <h2 id="purity-spectrum"><a class="header" href="#purity-spectrum">Purity Spectrum</a></h2>
-<p>The purity spectrum classifies functions into five levels based on their side effects and mutation behavior. Pure functions receive the lowest priority multipliers since they represent minimal technical debt.</p>
+<p>Rust scoring consumes the same typed effect assessment used by propagation and reporting. A known classification is granted only when the supported analysis is complete; unresolved behavior is represented as <code>Unknown</code> rather than being folded into <code>Impure</code> or overridden by confidence.</p>
 <h3 id="classification-levels"><a class="header" href="#classification-levels">Classification Levels</a></h3>
 <div class="table-wrapper">
 <table>
@@ -202,46 +202,32 @@ combined_adjustment = (purity_factor * purity_weight
 <tr><th>Level</th><th>Multiplier</th><th>Description</th></tr>
 </thead>
 <tbody>
-<tr><td><code>StrictlyPure</code></td><td>0.0</td><td>No mutations, no I/O, referentially transparent</td></tr>
-<tr><td><code>LocallyPure</code></td><td>0.3</td><td>Pure interface but uses local mutations internally</td></tr>
-<tr><td><code>IOIsolated</code></td><td>0.6</td><td>I/O operations clearly separated from logic</td></tr>
-<tr><td><code>IOMixed</code></td><td>0.9</td><td>I/O mixed with business logic</td></tr>
-<tr><td><code>Impure</code></td><td>1.0</td><td>Mutable state, side effects throughout</td></tr>
+<tr><td><code>StrictlyPure</code></td><td>0.0</td><td>Complete supported analysis with no modeled effects</td></tr>
+<tr><td><code>LocallyPure</code></td><td>0.3</td><td>Complete analysis with local mutation only</td></tr>
+<tr><td><code>ReadOnly</code></td><td>1.0</td><td>Complete analysis with external reads but no writes or I/O</td></tr>
+<tr><td><code>Impure</code></td><td>1.0</td><td>Confirmed external write, I/O, or modeled nondeterminism</td></tr>
+<tr><td><code>Unknown</code></td><td>1.0</td><td>Incomplete analysis, retaining any effects already observed</td></tr>
 </tbody>
 </table>
 </div>
-<p><strong>Source</strong>: <code>src/priority/unified_scorer.rs:64-94</code> (<code>PuritySpectrum</code> enum)</p>
 <h3 id="classification-algorithm"><a class="header" href="#classification-algorithm">Classification Algorithm</a></h3>
-<p>The purity factor is calculated by analyzing three sources of information from the data flow graph:</p>
+<p>The assessment contains three independent parts:</p>
 <ol>
-<li><strong>Purity Analysis Results</strong>: High-confidence purity (&gt;80%) indicates strict or local purity</li>
-<li><strong>Mutation Analysis</strong>: Tracks whether a function has local mutations</li>
-<li><strong>I/O Operations</strong>: Identifies I/O patterns for non-pure functions</li>
+<li><strong>Observed effects</strong>: local mutation, external read/write, confirmed I/O, and modeled nondeterminism</li>
+<li><strong>Unresolved behavior</strong>: unresolved or ambiguous calls, unknown receivers, unsupported syntax or dispatch, callback uncertainty, and unavailable bodies</li>
+<li><strong>Provenance</strong>: the owning definition, exact source location, resolved declaration/model identity, and propagation dependency</li>
 </ol>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>// Classification logic (simplified)
-if purity.is_pure &amp;&amp; purity.confidence &gt; 0.8 {
-    if mutations.has_mutations {
-        PuritySpectrum::LocallyPure  // 0.3 multiplier
-    } else {
-        PuritySpectrum::StrictlyPure // 0.0 multiplier
-    }
-} else if purity.is_pure {
-    PuritySpectrum::LocallyPure      // 0.3 multiplier
-} else {
-    classify_io_isolation(io_ops)    // 0.6-1.0 multiplier
+</span>match assessment.classification() {
+    StrictlyPure =&gt; 0.0,
+    LocallyPure =&gt; 0.3,
+    ReadOnly | Impure | Unknown =&gt; 1.0,
 }
 <span class="boring">}</span></code></pre>
-<p><strong>Source</strong>: <code>src/priority/unified_scorer.rs:878-918</code> (<code>calculate_purity_factor</code>)</p>
+<p>Confidence can describe supporting analysis, but cannot promote incomplete evidence to a known classification. Adding unresolved behavior cannot newly qualify a function for a purity discount.</p>
 <h3 id="io-isolation-classification"><a class="header" href="#io-isolation-classification">I/O Isolation Classification</a></h3>
-<p>For impure functions, the system evaluates I/O isolation based on concentration:</p>
-<ul>
-<li><strong>IOIsolated (0.6)</strong>: At most 2 unique I/O operation types and 3 total operations</li>
-<li><strong>IOMixed (0.9)</strong>: More than 2 unique types or more than 3 operations</li>
-<li><strong>Impure (1.0)</strong>: No I/O information available</li>
-</ul>
-<p><strong>Source</strong>: <code>src/priority/unified_scorer.rs:921-935</code> (<code>classify_io_isolation</code>)</p>
+<p><code>IOIsolated</code> and <code>IOMixed</code> remain readable legacy enum values, but fresh analysis does not infer them from operation counts. Structural I/O-isolation analysis is not implemented, so confirmed I/O receives the neutral <code>Impure</code> factor of 1.0.</p>
 <h2 id="purity-level-vs-purity-spectrum"><a class="header" href="#purity-level-vs-purity-spectrum">Purity Level vs Purity Spectrum</a></h2>
 <p>Debtmap uses two related but distinct purity classifications:</p>
 <div class="table-wrapper">
@@ -251,14 +237,13 @@ if purity.is_pure &amp;&amp; purity.confidence &gt; 0.8 {
 </thead>
 <tbody>
 <tr><td><strong>Purpose</strong></td><td>Analysis classification</td><td>Scoring multiplier</td></tr>
-<tr><td><strong>Levels</strong></td><td>4 (StrictlyPure, LocallyPure, ReadOnly, Impure)</td><td>5 (adds IOIsolated, IOMixed)</td></tr>
+<tr><td><strong>Levels</strong></td><td>5 including internal Unknown</td><td>Known levels plus legacy-readable IOIsolated/IOMixed</td></tr>
 <tr><td><strong>Usage</strong></td><td><code>src/analysis/purity_analysis.rs</code></td><td><code>src/priority/unified_scorer.rs</code></td></tr>
 <tr><td><strong>Focus</strong></td><td>Categorizing purity type</td><td>Assigning debt priority</td></tr>
 </tbody>
 </table>
 </div>
-<p><strong>PurityLevel</strong> (from purity analysis) describes <em>what kind</em> of function this is. <strong>PuritySpectrum</strong> (for scoring) determines <em>how much</em> this affects debt priority, with finer granularity for I/O patterns.</p>
-<p><strong>Source</strong>: <code>src/analysis/purity_analysis.rs:32-43</code> (<code>PurityLevel</code>), <code>src/priority/unified_scorer.rs:64-94</code> (<code>PuritySpectrum</code>)</p>
+<p>The public <code>PurityLevel</code> schema remains unchanged. Internal <code>Unknown</code> is represented by omission in compatible JSON fields, while scoring uses the typed assessment directly. Only <code>StrictlyPure</code> projects to the historical <code>is_pure: true</code> boolean.</p>
 <h2 id="pattern-factor"><a class="header" href="#pattern-factor">Pattern Factor</a></h2>
 <p>The pattern factor distinguishes data flow pipelines from business logic. Pure data transformation chains (map/filter/reduce patterns) receive reduced priority.</p>
 <h3 id="calculation"><a class="header" href="#calculation">Calculation</a></h3>

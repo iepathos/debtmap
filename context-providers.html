@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-742af30f.js";
+            window.path_to_searchindex_js = "searchindex-dedc95d2.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-41409472.js"></script>
+        <script src="toc-94861fa4.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -378,17 +378,17 @@ include_transitive = true
 max_depth = 5
 </code></pre>
 <h2 id="git-history-provider"><a class="header" href="#git-history-provider">Git History Provider</a></h2>
-<p>The Git History provider integrates version control data to detect change-prone code and bug patterns. Files with frequent changes and bug fixes indicate higher maintenance risk.</p>
+<p>The Git History provider uses version control activity and commit-message labels as maintenance signals. It does not count confirmed defects or estimate their probability.</p>
 <h3 id="metrics-collected"><a class="header" href="#metrics-collected">Metrics Collected</a></h3>
 <p>The provider analyzes Git history to calculate:</p>
 <ul>
 <li><strong>Change frequency</strong>: Commits per month (recent activity indicator)</li>
-<li><strong>Bug density</strong>: Ratio of bug fix commits to total commits</li>
+<li><strong>Fix-labelled commit ratio</strong>: Share of observed commits matching the fix-message heuristic; the JSON field remains <code>bug_density</code></li>
 <li><strong>Age</strong>: Days since first commit (maturity indicator)</li>
 <li><strong>Author count</strong>: Number of unique contributors (complexity indicator)</li>
 <li><strong>Total commits</strong>: Total number of commits to the file</li>
 <li><strong>Last modified</strong>: Timestamp of the most recent commit</li>
-<li><strong>Stability score</strong>: Weighted combination of churn, bug fixes, and age (0.0-1.0)</li>
+<li><strong>Stability classification</strong>: Heuristic label from change frequency, fix-labelled ratio, and age</li>
 </ul>
 <p><strong>What it analyzes:</strong></p>
 <ul>
@@ -397,67 +397,29 @@ max_depth = 5
 <li>Code churn (lines added/removed)</li>
 <li>Recent activity</li>
 </ul>
-<h3 id="risk-classification"><a class="header" href="#risk-classification">Risk Classification</a></h3>
-<p>The table below shows approximate contribution thresholds for understanding risk levels:</p>
+<h3 id="sample-aware-scoring-model"><a class="header" href="#sample-aware-scoring-model">Sample-aware Scoring Model</a></h3>
+<p>The historical contribution is reduced toward neutral when few modifications have been observed (<code>src/risk/context/git_history/stability.rs</code>):</p>
+<pre><code class="language-text">raw_contribution = min(1.5 * fix_labelled_ratio + min(changes_per_month / 20, 0.5), 2)
+confidence = observed_commits / (observed_commits + 5)
+history_contribution = raw_contribution * confidence
+history_only_multiplier = 1 + history_contribution
+</code></pre>
+<p>Five prior-equivalent observations are an explicit ranking policy, not a fitted statistical estimate. With no observations, history contributes zero. One observation gets 1/6 weight, five get 1/2 weight, and larger samples approach the original contribution. The contribution remains capped at 2.0. Other context providers can also contribute to the final multiplier.</p>
+<p>For function history, both the ratio and confidence use modifications <strong>after introduction</strong>. The displayed total commit count includes introduction. File fallback uses all observed commits touching the file. Output retains the recorded ratio and labelled count instead of guessing its denominator from the displayed total.</p>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Category</th><th>Conditions</th><th>Contribution</th><th>Explanation</th></tr>
+<tr><th>Observed modifications</th><th>Frequency</th><th>Fix-labelled ratio</th><th>Confidence</th><th>History-only multiplier</th></tr>
 </thead>
 <tbody>
-<tr><td>Very unstable</td><td>freq &gt; 5.0 AND bug_density &gt; 0.3</td><td>2.0</td><td>High churn with many bug fixes</td></tr>
-<tr><td>Moderately unstable</td><td>freq &gt; 2.0 OR bug_density &gt; 0.2</td><td>1.0</td><td>Frequent changes or bug-prone</td></tr>
-<tr><td>Slightly unstable</td><td>freq &gt; 1.0 OR bug_density &gt; 0.1</td><td>0.5</td><td>Some instability</td></tr>
-<tr><td>Stable</td><td>freq ≤ 1.0 AND bug_density ≤ 0.1</td><td>0.1</td><td>Low change rate, few bugs</td></tr>
+<tr><td>0</td><td>0/month</td><td>0%</td><td>0</td><td>1.00x</td></tr>
+<tr><td>1</td><td>4.2/month</td><td>100%</td><td>1/6</td><td>1.285x</td></tr>
+<tr><td>5</td><td>4.2/month</td><td>100%</td><td>1/2</td><td>1.855x</td></tr>
+<tr><td>995</td><td>4.2/month</td><td>100%</td><td>0.995</td><td>2.70145x</td></tr>
 </tbody>
 </table>
 </div>
-<h4 id="continuous-scoring-model"><a class="header" href="#continuous-scoring-model">Continuous Scoring Model</a></h4>
-<p>The actual implementation uses a <strong>continuous scoring formula</strong> rather than discrete thresholds. This provides more accurate differentiation between risk levels (from <code>src/risk/context/git_history.rs:495</code>):</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>contribution = (bug_density * 1.5) + min(change_frequency / 20.0, 0.5)
-<span class="boring">}</span></code></pre>
-<p><strong>Scoring breakdown:</strong></p>
-<ul>
-<li>
-<p><strong>Bug density</strong> (primary signal): Scales linearly from 0.0 to 1.5</p>
-<ul>
-<li>0% bugs → 0.0 contribution</li>
-<li>50% bugs → 0.75 contribution</li>
-<li>100% bugs → 1.5 contribution</li>
-</ul>
-</li>
-<li>
-<p><strong>Change frequency</strong> (secondary signal): Scales from 0.0 to 0.5, saturates at 10/month</p>
-<ul>
-<li>0/month → 0.0</li>
-<li>5/month → 0.25</li>
-<li>10+/month → 0.5 (capped)</li>
-</ul>
-</li>
-<li>
-<p><strong>Total</strong> is capped at 2.0 to prevent excessive score amplification</p>
-</li>
-<li>
-<p>Stable code with no bugs and no changes contributes 0.0 (no risk increase)</p>
-</li>
-</ul>
-<p><strong>Example calculations:</strong></p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Scenario</th><th>Frequency</th><th>Bug Density</th><th>Contribution</th></tr>
-</thead>
-<tbody>
-<tr><td>Stable code</td><td>0.0/month</td><td>0%</td><td>0.0</td></tr>
-<tr><td>Low activity, some bugs</td><td>2.0/month</td><td>25%</td><td>0.475</td></tr>
-<tr><td>High churn, no bugs</td><td>10.0/month</td><td>0%</td><td>0.5</td></tr>
-<tr><td>Bug-prone</td><td>0.5/month</td><td>100%</td><td>1.525</td></tr>
-<tr><td>Critical hotspot</td><td>10.0/month</td><td>50%</td><td>1.25</td></tr>
-</tbody>
-</table>
-</div>
+<p>The 100% ratio in the one-modification example means one observed modification had a matching message. It is not evidence that every line is defective, or that the function has the same evidence strength as 995 labelled modifications.</p>
 <h3 id="bug-fix-detection"><a class="header" href="#bug-fix-detection">Bug Fix Detection</a></h3>
 <p>The provider identifies bug fixes using sophisticated pattern matching with <strong>word boundary detection</strong> to minimize false positives from substring matches like “prefix” or “debug”.</p>
 <p><strong>Detection Patterns:</strong></p>
@@ -506,66 +468,15 @@ max_depth = 5
 </tbody>
 </table>
 </div>
-<p><strong>Bug Density Calculation:</strong></p>
+<p><strong>Fix-labelled Commit Ratio:</strong></p>
 <pre><code>bug_density = bug_fix_count / total_commits
 </code></pre>
-<p>For example, if a file has 10 total commits and 3 are genuine bug fixes (after exclusion filtering):</p>
-<ul>
-<li>Bug density = 3/10 = 0.30 (30%)</li>
-</ul>
-<p>A file with 100% bug density means every commit to that file was a bug fix, which is a strong signal that the code is problematic.</p>
-<h3 id="research-background-the-bug-magnet-hypothesis"><a class="header" href="#research-background-the-bug-magnet-hypothesis">Research Background: The Bug Magnet Hypothesis</a></h3>
-<p>The use of git history for risk assessment is backed by extensive empirical research in software engineering. The core theory, often called the <strong>“Bug Magnet Hypothesis”</strong>, states that <strong>code with a history of bugs is significantly more likely to contain future bugs</strong>.</p>
-<h4 id="empirical-evidence"><a class="header" href="#empirical-evidence">Empirical Evidence</a></h4>
-<p>Multiple large-scale studies have validated this approach:</p>
-<ul>
-<li>
-<p><strong>Microsoft Study (Nagappan &amp; Ball, 2005)</strong>: Analyzed Windows Server 2003 and found that modules with prior bugs were <strong>4-16 times more likely</strong> to have future bugs than modules without bug history.</p>
-</li>
-<li>
-<p><strong>Mozilla Study (Hassan, 2009)</strong>: Found that bug prediction models based on change history achieved <strong>73% accuracy</strong> in identifying future buggy files.</p>
-</li>
-<li>
-<p><strong>Linux Kernel Study (Kim et al., 2007)</strong>: Showed that files with bug fixes in their recent history had a significantly higher probability of containing latent defects.</p>
-</li>
-</ul>
-<h4 id="why-past-bugs-predict-future-bugs"><a class="header" href="#why-past-bugs-predict-future-bugs">Why Past Bugs Predict Future Bugs</a></h4>
-<p>There are four key mechanisms that explain this phenomenon:</p>
-<ol>
-<li>
-<p><strong>Inherent Complexity</strong>: Code that attracted bugs in the past is often more complex, making it harder to fix correctly and more prone to regression.</p>
-</li>
-<li>
-<p><strong>Incomplete Understanding</strong>: If developers repeatedly introduce bugs in the same area, it suggests the code is difficult to understand or has subtle edge cases.</p>
-</li>
-<li>
-<p><strong>Technical Debt Accumulation</strong>: Bug fixes under time pressure often introduce workarounds rather than proper solutions, creating technical debt that leads to more bugs.</p>
-</li>
-<li>
-<p><strong>Broken Window Effect</strong>: Once code develops a reputation for being buggy, it may receive less careful maintenance, perpetuating the cycle.</p>
-</li>
-</ol>
-<h4 id="interpreting-bug-density-scores"><a class="header" href="#interpreting-bug-density-scores">Interpreting Bug Density Scores</a></h4>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Bug Density</th><th>Interpretation</th><th>Action</th></tr>
-</thead>
-<tbody>
-<tr><td>0% - 10%</td><td>Healthy</td><td>Typical for stable, well-tested code</td></tr>
-<tr><td>10% - 30%</td><td>Moderate concern</td><td>Consider adding tests or documentation</td></tr>
-<tr><td>30% - 50%</td><td>High risk</td><td>Strong candidate for refactoring</td></tr>
-<tr><td>50% - 100%</td><td>Critical</td><td>Almost certainly needs redesign or major refactoring</td></tr>
-</tbody>
-</table>
-</div>
-<p><strong>Example from real output:</strong></p>
-<pre><code>├─ GIT HISTORY: 2.0 changes/month, 100.0% bugs, 30 days old, 1 authors
-│  └─ Risk Impact: base_risk=39.7 → contextual_risk=88.9 (2.2x multiplier)
-</code></pre>
-<p>This shows a file where <strong>every single commit</strong> was a bug fix (100% bug density), resulting in a 2.2x risk multiplier. This is a critical red flag indicating code that needs immediate attention.</p>
+<p>For example, if a file has 10 observed commits and 3 messages match the heuristic after exclusion filtering, its ratio is 3/10 = 0.30 (30%).</p>
+<p>A 100% ratio means every sampled commit matched the message heuristic. Validate the changes themselves before treating those labels as defect evidence.</p>
+<h3 id="interpreting-history-signals"><a class="header" href="#interpreting-history-signals">Interpreting History Signals</a></h3>
+<p>Use the ratio together with sample size, change frequency, coverage, and the actual commit diffs. A high ratio can justify inspection; it does not establish that redesign is necessary. A zero ratio can reflect message conventions or missing history and does not establish correctness. The scoring coefficients and confidence policy have not been calibrated as defect probabilities.</p>
 <h4 id="limitations-and-false-positives"><a class="header" href="#limitations-and-false-positives">Limitations and False Positives</a></h4>
-<p>The improved detection methodology with word boundary matching and exclusion filters significantly reduces false positives, but some limitations remain:</p>
+<p>Word boundary matching and exclusion filters reject several known message patterns, but they do not validate the underlying changes:</p>
 <p><strong>Reduced Issues</strong> (handled by word boundaries and exclusion filters):</p>
 <ul>
 <li>✅ <strong>Substring matches</strong>: Word boundary matching (<code>\bfix\b</code>) now correctly excludes “prefix”, “fixture”, “suffix”, and “debugging”</li>
@@ -583,41 +494,21 @@ max_depth = 5
 </li>
 <li><strong>New code</strong>: Cannot assess code without commit history
 <ul>
-<li>Files with &lt;5 commits may not have enough data for reliable bug density calculation</li>
+<li>Small samples receive less scoring weight even when the raw labelled ratio is high</li>
 </ul>
 </li>
 <li><strong>Language barriers</strong>: Non-English commit messages may use different bug-fix keywords</li>
 <li><strong>Informal commits</strong>: Internal repos may use different conventions (e.g., ticket IDs only)</li>
 </ul>
-<p><strong>Accuracy Improvements:</strong></p>
-<p>Before word boundary matching and exclusion filters:</p>
-<ul>
-<li>False positive rate: ~15-25% (substring matches, style commits, etc.)</li>
-</ul>
-<p>After improvements:</p>
-<ul>
-<li>False positive rate: ~5-10% (primarily commit message quality issues)</li>
-<li>Precision: Significantly improved, particularly for conventional commit style repositories</li>
-</ul>
-<p><strong>Recommended practice</strong>: Use git history as one signal among many. Combine it with complexity metrics, test coverage, and dependency analysis for a complete risk picture. The bug density metric is most reliable when:</p>
+<p>No repository-scale false-positive rate or defect-prediction accuracy is claimed for this heuristic.</p>
+<p><strong>Recommended practice</strong>: Use git history as one signal among many. Interpret labelled ratios in the context of:</p>
 <ul>
 <li>Repository uses consistent commit message conventions</li>
-<li>Files have at least 10+ commits in their history</li>
+<li>The number of observed modifications</li>
 <li>Development team follows English-based conventional commit style</li>
 </ul>
-<h3 id="stability-score"><a class="header" href="#stability-score">Stability Score</a></h3>
-<p>Stability is calculated using weighted factors:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>stability = (churn_factor × 0.4) + (bug_factor × 0.4) + (age_factor × 0.2)
-
-where:
-  churn_factor = 1.0 / (1.0 + monthly_churn)
-  bug_factor = 1.0 - (bug_fixes / total_commits)
-  age_factor = min(1.0, age_days / 365.0)
-<span class="boring">}</span></code></pre>
 <h3 id="stability-status-classifications"><a class="header" href="#stability-status-classifications">Stability Status Classifications</a></h3>
-<p>The provider internally classifies files into stability statuses based on the calculated metrics:</p>
+<p>Legacy internal and JSON stability labels use the following thresholds. These labels are history summaries, not validated defect classifications; the contribution uses the separate sample-aware formula above.</p>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -1149,7 +1040,7 @@ let contribution = context.total_contribution();
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="call-graph-analysis.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="rust-effect-analysis.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
@@ -1163,7 +1054,7 @@ let contribution = context.total_contribution();
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="call-graph-analysis.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="rust-effect-analysis.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 

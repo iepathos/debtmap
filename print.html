@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-742af30f.js";
+            window.path_to_searchindex_js = "searchindex-dedc95d2.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-41409472.js"></script>
+        <script src="toc-94861fa4.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -1412,6 +1412,11 @@ Similar to <code>analyze</code> but enforces thresholds defined in configuration
 </ul>
 <p><strong>Description:</strong>
 Compares two analysis results and generates a diff showing improvements or regressions in code quality metrics.</p>
+<p>Requires matching analyzer versions and compatible analysis receipts with
+complete scope. Incompatible or unverifiable inputs exit nonzero, explain the
+reason on stderr, and do not emit or overwrite a comparison report. Regenerate
+both reports using the same Debtmap version and settings after an upgrade;
+legacy reports without receipts cannot establish comparable measurements.</p>
 <h3 id="validate-improvement"><a class="header" href="#validate-improvement"><code>validate-improvement</code></a></h3>
 <p>Validate that technical debt improvements meet quality thresholds.</p>
 <p><strong>Usage:</strong></p>
@@ -5847,6 +5852,24 @@ Impact:
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="compare-analysis"><a class="header" href="#compare-analysis">Compare Analysis</a></h1>
 <p>The <code>compare</code> command enables you to track technical debt changes over time by comparing two analysis results. This is essential for validating refactoring efforts, detecting regressions in pull requests, and monitoring project health trends.</p>
+<h2 id="comparable-inputs-are-required"><a class="header" href="#comparable-inputs-are-required">Comparable inputs are required</a></h2>
+<p><code>compare</code> checks report provenance before calculating changes. Both inputs must
+identify the same Debtmap version, contain analysis receipts with complete scope,
+and agree on analysis policy, evidence settings, selection, analysis target and
+multi-pass configuration. Source revisions and measured values may differ;
+parallel execution and worker counts need not match.</p>
+<p>Incompatible inputs, missing analyzer identity or receipts, and partial, limited
+or unknown scopes produce a nonzero exit status with an explanation on stderr.
+No trend report is emitted and an existing <code>--output</code> file is left unchanged.
+This applies to JSON, Markdown and terminal output. Older v3 reports remain
+readable, but reports without receipts cannot establish a safe comparison.</p>
+<p>After upgrading Debtmap, regenerate both the before and after reports with the
+same analyzer version and settings. Comparing an old baseline to a newly scored
+report can mistake analyzer changes for code improvements or regressions.
+Matching provenance is a prerequisite for comparison, not proof that a score
+change was caused by a particular refactoring.
+Analyzer identity uses the recorded package version; it cannot distinguish
+locally modified development builds that reuse the same version string.</p>
 <h2 id="implementation-status"><a class="header" href="#implementation-status">Implementation Status</a></h2>
 <p><strong>All Features Available Now</strong>:</p>
 <ul>
@@ -10623,10 +10646,12 @@ Shows variable mutation patterns within functions:
 </code></pre>
 <p><strong>Purity Assessment:</strong></p>
 <ul>
-<li><strong>Is Pure:</strong> Boolean indicating if the function is pure (deterministic, no side effects)</li>
-<li><strong>Confidence Level:</strong> Percentage confidence in the assessment (0-100%)</li>
-<li><strong>Impurity Reasons:</strong> Specific reasons why the function is not pure</li>
+<li><strong>Is Pure:</strong> Compatibility boolean; only complete <code>StrictlyPure</code> evidence maps to true</li>
+<li><strong>Confidence Level:</strong> Supporting confidence, never a replacement for complete evidence</li>
+<li><strong>Observed Effects:</strong> Effects established by supported analysis or a reviewed model</li>
+<li><strong>Unresolved Behavior:</strong> Calls, receivers, callbacks, syntax, or bodies the analysis could not establish</li>
 </ul>
+<p>Human output reports unknown purity when evidence is incomplete. Existing JSON schemas do not add an <code>Unknown</code> enum value: optional purity fields are omitted instead. Older reports remain readable, but their legacy labels do not create effect provenance.</p>
 <p><strong>Common Impurity Reasons:</strong></p>
 <ul>
 <li>Mutates shared or global state</li>
@@ -13506,24 +13531,75 @@ trait_delegation_threshold = 0.95
 <p>By identifying boilerplate with 85%+ confidence, Debtmap ensures that high-complexity scores reflect actual cognitive burden rather than necessary but mechanical code patterns.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="call-graph-analysis"><a class="header" href="#call-graph-analysis">Call Graph Analysis</a></h1>
-<p>Debtmap constructs detailed call graphs to track function relationships and dependencies across your codebase. This enables critical path identification, circular dependency detection, and transitive coverage propagation.</p>
+<p>Debtmap constructs call graphs to track function relationships and dependencies across your codebase. This supports dependency analysis, circular dependency detection, and transitive coverage propagation.</p>
 <h2 id="overview-12"><a class="header" href="#overview-12">Overview</a></h2>
 <p>Call graph analysis builds a comprehensive map of which functions call which other functions. This information powers several key features:</p>
 <ul>
-<li><strong>Critical path identification</strong> - Find frequently-called functions that deserve extra attention</li>
+<li><strong>Dependency analysis</strong> - Find functions with many direct callers or callees</li>
 <li><strong>Circular dependency detection</strong> - Identify problematic circular call patterns</li>
 <li><strong>Transitive coverage</strong> - Propagate test coverage through the call graph</li>
 <li><strong>Dependency visualization</strong> - See caller/callee relationships in output</li>
 <li><strong>Risk assessment</strong> - Factor calling patterns into priority scoring</li>
 </ul>
+<h3 id="immediate-dependency-metrics"><a class="header" href="#immediate-dependency-metrics">Immediate dependency metrics</a></h3>
+<p>Recursive calls remain in the graph, but a function does not count itself as an
+external caller or callee. Immediate neighborhood size counts distinct neighboring
+definitions across both directions: a mutually recursive neighbor counts once.
+Definitions are distinguished by their source identities before display names are
+formatted. Colliding display labels include source locations.</p>
+<p>Public JSON v3 retains the field names <code>blast_radius</code> and
+<code>production_blast_radius</code>. They report immediate neighborhood counts, not
+transitive impact. The production count unions production callers with direct
+callees. Historical records containing only display labels cannot recover exact
+definition identities; their fallback count deduplicates available labels and
+retains any unlabeled counts.</p>
+<p>Dependency degree alone does not establish a critical execution path and does
+not set <code>critical_path</code>. Human output reports factual neighbor counts without
+assigning impact severity from those counts.</p>
 <h2 id="call-graph-construction"><a class="header" href="#call-graph-construction">Call Graph Construction</a></h2>
-<p>Debtmap builds call graphs through a three-phase AST-based construction process:</p>
+<p>For Rust, Debtmap builds an immutable declaration index over all discovered
+source files before analyzing function bodies. Source readers capture each file once;
+both parsing passes use that snapshot:</p>
 <ol>
-<li><strong>Extract functions and collect unresolved calls</strong> - Parse each file to identify function definitions and call expressions</li>
-<li><strong>Resolve calls using CallResolver and PathResolver</strong> - Match call expressions to function definitions within the same file</li>
-<li><strong>Final cross-file resolution</strong> - Resolve remaining calls across module boundaries</li>
+<li><strong>Index declarations</strong> — Parse batches of at most 200 files and retain owned
+type syntax, aliases, fields, imports, callable signatures, receiver forms, module
+relationships, and definition locations. Finalize the index after every batch
+has contributed declarations; it contains no ASTs or spans.</li>
+<li><strong>Collect source facts</strong> — Reparse bounded batches against the complete index,
+tracking lexical bindings and supported receiver types. Drop each batch before
+resetting span storage. File ordering and batch boundaries do not restrict lookup.</li>
+<li><strong>Record outcomes</strong> — Add an ordinary edge when declaration evidence justifies a
+target; otherwise preserve the call and its admissible possible targets separately.</li>
 </ol>
-<p>This multi-phase approach ensures accurate resolution while handling complex scenarios like trait methods, macros, and module imports.</p>
+<p>The standard <code>analyze</code> command also uses this resolver when its graph is built from
+cached extraction data. Rust extraction retains a source snapshot so that the complete
+declaration index can be reconstructed before resolving bodies. Older cache records
+without source snapshots preserve uncertain method calls instead of recovering edges
+through name-only matching. Public JSON output does not expose the internal snapshot.
+Rust extraction, metrics, and cached graphs use the same module-qualified function
+names, including multiple inline modules on one source line. Current extraction
+records support Postcard round trips with present or absent source snapshots; this
+does not provide migration for older binary cache layouts.
+Keeping these snapshots costs source-sized storage. Graph construction parses each
+snapshot twice, once for owned declarations and once for body analysis; it avoids
+retaining an entire workspace AST or parsing separately for each function. Resolution totals are available in existing debug logs with
+<code>RUST_LOG=debtmap=debug</code>.</p>
+<p>Git-history context retains qualified names as cache keys and searches the source
+declaration spelling, such as <code>fn run</code> for <code>Worker::run</code>. A completed history preload
+also remembers missing results, allowing cached file-history fallback without
+repeating the repository scan during scoring. This history search remains based on
+textual occurrences; it does not distinguish same-named historical declarations
+within one file. Function-scoring progress advances as metrics finish.</p>
+<p>Definition identity includes its file, name, line, and optional zero-based identifier
+column. Rust extraction and metric adapters populate the same columns, distinguishing
+same-line implementations without changing display names. Older JSON records default
+missing columns to absent; a legacy lookup selects a definition only when unique.
+Type identity additionally preserves its lexical module. Printed
+names are display values. A dotted call cannot select a free function or an
+associated function without a receiver. Known receiver constraints remain in force
+through import lookup and fallback handling: <code>Timeline</code> never matches <code>PyTimeline</code>
+merely because their names have a common suffix. A unique method name alone does
+not establish a resolved edge.</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Example: Debtmap tracks these relationships
@@ -13539,16 +13615,143 @@ fn validate_input(input: &amp;str) -&gt; Result&lt;()&gt; {
 <span class="boring">}</span></code></pre>
 <p><strong>Source</strong>: Example pattern from tests/call_graph_comprehensive_test.rs:48-94</p>
 <h3 id="resolution-mechanisms"><a class="header" href="#resolution-mechanisms">Resolution Mechanisms</a></h3>
-<p>The call graph analyzer handles complex resolution scenarios:</p>
+<p>The bounded Rust resolver supports:</p>
 <ul>
-<li><strong>Trait method resolution</strong> - Resolves trait method calls to implementations using struct prefixes (e.g., <code>Processor::process</code>)</li>
-<li><strong>Macro expansion tracking</strong> - Classifies and tracks calls within macros (collection, formatting, assertion, and logging macros)</li>
-<li><strong>Module path resolution</strong> - Resolves fully-qualified paths across module boundaries</li>
-<li><strong>Cross-file resolution</strong> - Matches unresolved calls (marked with line 0) to actual function definitions</li>
+<li>Parameters, <code>self</code>/<code>Self</code>, annotated and inferred locals, local aliases,
+references, dereferences of known references, and parentheses.</li>
+<li>Struct literals, declared unit structs, tuple-struct constructors with matching
+arity, named and tuple fields, and known
+function/method return chains. Local async declarations propagate their output
+through <code>.await</code>.</li>
+<li>Explicit module paths and imports when the discovered source establishes one
+declaration identity. Type import aliases retain declaration identities. Module <code>#[path]</code> attributes normalize <code>.</code>
+and <code>..</code> for lookup while preserving the discovered file’s identity. Absolute
+external paths such as <code>::std</code> do not select similarly named local modules. Local
+declarations and explicit imports shadow globs in the relevant namespace; conflicts
+retain admissible owner constraints rather than selecting one declaration.</li>
+<li>Constants and statics use their declared value types. Enums and type aliases
+do not establish unit-struct values merely by sharing a name.</li>
+<li>Direct generic substitution from explicit arguments and known receiver arguments
+into fields and return types. Lifetimes do not become part of a type name; const
+arguments are retained without evaluation. A declared <code>new() -&gt; Other</code> returns
+<code>Other</code>, irrespective of its constructor-like name.</li>
+<li>Inherent methods and concrete trait implementations whose owner, trait scope,
+and requirements are established. Explicit trait qualification distinguishes
+competing implementation bodies from trait declarations and retains the enclosing
+impl’s <code>Self</code> substitution. Dynamic and generic trait bounds retain declaration
+identities from their original lexical context through fields, aliases, returns,
+and substitutions. Unavailable bounds retain that context and diagnostic reason.</li>
+<li>Primitive receiver identities, references, aliases, and lexical type shadowing.
+A primitive receiver excludes incompatible nominal owners; explicit qualification
+may resolve a local trait implementation. Dotted primitive calls remain uncertain
+because library inherent-method precedence is not indexed.</li>
 </ul>
-<p><strong>Source</strong>: Resolution mechanisms from src/analyzers/call_graph/trait_handling.rs, src/analyzers/call_graph/macro_expansion.rs, src/analyzers/call_graph/path_resolver.rs</p>
+<p>Bindings follow lexical scope. An initializer sees the previous binding; an
+unknown inner binding shadows an outer known binding. Unsupported pattern bindings
+introduce unknown facts. Assignments update inferred types or preserve explicit
+constraints with uncertainty; branch joins require agreement. Loops conservatively
+invalidate inferred facts they modify. Conditions carry distinct successful and
+unsuccessful binding states through <code>&amp;&amp;</code>, <code>||</code>, <code>if</code>, and <code>while</code>, so successful
+let-chain bindings reach their branch. Block items have separate type and value
+shadows with block-wide item scope.
+Tuple annotations retain each component’s declared owner when initializer facts
+are unavailable. A contradictory component remains constrained uncertainty without
+making unrelated owners possible or invalidating an agreeing sibling.</p>
+<p>Project declarations named <code>clone</code>, <code>get</code>, or <code>any</code> receive the same receiver
+checks as other methods. Their names alone do not establish library ownership.
+Existing supported macro argument scanning, function-pointer tracking, and framework
+registrations remain separate inputs to graph construction. Trait enhancement
+consumes shared call uncertainty and cannot recreate ordinary method edges through
+weaker name matching. Sequential, parallel, and cached-source builders accumulate
+enhancement metadata across batches and finalize it once against existing canonical
+definitions. Unmatched legacy metadata remains diagnostic; it creates no ghost node.
+Public <code>RustCallGraphBuilder::build()</code> also finalizes collected enhancement. Explicit
+finalization followed by <code>build()</code> performs one pass; collecting more metadata
+requires another pass without duplicating Visit patterns. The effects entry point
+seeds canonical definitions from its supplied AST before applying enhancement.</p>
+<h3 id="possible-calls-and-dead-code"><a class="header" href="#possible-calls-and-dead-code">Possible Calls and Dead Code</a></h3>
+<p><code>CallGraph</code> retains uncertain calls with caller and call-site identity, lexical
+module, query, available receiver information, sorted deduplicated candidate
+identities, and a reason. Reasons distinguish unknown receivers, ambiguous
+identities, unsupported type operations, unavailable definitions, and analysis
+limits. Zero-candidate calls remain available for diagnostics. Repeated merges
+preserve distinct sites and do not duplicate identical records.
+Legacy extraction summaries without columns carry a separate occurrence ordinal,
+so repeated calls on one line remain distinct without fabricated source positions.
+Loading legacy graph records deduplicates edges and evidence and rebuilds indexes.
+Sequential and parallel conversions also retain legacy entry-point and test flags.</p>
+<p>Ordinary <code>get_callers</code> and <code>get_callees</code> queries return resolved relationships.
+Possible targets do not increase caller/dependency counts or propagate coverage,
+purity, or ordinary graph scores. Internal consumers can use <code>uncertain_calls</code>,
+<code>get_possible_callers</code>, <code>get_possible_callees</code>, and
+<code>get_transitive_possible_callees</code> to inspect uncertainty explicitly.</p>
+<p>The caller-based dead-code classifier withholds <code>DeadCode</code> when an admissible
+possible caller exists. Enhanced reachability analysis follows both resolved and
+possible relations from its existing live roots, protecting reachable descendants.
+An uncertain call in unreachable code does not become a new root. Definitely-live
+queries retain their existing resolved semantics. Zero-candidate calls cannot
+protect unrelated functions; missing project targets remain a limitation of
+syntax-based dead-code analysis.</p>
+<h3 id="accuracy-limits"><a class="header" href="#accuracy-limits">Accuracy Limits</a></h3>
+<p>This is a bounded source resolver, not Rust’s type checker. Dynamic dispatch and
+unresolved generic trait receivers retain possible implementation targets.
+Trait paths with generic or associated arguments and reference-owned trait impls
+remain uncertain. Trait declarations without bodies are not graph nodes; default
+trait bodies are not instantiated for concrete impls that omit an override. Nested
+glob reexports are unsupported. An explicitly qualified or imported unavailable
+receiver excludes unrelated project methods; a bare unavailable receiver may retain
+a possible target found only by method name. Custom
+<code>Deref</code>, blanket-impl solving, associated-type projection, arbitrary coercions,
+general <code>?</code>/wrapper inference, and const-generic evaluation remain unsupported.
+Block-local item declarations and imports are not indexed as independent lexical
+module contexts; calls requiring those contexts remain uncertain. Receiver checks
+respect those block-local shadows in qualified types and trait bounds inside
+<code>dyn T</code>, excluding unrelated module-level targets. Reference projection preserves
+these constraints; associated-call owner and trait arguments use the same lexical
+type lowering. Alias bodies, fields and returns retain their declaration context.
+Generic arguments
+are not inferred from arbitrary argument constraints, including tuple-constructor
+arguments. Constructors supply a nominal type without manufacturing a callable node.
+Value lookup considers functions, constructors and constants together, so mixed
+glob bindings remain ambiguous even when only one has a callable body. Renamed
+free-function imports retain their resolved declaration identity.
+Loop analysis does not compute a fixed point. Alias and substitution
+expansion stops at 32 levels; recursive aliases and other incomplete facts remain
+uncertain instead of triggering a name-only guess.</p>
+<p>Existing source discovery remains authoritative. The resolver does not invoke
+Cargo project builds or metadata, download dependencies, execute build scripts, or
+introduce general macro expansion. It does not use rust-analyzer. Ambiguous crate,
+module, or configuration contexts may remain unresolved; filenames alone do not
+establish cross-crate ownership.</p>
+<p>These internal graph changes do not add fields to public JSON v3 output. Internal
+serialized graphs in self-describing formats such as JSON preserve uncertainty and
+evidence; older JSON graphs load with empty uncertainty. The existing graph serializer
+does not support a postcard round trip, so binary-format compatibility is not claimed.
+Caller counts and debt rankings can change as incorrect edges are removed or supported
+calls are recovered.</p>
+<p>The labeled regression corpus is in <code>tests/data/rust_method_resolution/</code>. Its
+exact-edge precision and recall describe those fixtures only, not arbitrary Rust
+projects. The additional identity, receiver, lexical, and workspace-boundary regression
+targets cover the nine reviewed gaps, including exact possible-target sets and
+199/200/201/401-file workspaces. The existing Criterion call-graph benchmark measures
+sequential and parallel Rust workspace construction at those boundaries:</p>
+<pre><code class="language-bash">cargo bench --offline --profile dev --bench call_graph_bench -- rust_workspace_resolution
+</code></pre>
+<p>The <a href="../../docs/benchmarks/rust-resolution-nine-gaps.html">measured repair report</a>
+records five warmed debug runs on identical frozen repository and synthetic inputs,
+including context/LCOV, phase timings, peak memory, and the full CLI commands with
+the interactive explorer disabled. Fixture and boundary benchmarks do not establish
+repository-scale performance.</p>
+<p>The <a href="../../docs/rust-resolution-gap-test-matrix.html">systematic gap matrix</a> adds
+451 identity, expression and namespace cases, plus independent compiler
+classifications and harness rejection checks. These targets run in
+<code>just test-integration</code>; the selected fast <code>just test</code> suite alone does not run
+them. The <a href="../../docs/benchmarks/rust-resolution-gap-repairs.html">follow-up performance report</a>
+records the comparison against the committed matrix baseline.</p>
 <h3 id="parallel-construction"><a class="header" href="#parallel-construction">Parallel Construction</a></h3>
-<p>Call graph construction runs in parallel by default for improved performance. You can disable parallel processing with <code>--no-parallel</code> for debugging purposes, though this affects overall analysis performance, not just call graph construction.</p>
+<p>Sequential and parallel Rust builders use the same complete workspace resolution.
+Parallel conversion preserves resolved edge evidence, node role evidence, and
+uncertain calls. Call graph construction runs in parallel by default for improved performance. You can disable parallel processing with <code>--no-parallel</code> for debugging purposes, though this affects overall analysis performance, not just call graph construction.</p>
 <h2 id="configuration-6"><a class="header" href="#configuration-6">Configuration</a></h2>
 <p>Call graph behavior is controlled through two configuration sections:</p>
 <h3 id="analysis-settings"><a class="header" href="#analysis-settings">Analysis Settings</a></h3>
@@ -13726,6 +13929,90 @@ debtmap analyze . --no-parallel
 <li><a href="configuration.html">Configuration</a> - Complete configuration reference</li>
 <li><a href="#cli-reference">CLI Reference</a> - All command-line flags</li>
 </ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="rust-effect-analysis"><a class="header" href="#rust-effect-analysis">Rust effect analysis</a></h1>
+<p>Debtmap’s Rust purity signal is derived from owned semantic evidence collected by the bounded workspace resolver. Observed effects, unresolved behavior, and provenance are retained separately through graph merging, propagation, data-flow preparation, scoring, and human reporting.</p>
+<h2 id="classification-contract"><a class="header" href="#classification-contract">Classification contract</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Evidence</th><th>Internal classification</th></tr>
+</thead>
+<tbody>
+<tr><td>Complete supported analysis, no effects</td><td><code>StrictlyPure</code></td></tr>
+<tr><td>Complete analysis, local mutations only</td><td><code>LocallyPure</code></td></tr>
+<tr><td>Complete analysis, external reads without writes or I/O</td><td><code>ReadOnly</code></td></tr>
+<tr><td>Confirmed external write, I/O, or modeled nondeterminism</td><td><code>Impure</code></td></tr>
+<tr><td>Incomplete analysis without a confirmed impure effect</td><td><code>Unknown</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>Confirmed impure effects remain <code>Impure</code> even when additional behavior is unresolved. Every observed fact and uncertainty reason remains available for explanations. The model concerns modeled program effects; it does not prove termination, panic freedom, allocation success, or timing independence.</p>
+<h2 id="supported-evidence"><a class="header" href="#supported-evidence">Supported evidence</a></h2>
+<p>Project calls use exact declaration identities, lexical scopes, receiver facts, and source locations. Callable references remain reachability relationships and do not execute their targets. Closure bodies contribute effects only when a supported invocation relationship executes them. Directly bound callbacks and modeled <code>Option</code>/<code>Result</code> callback operations are supported; unsupported consumers, escapes, reassignment, and indirect invocation remain uncertain.</p>
+<p>Transparent project wrappers are recognized from a single direct callback-parameter invocation, not from a function-name whitelist. Their callers retain confirmed callback effects alongside any unresolved generic-wrapper behavior. Immutable locally bound closures can execute against their captured lexical facts; changed captures and unsupported forwarding remain uncertain. Constructing supported async functions, methods, blocks, or closures does not execute their bodies.</p>
+<p>The reviewed standard-library registry covers the primitive and string operations needed by the resolver corpus, selected collection operations, selected <code>Option</code>/<code>Result</code> operations, memory-backed cursor reads/writes, and explicit filesystem, console, environment, time, and socket operations. Collection mutation is local only when receiver ownership is established. Generic dispatch such as an unknown key’s <code>Hash</code> implementation remains uncertain.</p>
+<p>Project definitions take precedence over library models. Imports, aliases, lexical shadowing, receiver facts, and source identity determine model selection; variable spelling and method-name substrings do not. Unsupported third-party HTTP/database APIs remain <code>Unknown</code>, not inferred I/O.</p>
+<h2 id="compatibility-and-scoring"><a class="header" href="#compatibility-and-scoring">Compatibility and scoring</a></h2>
+<p>Public JSON v3/v4 fields and enum values are unchanged. Internal <code>Unknown</code> uses the existing optional-field omission behavior. Only <code>StrictlyPure</code> maps to the historical <code>is_pure: true</code>; internal consumers use the full assessment.</p>
+<p>Unknown receives neutral complexity and data-flow factors of 1.0. Data-flow purity factors are 0.0 for <code>StrictlyPure</code>, 0.3 for <code>LocallyPure</code>, and 1.0 for <code>ReadOnly</code>, <code>Impure</code>, and <code>Unknown</code>. Fresh analysis does not infer the legacy <code>IOIsolated</code> or <code>IOMixed</code> discounts from operation counts.</p>
+<p>Persisted purity records include an evidence/model version. Obsolete or unframed cache payloads are rebuilt, and absent evidence remains unknown rather than inheriting a legacy purity label.</p>
+<p>Live scoring traces list observed effects separately from unresolved behavior. Public compatibility records without evidence do not synthesize side-effect explanations from a purity label; loading an older report cannot reconstruct missing provenance.</p>
+<h2 id="known-limits"><a class="header" href="#known-limits">Known limits</a></h2>
+<p>Debtmap does not perform Cargo builds, rust-analyzer integration, general macro expansion, arbitrary trait-dispatch execution, custom <code>Deref</code>/operator reasoning, third-party API modeling, or structural I/O-isolation solving. Possible call targets remain possibilities and do not become observed execution. These limits can withhold a purity discount without erasing confirmed effects.</p>
+<p>Static access, unsupported dereference/index/iterator operations, implicit destruction of owned generic or project values, and unsupported callback consumers prevent a completeness claim. Memory-backed cursor operations are not external I/O, but unsupported generic dispatch can still make their assessment unknown. This intentionally favors withholding a discount over claiming unsupported purity.</p>
+<p>Library models do not inherit completeness through arbitrary argument conversions such as user-defined <code>AsRef</code>. Console models retain formatting-dispatch uncertainty alongside their confirmed I/O. Uncertain receiver identities cannot select confirmed standard-library models.</p>
+<h2 id="accuracy-validation"><a class="header" href="#accuracy-validation">Accuracy validation</a></h2>
+<p>The LCOV-backed report for <code>CallResolver::resolve_call_outcome</code> reports unknown purity, neutral complexity/data-flow purity factors, retained local mutation evidence, and separate unresolved operations. It makes no external-read, external-write, or network/I/O claim for that resolver. Its final score is not an acceptance criterion.</p>
+<p>Validation includes the classification join matrix; property tests for normalized joins and uncertainty; callable references, bound closures and wrapper variants; shadowed/aliased models; JSON and Postcard evidence round trips; public v3/v4 contracts; both propagation paths; and direct/cached, sequential/parallel workspace cases at 199, 200, 201, and 401 files.</p>
+<p>The initial offline debug gates passed: 6,252 fast tests (ten existing skips), 541 bounded integration tests (one existing skip), 58 focused pipeline tests, formatting, and strict Clippy across all targets and features. These bounded suites did not cover every integration target run by <code>just coverage-lcov</code>.</p>
+<p>The subsequent coverage run exposed lost source queries for uncertain shadowed calls and stale role/model expectations. The follow-up preserves the original callable query without resolving the call, makes absolute standard-library type aliases agree with directly qualified types, and checks missing evidence as <code>Unknown</code>. The three affected integration targets pass all 33 tests.</p>
+<p>Follow-up validation on 2026-09-19 ran the actual <code>CARGO_NET_OFFLINE=true just coverage-lcov</code>: 7,602 tests passed across 192 binaries, zero failed, and 44 existing tests were ignored. LCOV export completed successfully at <code>target/coverage/lcov.info</code>; no tests were excluded and the recipe was unchanged. Formatting, all 6,252 fast tests (ten existing skips), and strict offline all-target/all-feature Clippy also passed. The originally reported library failure did not reproduce in ordinary libtest, the instrumented library binary, or the full coverage run; its cause remains unconfirmed.</p>
+<h3 id="debug-microbenchmarks"><a class="header" href="#debug-microbenchmarks">Debug microbenchmarks</a></h3>
+<p>Criterion was run with <code>cargo bench --offline --profile dev --bench call_graph_bench -- effect --sample-size 10 --warm-up-time 1 --measurement-time 2</code> on an arm64, 12-core, 16-GiB machine using Rust 1.89.0. Estimates are local measurements, not cross-machine performance guarantees.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Benchmark</th><th style="text-align: right">Estimate</th></tr>
+</thead>
+<tbody>
+<tr><td>Construct/deduplicate 100 evidence records</td><td style="text-align: right">196.11 µs</td></tr>
+<tr><td>Resolve and collect evidence for 100 functions</td><td style="text-align: right">4.9894 ms</td></tr>
+<tr><td>Propagate an I/O effect through 100 functions</td><td style="text-align: right">2.2834 ms</td></tr>
+<tr><td>Score one evidence-bearing function</td><td style="text-align: right">144.10 µs</td></tr>
+</tbody>
+</table>
+</div>
+<p>Propagation includes graph/adapter setup. The new effect benchmarks have no equivalent pre-evidence baseline; their earlier development snapshots are not before/after measurements of the old analyzer.</p>
+<h3 id="repository-performance-comparison"><a class="header" href="#repository-performance-comparison">Repository performance comparison</a></h3>
+<p>Both debug binaries analyzed the same clean, fixed worktree at <code>8b650ea915dda700969b09220e4156af4b51b16b</code>, with context, the existing LCOV snapshot, <code>--no-tui</code>, JSON output, and profiling. Five final paired runs followed warm-up analyses; each measurement started a fresh process. Development samples taken before the final corrections were excluded. No Debtmap builds or tests ran alongside the final measurements.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Median measurement</th><th style="text-align: right">Baseline</th><th style="text-align: right">Evidence analysis</th><th style="text-align: right">Change</th></tr>
+</thead>
+<tbody>
+<tr><td>Total wall time</td><td style="text-align: right">94.54 s</td><td style="text-align: right">111.44 s</td><td style="text-align: right">+17.9%</td></tr>
+<tr><td>Graph building and effect collection</td><td style="text-align: right">27.419 s</td><td style="text-align: right">40.983 s</td><td style="text-align: right">+49.5%</td></tr>
+<tr><td>Purity propagation</td><td style="text-align: right">1.880 s</td><td style="text-align: right">2.263 s</td><td style="text-align: right">+20.4%</td></tr>
+<tr><td>Git-history preload</td><td style="text-align: right">46.926 s</td><td style="text-align: right">51.846 s</td><td style="text-align: right">+10.5%</td></tr>
+<tr><td>Debt scoring</td><td style="text-align: right">9.169 s</td><td style="text-align: right">10.347 s</td><td style="text-align: right">+12.8%</td></tr>
+<tr><td>Maximum resident set size</td><td style="text-align: right">1.497 GiB</td><td style="text-align: right">1.603 GiB</td><td style="text-align: right">+7.0%</td></tr>
+<tr><td>macOS reported peak memory footprint</td><td style="text-align: right">1.205 GiB</td><td style="text-align: right">2.537 GiB</td><td style="text-align: right">+110.4%</td></tr>
+</tbody>
+</table>
+</div>
+<p>The five wall-time samples were baseline <code>90.51, 97.06, 101.69, 94.54, 94.29</code> seconds and candidate <code>109.75, 102.58, 119.93, 111.44, 118.22</code> seconds. Phase medians are independent and need not sum to total time. Both memory measures are reported because they differ substantially; RSS alone would conceal the footprint increase.</p>
+<p>The runtime and footprint investigation thresholds were exceeded. Investigation removed redundant propagation, replaced copied transitive explanation chains with compact call-site/category summaries, and reused owned maps during collection/propagation joins. Remaining costs include the new semantic collection itself and duplicated assessments across propagation snapshots, graph copies, and per-function data-flow records. Record keys also duplicate owned source identities. These are code-review findings, not allocation-profile attribution; an allocator-level profile was not performed. Git-history variability also affects whole-run timings. The remaining runtime/footprint regressions are explicitly unresolved performance limitations, not claimed passes of the thresholds.</p>
+<p>Release decision (2026-09-20): these measured costs are accepted for the upcoming
+release. This acceptance does not change the measurements or resolve the
+underlying performance limitations.</p>
+<p>Reproduce each measurement from the fixed input worktree with the respective debug binary:</p>
+<pre><code class="language-sh">/usr/bin/time -l debtmap analyze . --context --coverage-file /path/to/lcov.info \
+  --no-tui --min-score 0 --format json --output /path/to/report.json \
+  --profile --profile-output /path/to/profile.json
+</code></pre>
+<p>The LCOV snapshot SHA-256 was <code>a8e4de9f57c611327d903bc37d6fce88fd43e6e29f4f18f95b492e5c38b4e0f4</code>. The final sorted <code>src</code> file SHA-256 manifest digest was <code>35480f131d8e5dc24372869a8ceee5c2a9eb92f46a2cd4f32234d664de29837a</code>. Local raw timing/profile receipts were retained under <code>/tmp/debtmap-effect-validation/paired-*</code>, final run identifiers 4–8.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="context-providers"><a class="header" href="#context-providers">Context Providers</a></h1>
 <p>Context providers enhance debtmap’s risk analysis by incorporating additional factors beyond complexity and test coverage. They analyze critical execution paths, dependency relationships, and version control history to provide a more comprehensive understanding of technical risk.</p>
@@ -13928,17 +14215,17 @@ include_transitive = true
 max_depth = 5
 </code></pre>
 <h2 id="git-history-provider"><a class="header" href="#git-history-provider">Git History Provider</a></h2>
-<p>The Git History provider integrates version control data to detect change-prone code and bug patterns. Files with frequent changes and bug fixes indicate higher maintenance risk.</p>
+<p>The Git History provider uses version control activity and commit-message labels as maintenance signals. It does not count confirmed defects or estimate their probability.</p>
 <h3 id="metrics-collected"><a class="header" href="#metrics-collected">Metrics Collected</a></h3>
 <p>The provider analyzes Git history to calculate:</p>
 <ul>
 <li><strong>Change frequency</strong>: Commits per month (recent activity indicator)</li>
-<li><strong>Bug density</strong>: Ratio of bug fix commits to total commits</li>
+<li><strong>Fix-labelled commit ratio</strong>: Share of observed commits matching the fix-message heuristic; the JSON field remains <code>bug_density</code></li>
 <li><strong>Age</strong>: Days since first commit (maturity indicator)</li>
 <li><strong>Author count</strong>: Number of unique contributors (complexity indicator)</li>
 <li><strong>Total commits</strong>: Total number of commits to the file</li>
 <li><strong>Last modified</strong>: Timestamp of the most recent commit</li>
-<li><strong>Stability score</strong>: Weighted combination of churn, bug fixes, and age (0.0-1.0)</li>
+<li><strong>Stability classification</strong>: Heuristic label from change frequency, fix-labelled ratio, and age</li>
 </ul>
 <p><strong>What it analyzes:</strong></p>
 <ul>
@@ -13947,67 +14234,29 @@ max_depth = 5
 <li>Code churn (lines added/removed)</li>
 <li>Recent activity</li>
 </ul>
-<h3 id="risk-classification"><a class="header" href="#risk-classification">Risk Classification</a></h3>
-<p>The table below shows approximate contribution thresholds for understanding risk levels:</p>
+<h3 id="sample-aware-scoring-model"><a class="header" href="#sample-aware-scoring-model">Sample-aware Scoring Model</a></h3>
+<p>The historical contribution is reduced toward neutral when few modifications have been observed (<code>src/risk/context/git_history/stability.rs</code>):</p>
+<pre><code class="language-text">raw_contribution = min(1.5 * fix_labelled_ratio + min(changes_per_month / 20, 0.5), 2)
+confidence = observed_commits / (observed_commits + 5)
+history_contribution = raw_contribution * confidence
+history_only_multiplier = 1 + history_contribution
+</code></pre>
+<p>Five prior-equivalent observations are an explicit ranking policy, not a fitted statistical estimate. With no observations, history contributes zero. One observation gets 1/6 weight, five get 1/2 weight, and larger samples approach the original contribution. The contribution remains capped at 2.0. Other context providers can also contribute to the final multiplier.</p>
+<p>For function history, both the ratio and confidence use modifications <strong>after introduction</strong>. The displayed total commit count includes introduction. File fallback uses all observed commits touching the file. Output retains the recorded ratio and labelled count instead of guessing its denominator from the displayed total.</p>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Category</th><th>Conditions</th><th>Contribution</th><th>Explanation</th></tr>
+<tr><th>Observed modifications</th><th>Frequency</th><th>Fix-labelled ratio</th><th>Confidence</th><th>History-only multiplier</th></tr>
 </thead>
 <tbody>
-<tr><td>Very unstable</td><td>freq &gt; 5.0 AND bug_density &gt; 0.3</td><td>2.0</td><td>High churn with many bug fixes</td></tr>
-<tr><td>Moderately unstable</td><td>freq &gt; 2.0 OR bug_density &gt; 0.2</td><td>1.0</td><td>Frequent changes or bug-prone</td></tr>
-<tr><td>Slightly unstable</td><td>freq &gt; 1.0 OR bug_density &gt; 0.1</td><td>0.5</td><td>Some instability</td></tr>
-<tr><td>Stable</td><td>freq ≤ 1.0 AND bug_density ≤ 0.1</td><td>0.1</td><td>Low change rate, few bugs</td></tr>
+<tr><td>0</td><td>0/month</td><td>0%</td><td>0</td><td>1.00x</td></tr>
+<tr><td>1</td><td>4.2/month</td><td>100%</td><td>1/6</td><td>1.285x</td></tr>
+<tr><td>5</td><td>4.2/month</td><td>100%</td><td>1/2</td><td>1.855x</td></tr>
+<tr><td>995</td><td>4.2/month</td><td>100%</td><td>0.995</td><td>2.70145x</td></tr>
 </tbody>
 </table>
 </div>
-<h4 id="continuous-scoring-model"><a class="header" href="#continuous-scoring-model">Continuous Scoring Model</a></h4>
-<p>The actual implementation uses a <strong>continuous scoring formula</strong> rather than discrete thresholds. This provides more accurate differentiation between risk levels (from <code>src/risk/context/git_history.rs:495</code>):</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>contribution = (bug_density * 1.5) + min(change_frequency / 20.0, 0.5)
-<span class="boring">}</span></code></pre>
-<p><strong>Scoring breakdown:</strong></p>
-<ul>
-<li>
-<p><strong>Bug density</strong> (primary signal): Scales linearly from 0.0 to 1.5</p>
-<ul>
-<li>0% bugs → 0.0 contribution</li>
-<li>50% bugs → 0.75 contribution</li>
-<li>100% bugs → 1.5 contribution</li>
-</ul>
-</li>
-<li>
-<p><strong>Change frequency</strong> (secondary signal): Scales from 0.0 to 0.5, saturates at 10/month</p>
-<ul>
-<li>0/month → 0.0</li>
-<li>5/month → 0.25</li>
-<li>10+/month → 0.5 (capped)</li>
-</ul>
-</li>
-<li>
-<p><strong>Total</strong> is capped at 2.0 to prevent excessive score amplification</p>
-</li>
-<li>
-<p>Stable code with no bugs and no changes contributes 0.0 (no risk increase)</p>
-</li>
-</ul>
-<p><strong>Example calculations:</strong></p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Scenario</th><th>Frequency</th><th>Bug Density</th><th>Contribution</th></tr>
-</thead>
-<tbody>
-<tr><td>Stable code</td><td>0.0/month</td><td>0%</td><td>0.0</td></tr>
-<tr><td>Low activity, some bugs</td><td>2.0/month</td><td>25%</td><td>0.475</td></tr>
-<tr><td>High churn, no bugs</td><td>10.0/month</td><td>0%</td><td>0.5</td></tr>
-<tr><td>Bug-prone</td><td>0.5/month</td><td>100%</td><td>1.525</td></tr>
-<tr><td>Critical hotspot</td><td>10.0/month</td><td>50%</td><td>1.25</td></tr>
-</tbody>
-</table>
-</div>
+<p>The 100% ratio in the one-modification example means one observed modification had a matching message. It is not evidence that every line is defective, or that the function has the same evidence strength as 995 labelled modifications.</p>
 <h3 id="bug-fix-detection"><a class="header" href="#bug-fix-detection">Bug Fix Detection</a></h3>
 <p>The provider identifies bug fixes using sophisticated pattern matching with <strong>word boundary detection</strong> to minimize false positives from substring matches like “prefix” or “debug”.</p>
 <p><strong>Detection Patterns:</strong></p>
@@ -14056,66 +14305,15 @@ max_depth = 5
 </tbody>
 </table>
 </div>
-<p><strong>Bug Density Calculation:</strong></p>
+<p><strong>Fix-labelled Commit Ratio:</strong></p>
 <pre><code>bug_density = bug_fix_count / total_commits
 </code></pre>
-<p>For example, if a file has 10 total commits and 3 are genuine bug fixes (after exclusion filtering):</p>
-<ul>
-<li>Bug density = 3/10 = 0.30 (30%)</li>
-</ul>
-<p>A file with 100% bug density means every commit to that file was a bug fix, which is a strong signal that the code is problematic.</p>
-<h3 id="research-background-the-bug-magnet-hypothesis"><a class="header" href="#research-background-the-bug-magnet-hypothesis">Research Background: The Bug Magnet Hypothesis</a></h3>
-<p>The use of git history for risk assessment is backed by extensive empirical research in software engineering. The core theory, often called the <strong>“Bug Magnet Hypothesis”</strong>, states that <strong>code with a history of bugs is significantly more likely to contain future bugs</strong>.</p>
-<h4 id="empirical-evidence"><a class="header" href="#empirical-evidence">Empirical Evidence</a></h4>
-<p>Multiple large-scale studies have validated this approach:</p>
-<ul>
-<li>
-<p><strong>Microsoft Study (Nagappan &amp; Ball, 2005)</strong>: Analyzed Windows Server 2003 and found that modules with prior bugs were <strong>4-16 times more likely</strong> to have future bugs than modules without bug history.</p>
-</li>
-<li>
-<p><strong>Mozilla Study (Hassan, 2009)</strong>: Found that bug prediction models based on change history achieved <strong>73% accuracy</strong> in identifying future buggy files.</p>
-</li>
-<li>
-<p><strong>Linux Kernel Study (Kim et al., 2007)</strong>: Showed that files with bug fixes in their recent history had a significantly higher probability of containing latent defects.</p>
-</li>
-</ul>
-<h4 id="why-past-bugs-predict-future-bugs"><a class="header" href="#why-past-bugs-predict-future-bugs">Why Past Bugs Predict Future Bugs</a></h4>
-<p>There are four key mechanisms that explain this phenomenon:</p>
-<ol>
-<li>
-<p><strong>Inherent Complexity</strong>: Code that attracted bugs in the past is often more complex, making it harder to fix correctly and more prone to regression.</p>
-</li>
-<li>
-<p><strong>Incomplete Understanding</strong>: If developers repeatedly introduce bugs in the same area, it suggests the code is difficult to understand or has subtle edge cases.</p>
-</li>
-<li>
-<p><strong>Technical Debt Accumulation</strong>: Bug fixes under time pressure often introduce workarounds rather than proper solutions, creating technical debt that leads to more bugs.</p>
-</li>
-<li>
-<p><strong>Broken Window Effect</strong>: Once code develops a reputation for being buggy, it may receive less careful maintenance, perpetuating the cycle.</p>
-</li>
-</ol>
-<h4 id="interpreting-bug-density-scores"><a class="header" href="#interpreting-bug-density-scores">Interpreting Bug Density Scores</a></h4>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Bug Density</th><th>Interpretation</th><th>Action</th></tr>
-</thead>
-<tbody>
-<tr><td>0% - 10%</td><td>Healthy</td><td>Typical for stable, well-tested code</td></tr>
-<tr><td>10% - 30%</td><td>Moderate concern</td><td>Consider adding tests or documentation</td></tr>
-<tr><td>30% - 50%</td><td>High risk</td><td>Strong candidate for refactoring</td></tr>
-<tr><td>50% - 100%</td><td>Critical</td><td>Almost certainly needs redesign or major refactoring</td></tr>
-</tbody>
-</table>
-</div>
-<p><strong>Example from real output:</strong></p>
-<pre><code>├─ GIT HISTORY: 2.0 changes/month, 100.0% bugs, 30 days old, 1 authors
-│  └─ Risk Impact: base_risk=39.7 → contextual_risk=88.9 (2.2x multiplier)
-</code></pre>
-<p>This shows a file where <strong>every single commit</strong> was a bug fix (100% bug density), resulting in a 2.2x risk multiplier. This is a critical red flag indicating code that needs immediate attention.</p>
+<p>For example, if a file has 10 observed commits and 3 messages match the heuristic after exclusion filtering, its ratio is 3/10 = 0.30 (30%).</p>
+<p>A 100% ratio means every sampled commit matched the message heuristic. Validate the changes themselves before treating those labels as defect evidence.</p>
+<h3 id="interpreting-history-signals"><a class="header" href="#interpreting-history-signals">Interpreting History Signals</a></h3>
+<p>Use the ratio together with sample size, change frequency, coverage, and the actual commit diffs. A high ratio can justify inspection; it does not establish that redesign is necessary. A zero ratio can reflect message conventions or missing history and does not establish correctness. The scoring coefficients and confidence policy have not been calibrated as defect probabilities.</p>
 <h4 id="limitations-and-false-positives"><a class="header" href="#limitations-and-false-positives">Limitations and False Positives</a></h4>
-<p>The improved detection methodology with word boundary matching and exclusion filters significantly reduces false positives, but some limitations remain:</p>
+<p>Word boundary matching and exclusion filters reject several known message patterns, but they do not validate the underlying changes:</p>
 <p><strong>Reduced Issues</strong> (handled by word boundaries and exclusion filters):</p>
 <ul>
 <li>✅ <strong>Substring matches</strong>: Word boundary matching (<code>\bfix\b</code>) now correctly excludes “prefix”, “fixture”, “suffix”, and “debugging”</li>
@@ -14133,41 +14331,21 @@ max_depth = 5
 </li>
 <li><strong>New code</strong>: Cannot assess code without commit history
 <ul>
-<li>Files with &lt;5 commits may not have enough data for reliable bug density calculation</li>
+<li>Small samples receive less scoring weight even when the raw labelled ratio is high</li>
 </ul>
 </li>
 <li><strong>Language barriers</strong>: Non-English commit messages may use different bug-fix keywords</li>
 <li><strong>Informal commits</strong>: Internal repos may use different conventions (e.g., ticket IDs only)</li>
 </ul>
-<p><strong>Accuracy Improvements:</strong></p>
-<p>Before word boundary matching and exclusion filters:</p>
-<ul>
-<li>False positive rate: ~15-25% (substring matches, style commits, etc.)</li>
-</ul>
-<p>After improvements:</p>
-<ul>
-<li>False positive rate: ~5-10% (primarily commit message quality issues)</li>
-<li>Precision: Significantly improved, particularly for conventional commit style repositories</li>
-</ul>
-<p><strong>Recommended practice</strong>: Use git history as one signal among many. Combine it with complexity metrics, test coverage, and dependency analysis for a complete risk picture. The bug density metric is most reliable when:</p>
+<p>No repository-scale false-positive rate or defect-prediction accuracy is claimed for this heuristic.</p>
+<p><strong>Recommended practice</strong>: Use git history as one signal among many. Interpret labelled ratios in the context of:</p>
 <ul>
 <li>Repository uses consistent commit message conventions</li>
-<li>Files have at least 10+ commits in their history</li>
+<li>The number of observed modifications</li>
 <li>Development team follows English-based conventional commit style</li>
 </ul>
-<h3 id="stability-score"><a class="header" href="#stability-score">Stability Score</a></h3>
-<p>Stability is calculated using weighted factors:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>stability = (churn_factor × 0.4) + (bug_factor × 0.4) + (age_factor × 0.2)
-
-where:
-  churn_factor = 1.0 / (1.0 + monthly_churn)
-  bug_factor = 1.0 - (bug_fixes / total_commits)
-  age_factor = min(1.0, age_days / 365.0)
-<span class="boring">}</span></code></pre>
 <h3 id="stability-status-classifications"><a class="header" href="#stability-status-classifications">Stability Status Classifications</a></h3>
-<p>The provider internally classifies files into stability statuses based on the calculated metrics:</p>
+<p>Legacy internal and JSON stability labels use the following thresholds. These labels are history summaries, not validated defect classifications; the contribution uses the separate sample-aware formula above.</p>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -24798,7 +24976,7 @@ combined_adjustment = (purity_factor * purity_weight
 <p>Each factor ranges from 0.0 to 1.0, where lower values reduce the final priority score.</p>
 <p><strong>Source</strong>: <code>src/priority/unified_scorer.rs:1058-1075</code></p>
 <h2 id="purity-spectrum"><a class="header" href="#purity-spectrum">Purity Spectrum</a></h2>
-<p>The purity spectrum classifies functions into five levels based on their side effects and mutation behavior. Pure functions receive the lowest priority multipliers since they represent minimal technical debt.</p>
+<p>Rust scoring consumes the same typed effect assessment used by propagation and reporting. A known classification is granted only when the supported analysis is complete; unresolved behavior is represented as <code>Unknown</code> rather than being folded into <code>Impure</code> or overridden by confidence.</p>
 <h3 id="classification-levels"><a class="header" href="#classification-levels">Classification Levels</a></h3>
 <div class="table-wrapper">
 <table>
@@ -24806,46 +24984,32 @@ combined_adjustment = (purity_factor * purity_weight
 <tr><th>Level</th><th>Multiplier</th><th>Description</th></tr>
 </thead>
 <tbody>
-<tr><td><code>StrictlyPure</code></td><td>0.0</td><td>No mutations, no I/O, referentially transparent</td></tr>
-<tr><td><code>LocallyPure</code></td><td>0.3</td><td>Pure interface but uses local mutations internally</td></tr>
-<tr><td><code>IOIsolated</code></td><td>0.6</td><td>I/O operations clearly separated from logic</td></tr>
-<tr><td><code>IOMixed</code></td><td>0.9</td><td>I/O mixed with business logic</td></tr>
-<tr><td><code>Impure</code></td><td>1.0</td><td>Mutable state, side effects throughout</td></tr>
+<tr><td><code>StrictlyPure</code></td><td>0.0</td><td>Complete supported analysis with no modeled effects</td></tr>
+<tr><td><code>LocallyPure</code></td><td>0.3</td><td>Complete analysis with local mutation only</td></tr>
+<tr><td><code>ReadOnly</code></td><td>1.0</td><td>Complete analysis with external reads but no writes or I/O</td></tr>
+<tr><td><code>Impure</code></td><td>1.0</td><td>Confirmed external write, I/O, or modeled nondeterminism</td></tr>
+<tr><td><code>Unknown</code></td><td>1.0</td><td>Incomplete analysis, retaining any effects already observed</td></tr>
 </tbody>
 </table>
 </div>
-<p><strong>Source</strong>: <code>src/priority/unified_scorer.rs:64-94</code> (<code>PuritySpectrum</code> enum)</p>
 <h3 id="classification-algorithm"><a class="header" href="#classification-algorithm">Classification Algorithm</a></h3>
-<p>The purity factor is calculated by analyzing three sources of information from the data flow graph:</p>
+<p>The assessment contains three independent parts:</p>
 <ol>
-<li><strong>Purity Analysis Results</strong>: High-confidence purity (&gt;80%) indicates strict or local purity</li>
-<li><strong>Mutation Analysis</strong>: Tracks whether a function has local mutations</li>
-<li><strong>I/O Operations</strong>: Identifies I/O patterns for non-pure functions</li>
+<li><strong>Observed effects</strong>: local mutation, external read/write, confirmed I/O, and modeled nondeterminism</li>
+<li><strong>Unresolved behavior</strong>: unresolved or ambiguous calls, unknown receivers, unsupported syntax or dispatch, callback uncertainty, and unavailable bodies</li>
+<li><strong>Provenance</strong>: the owning definition, exact source location, resolved declaration/model identity, and propagation dependency</li>
 </ol>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>// Classification logic (simplified)
-if purity.is_pure &amp;&amp; purity.confidence &gt; 0.8 {
-    if mutations.has_mutations {
-        PuritySpectrum::LocallyPure  // 0.3 multiplier
-    } else {
-        PuritySpectrum::StrictlyPure // 0.0 multiplier
-    }
-} else if purity.is_pure {
-    PuritySpectrum::LocallyPure      // 0.3 multiplier
-} else {
-    classify_io_isolation(io_ops)    // 0.6-1.0 multiplier
+</span>match assessment.classification() {
+    StrictlyPure =&gt; 0.0,
+    LocallyPure =&gt; 0.3,
+    ReadOnly | Impure | Unknown =&gt; 1.0,
 }
 <span class="boring">}</span></code></pre>
-<p><strong>Source</strong>: <code>src/priority/unified_scorer.rs:878-918</code> (<code>calculate_purity_factor</code>)</p>
+<p>Confidence can describe supporting analysis, but cannot promote incomplete evidence to a known classification. Adding unresolved behavior cannot newly qualify a function for a purity discount.</p>
 <h3 id="io-isolation-classification"><a class="header" href="#io-isolation-classification">I/O Isolation Classification</a></h3>
-<p>For impure functions, the system evaluates I/O isolation based on concentration:</p>
-<ul>
-<li><strong>IOIsolated (0.6)</strong>: At most 2 unique I/O operation types and 3 total operations</li>
-<li><strong>IOMixed (0.9)</strong>: More than 2 unique types or more than 3 operations</li>
-<li><strong>Impure (1.0)</strong>: No I/O information available</li>
-</ul>
-<p><strong>Source</strong>: <code>src/priority/unified_scorer.rs:921-935</code> (<code>classify_io_isolation</code>)</p>
+<p><code>IOIsolated</code> and <code>IOMixed</code> remain readable legacy enum values, but fresh analysis does not infer them from operation counts. Structural I/O-isolation analysis is not implemented, so confirmed I/O receives the neutral <code>Impure</code> factor of 1.0.</p>
 <h2 id="purity-level-vs-purity-spectrum"><a class="header" href="#purity-level-vs-purity-spectrum">Purity Level vs Purity Spectrum</a></h2>
 <p>Debtmap uses two related but distinct purity classifications:</p>
 <div class="table-wrapper">
@@ -24855,14 +25019,13 @@ if purity.is_pure &amp;&amp; purity.confidence &gt; 0.8 {
 </thead>
 <tbody>
 <tr><td><strong>Purpose</strong></td><td>Analysis classification</td><td>Scoring multiplier</td></tr>
-<tr><td><strong>Levels</strong></td><td>4 (StrictlyPure, LocallyPure, ReadOnly, Impure)</td><td>5 (adds IOIsolated, IOMixed)</td></tr>
+<tr><td><strong>Levels</strong></td><td>5 including internal Unknown</td><td>Known levels plus legacy-readable IOIsolated/IOMixed</td></tr>
 <tr><td><strong>Usage</strong></td><td><code>src/analysis/purity_analysis.rs</code></td><td><code>src/priority/unified_scorer.rs</code></td></tr>
 <tr><td><strong>Focus</strong></td><td>Categorizing purity type</td><td>Assigning debt priority</td></tr>
 </tbody>
 </table>
 </div>
-<p><strong>PurityLevel</strong> (from purity analysis) describes <em>what kind</em> of function this is. <strong>PuritySpectrum</strong> (for scoring) determines <em>how much</em> this affects debt priority, with finer granularity for I/O patterns.</p>
-<p><strong>Source</strong>: <code>src/analysis/purity_analysis.rs:32-43</code> (<code>PurityLevel</code>), <code>src/priority/unified_scorer.rs:64-94</code> (<code>PuritySpectrum</code>)</p>
+<p>The public <code>PurityLevel</code> schema remains unchanged. Internal <code>Unknown</code> is represented by omission in compatible JSON fields, while scoring uses the typed assessment directly. Only <code>StrictlyPure</code> projects to the historical <code>is_pure: true</code> boolean.</p>
 <h2 id="pattern-factor"><a class="header" href="#pattern-factor">Pattern Factor</a></h2>
 <p>The pattern factor distinguishes data flow pipelines from business logic. Pure data transformation chains (map/filter/reduce patterns) receive reduced priority.</p>
 <h3 id="calculation"><a class="header" href="#calculation">Calculation</a></h3>

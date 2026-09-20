@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-742af30f.js";
+            window.path_to_searchindex_js = "searchindex-dedc95d2.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-41409472.js"></script>
+        <script src="toc-94861fa4.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -179,6 +179,24 @@
                     <main>
                         <h1 id="compare-analysis"><a class="header" href="#compare-analysis">Compare Analysis</a></h1>
 <p>The <code>compare</code> command enables you to track technical debt changes over time by comparing two analysis results. This is essential for validating refactoring efforts, detecting regressions in pull requests, and monitoring project health trends.</p>
+<h2 id="comparable-inputs-are-required"><a class="header" href="#comparable-inputs-are-required">Comparable inputs are required</a></h2>
+<p><code>compare</code> checks report provenance before calculating changes. Both inputs must
+identify the same Debtmap version, contain analysis receipts with complete scope,
+and agree on analysis policy, evidence settings, selection, analysis target and
+multi-pass configuration. Source revisions and measured values may differ;
+parallel execution and worker counts need not match.</p>
+<p>Incompatible inputs, missing analyzer identity or receipts, and partial, limited
+or unknown scopes produce a nonzero exit status with an explanation on stderr.
+No trend report is emitted and an existing <code>--output</code> file is left unchanged.
+This applies to JSON, Markdown and terminal output. Older v3 reports remain
+readable, but reports without receipts cannot establish a safe comparison.</p>
+<p>After upgrading Debtmap, regenerate both the before and after reports with the
+same analyzer version and settings. Comparing an old baseline to a newly scored
+report can mistake analyzer changes for code improvements or regressions.
+Matching provenance is a prerequisite for comparison, not proof that a score
+change was caused by a particular refactoring.
+Analyzer identity uses the recorded package version; it cannot distinguish
+locally modified development builds that reuse the same version string.</p>
 <h2 id="implementation-status"><a class="header" href="#implementation-status">Implementation Status</a></h2>
 <p><strong>All Features Available Now</strong>:</p>
 <ul>

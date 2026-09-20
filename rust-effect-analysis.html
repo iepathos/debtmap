@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Why Debtmap? - Debtmap Documentation</title>
+        <title>Rust Effect Analysis - Debtmap Documentation</title>
 
 
         <!-- Custom HTML head -->
@@ -177,235 +177,99 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="why-debtmap"><a class="header" href="#why-debtmap">Why Debtmap?</a></h1>
-<p>Debtmap is a <strong>code complexity sensor</strong> for developers and automation. It identifies technical debt hotspots and provides prioritized results that you can inspect directly in the terminal, TUI, or dashboard, with structured outputs available when you want to feed the same findings into AI tools.</p>
-<h2 id="why-this-matters"><a class="header" href="#why-this-matters">Why This Matters</a></h2>
-<p>Technical debt prioritization is hard even before AI enters the picture. Developers need to know:</p>
-<ul>
-<li>Which hotspots are actually risky</li>
-<li>Which complex areas are protected by tests</li>
-<li>Which issues are isolated vs deeply coupled</li>
-<li>Which files keep causing churn over time</li>
-</ul>
-<p>Debtmap answers those questions directly, then makes the same information available to automation.</p>
-<h2 id="the-ai-development-paradox"><a class="header" href="#the-ai-development-paradox">The AI Development Paradox</a></h2>
-<p>AI coding assistants like Claude Code, GitHub Copilot, and Cursor are transforming software development. They can write code faster than ever before. But this creates a paradox:</p>
-<p><strong>AI creates technical debt faster than humans can manage it.</strong></p>
-<p>When an AI generates hundreds of lines of code per hour, traditional code review and refactoring processes break down. Teams accumulate debt faster than they can pay it down.</p>
-<p>At the same time, AI assistants struggle to fix the debt they create:</p>
-<ul>
-<li><strong>Limited context window</strong> - They can’t see the entire codebase at once</li>
-<li><strong>No test awareness</strong> - They don’t know which code is tested vs untested</li>
-<li><strong>No prioritization</strong> - They can’t identify what matters most</li>
-<li><strong>Wasted tokens</strong> - They read irrelevant code while missing critical context</li>
-</ul>
-<h2 id="what-developers-and-ai-tools-need"><a class="header" href="#what-developers-and-ai-tools-need">What Developers and AI Tools Need</a></h2>
-<p>For a developer or AI assistant to effectively fix technical debt, they need:</p>
-<h3 id="1-prioritized-targets"><a class="header" href="#1-prioritized-targets">1. Prioritized Targets</a></h3>
-<p>Not “here are 500 complex functions,” but “here are the 10 functions that matter most, ranked by severity.”</p>
-<p>Debtmap provides a unified priority score with critical, high, medium, and low severity bands. The score combines:</p>
-<ul>
-<li>Complexity metrics (cyclomatic, cognitive, nesting)</li>
-<li>Test coverage gaps</li>
-<li>Coupling and dependency impact</li>
-<li>Pattern-based false positive reduction</li>
-</ul>
-<h3 id="2-context-suggestions"><a class="header" href="#2-context-suggestions">2. Context Suggestions</a></h3>
-<p>Not “this function is complex,” but “read lines 38-85 of parser.rs, plus lines 100-120 of handler.rs where it’s called, and lines 50-75 of the test file.”</p>
-<p>Debtmap’s context suggestions tell you exactly which code to read:</p>
-<pre><code>CONTEXT:
-├─ Primary: src/parser.rs:38-85 (the debt item)
-├─ Caller: src/handler.rs:100-120 (usage context)
-└─ Tests: tests/parser_test.rs:50-75 (expected behavior)
+                        <h1 id="rust-effect-analysis"><a class="header" href="#rust-effect-analysis">Rust effect analysis</a></h1>
+<p>Debtmap’s Rust purity signal is derived from owned semantic evidence collected by the bounded workspace resolver. Observed effects, unresolved behavior, and provenance are retained separately through graph merging, propagation, data-flow preparation, scoring, and human reporting.</p>
+<h2 id="classification-contract"><a class="header" href="#classification-contract">Classification contract</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Evidence</th><th>Internal classification</th></tr>
+</thead>
+<tbody>
+<tr><td>Complete supported analysis, no effects</td><td><code>StrictlyPure</code></td></tr>
+<tr><td>Complete analysis, local mutations only</td><td><code>LocallyPure</code></td></tr>
+<tr><td>Complete analysis, external reads without writes or I/O</td><td><code>ReadOnly</code></td></tr>
+<tr><td>Confirmed external write, I/O, or modeled nondeterminism</td><td><code>Impure</code></td></tr>
+<tr><td>Incomplete analysis without a confirmed impure effect</td><td><code>Unknown</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>Confirmed impure effects remain <code>Impure</code> even when additional behavior is unresolved. Every observed fact and uncertainty reason remains available for explanations. The model concerns modeled program effects; it does not prove termination, panic freedom, allocation success, or timing independence.</p>
+<h2 id="supported-evidence"><a class="header" href="#supported-evidence">Supported evidence</a></h2>
+<p>Project calls use exact declaration identities, lexical scopes, receiver facts, and source locations. Callable references remain reachability relationships and do not execute their targets. Closure bodies contribute effects only when a supported invocation relationship executes them. Directly bound callbacks and modeled <code>Option</code>/<code>Result</code> callback operations are supported; unsupported consumers, escapes, reassignment, and indirect invocation remain uncertain.</p>
+<p>Transparent project wrappers are recognized from a single direct callback-parameter invocation, not from a function-name whitelist. Their callers retain confirmed callback effects alongside any unresolved generic-wrapper behavior. Immutable locally bound closures can execute against their captured lexical facts; changed captures and unsupported forwarding remain uncertain. Constructing supported async functions, methods, blocks, or closures does not execute their bodies.</p>
+<p>The reviewed standard-library registry covers the primitive and string operations needed by the resolver corpus, selected collection operations, selected <code>Option</code>/<code>Result</code> operations, memory-backed cursor reads/writes, and explicit filesystem, console, environment, time, and socket operations. Collection mutation is local only when receiver ownership is established. Generic dispatch such as an unknown key’s <code>Hash</code> implementation remains uncertain.</p>
+<p>Project definitions take precedence over library models. Imports, aliases, lexical shadowing, receiver facts, and source identity determine model selection; variable spelling and method-name substrings do not. Unsupported third-party HTTP/database APIs remain <code>Unknown</code>, not inferred I/O.</p>
+<h2 id="compatibility-and-scoring"><a class="header" href="#compatibility-and-scoring">Compatibility and scoring</a></h2>
+<p>Public JSON v3/v4 fields and enum values are unchanged. Internal <code>Unknown</code> uses the existing optional-field omission behavior. Only <code>StrictlyPure</code> maps to the historical <code>is_pure: true</code>; internal consumers use the full assessment.</p>
+<p>Unknown receives neutral complexity and data-flow factors of 1.0. Data-flow purity factors are 0.0 for <code>StrictlyPure</code>, 0.3 for <code>LocallyPure</code>, and 1.0 for <code>ReadOnly</code>, <code>Impure</code>, and <code>Unknown</code>. Fresh analysis does not infer the legacy <code>IOIsolated</code> or <code>IOMixed</code> discounts from operation counts.</p>
+<p>Persisted purity records include an evidence/model version. Obsolete or unframed cache payloads are rebuilt, and absent evidence remains unknown rather than inheriting a legacy purity label.</p>
+<p>Live scoring traces list observed effects separately from unresolved behavior. Public compatibility records without evidence do not synthesize side-effect explanations from a purity label; loading an older report cannot reconstruct missing provenance.</p>
+<h2 id="known-limits"><a class="header" href="#known-limits">Known limits</a></h2>
+<p>Debtmap does not perform Cargo builds, rust-analyzer integration, general macro expansion, arbitrary trait-dispatch execution, custom <code>Deref</code>/operator reasoning, third-party API modeling, or structural I/O-isolation solving. Possible call targets remain possibilities and do not become observed execution. These limits can withhold a purity discount without erasing confirmed effects.</p>
+<p>Static access, unsupported dereference/index/iterator operations, implicit destruction of owned generic or project values, and unsupported callback consumers prevent a completeness claim. Memory-backed cursor operations are not external I/O, but unsupported generic dispatch can still make their assessment unknown. This intentionally favors withholding a discount over claiming unsupported purity.</p>
+<p>Library models do not inherit completeness through arbitrary argument conversions such as user-defined <code>AsRef</code>. Console models retain formatting-dispatch uncertainty alongside their confirmed I/O. Uncertain receiver identities cannot select confirmed standard-library models.</p>
+<h2 id="accuracy-validation"><a class="header" href="#accuracy-validation">Accuracy validation</a></h2>
+<p>The LCOV-backed report for <code>CallResolver::resolve_call_outcome</code> reports unknown purity, neutral complexity/data-flow purity factors, retained local mutation evidence, and separate unresolved operations. It makes no external-read, external-write, or network/I/O claim for that resolver. Its final score is not an acceptance criterion.</p>
+<p>Validation includes the classification join matrix; property tests for normalized joins and uncertainty; callable references, bound closures and wrapper variants; shadowed/aliased models; JSON and Postcard evidence round trips; public v3/v4 contracts; both propagation paths; and direct/cached, sequential/parallel workspace cases at 199, 200, 201, and 401 files.</p>
+<p>The initial offline debug gates passed: 6,252 fast tests (ten existing skips), 541 bounded integration tests (one existing skip), 58 focused pipeline tests, formatting, and strict Clippy across all targets and features. These bounded suites did not cover every integration target run by <code>just coverage-lcov</code>.</p>
+<p>The subsequent coverage run exposed lost source queries for uncertain shadowed calls and stale role/model expectations. The follow-up preserves the original callable query without resolving the call, makes absolute standard-library type aliases agree with directly qualified types, and checks missing evidence as <code>Unknown</code>. The three affected integration targets pass all 33 tests.</p>
+<p>Follow-up validation on 2026-09-19 ran the actual <code>CARGO_NET_OFFLINE=true just coverage-lcov</code>: 7,602 tests passed across 192 binaries, zero failed, and 44 existing tests were ignored. LCOV export completed successfully at <code>target/coverage/lcov.info</code>; no tests were excluded and the recipe was unchanged. Formatting, all 6,252 fast tests (ten existing skips), and strict offline all-target/all-feature Clippy also passed. The originally reported library failure did not reproduce in ordinary libtest, the instrumented library binary, or the full coverage run; its cause remains unconfirmed.</p>
+<h3 id="debug-microbenchmarks"><a class="header" href="#debug-microbenchmarks">Debug microbenchmarks</a></h3>
+<p>Criterion was run with <code>cargo bench --offline --profile dev --bench call_graph_bench -- effect --sample-size 10 --warm-up-time 1 --measurement-time 2</code> on an arm64, 12-core, 16-GiB machine using Rust 1.89.0. Estimates are local measurements, not cross-machine performance guarantees.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Benchmark</th><th style="text-align: right">Estimate</th></tr>
+</thead>
+<tbody>
+<tr><td>Construct/deduplicate 100 evidence records</td><td style="text-align: right">196.11 µs</td></tr>
+<tr><td>Resolve and collect evidence for 100 functions</td><td style="text-align: right">4.9894 ms</td></tr>
+<tr><td>Propagate an I/O effect through 100 functions</td><td style="text-align: right">2.2834 ms</td></tr>
+<tr><td>Score one evidence-bearing function</td><td style="text-align: right">144.10 µs</td></tr>
+</tbody>
+</table>
+</div>
+<p>Propagation includes graph/adapter setup. The new effect benchmarks have no equivalent pre-evidence baseline; their earlier development snapshots are not before/after measurements of the old analyzer.</p>
+<h3 id="repository-performance-comparison"><a class="header" href="#repository-performance-comparison">Repository performance comparison</a></h3>
+<p>Both debug binaries analyzed the same clean, fixed worktree at <code>8b650ea915dda700969b09220e4156af4b51b16b</code>, with context, the existing LCOV snapshot, <code>--no-tui</code>, JSON output, and profiling. Five final paired runs followed warm-up analyses; each measurement started a fresh process. Development samples taken before the final corrections were excluded. No Debtmap builds or tests ran alongside the final measurements.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Median measurement</th><th style="text-align: right">Baseline</th><th style="text-align: right">Evidence analysis</th><th style="text-align: right">Change</th></tr>
+</thead>
+<tbody>
+<tr><td>Total wall time</td><td style="text-align: right">94.54 s</td><td style="text-align: right">111.44 s</td><td style="text-align: right">+17.9%</td></tr>
+<tr><td>Graph building and effect collection</td><td style="text-align: right">27.419 s</td><td style="text-align: right">40.983 s</td><td style="text-align: right">+49.5%</td></tr>
+<tr><td>Purity propagation</td><td style="text-align: right">1.880 s</td><td style="text-align: right">2.263 s</td><td style="text-align: right">+20.4%</td></tr>
+<tr><td>Git-history preload</td><td style="text-align: right">46.926 s</td><td style="text-align: right">51.846 s</td><td style="text-align: right">+10.5%</td></tr>
+<tr><td>Debt scoring</td><td style="text-align: right">9.169 s</td><td style="text-align: right">10.347 s</td><td style="text-align: right">+12.8%</td></tr>
+<tr><td>Maximum resident set size</td><td style="text-align: right">1.497 GiB</td><td style="text-align: right">1.603 GiB</td><td style="text-align: right">+7.0%</td></tr>
+<tr><td>macOS reported peak memory footprint</td><td style="text-align: right">1.205 GiB</td><td style="text-align: right">2.537 GiB</td><td style="text-align: right">+110.4%</td></tr>
+</tbody>
+</table>
+</div>
+<p>The five wall-time samples were baseline <code>90.51, 97.06, 101.69, 94.54, 94.29</code> seconds and candidate <code>109.75, 102.58, 119.93, 111.44, 118.22</code> seconds. Phase medians are independent and need not sum to total time. Both memory measures are reported because they differ substantially; RSS alone would conceal the footprint increase.</p>
+<p>The runtime and footprint investigation thresholds were exceeded. Investigation removed redundant propagation, replaced copied transitive explanation chains with compact call-site/category summaries, and reused owned maps during collection/propagation joins. Remaining costs include the new semantic collection itself and duplicated assessments across propagation snapshots, graph copies, and per-function data-flow records. Record keys also duplicate owned source identities. These are code-review findings, not allocation-profile attribution; an allocator-level profile was not performed. Git-history variability also affects whole-run timings. The remaining runtime/footprint regressions are explicitly unresolved performance limitations, not claimed passes of the thresholds.</p>
+<p>Release decision (2026-09-20): these measured costs are accepted for the upcoming
+release. This acceptance does not change the measurements or resolve the
+underlying performance limitations.</p>
+<p>Reproduce each measurement from the fixed input worktree with the respective debug binary:</p>
+<pre><code class="language-sh">/usr/bin/time -l debtmap analyze . --context --coverage-file /path/to/lcov.info \
+  --no-tui --min-score 0 --format json --output /path/to/report.json \
+  --profile --profile-output /path/to/profile.json
 </code></pre>
-<h3 id="3-quantified-signals"><a class="header" href="#3-quantified-signals">3. Quantified Signals</a></h3>
-<p>Not “this code is bad,” but “cyclomatic complexity: 12, cognitive complexity: 18, test coverage: 0%, called by 8 functions.”</p>
-<p>These signals let developers and AI make informed decisions about the best approach:</p>
-<ul>
-<li>High complexity + good coverage = risky to refactor</li>
-<li>Low complexity + no coverage = easy test target</li>
-<li>High coupling + high complexity = incremental approach needed</li>
-</ul>
-<h3 id="4-structured-output"><a class="header" href="#4-structured-output">4. Structured Output</a></h3>
-<p>Not free-form text, but JSON and markdown optimized for LLM consumption:</p>
-<ul>
-<li>Consistent structure across all debt items</li>
-<li>Minimal tokens for maximum information</li>
-<li>Deterministic output for reproducible workflows</li>
-<li>Stable IDs for referencing items across runs</li>
-</ul>
-<h2 id="what-debtmap-provides"><a class="header" href="#what-debtmap-provides">What Debtmap Provides</a></h2>
-<p>Debtmap is useful in two modes:</p>
-<ul>
-<li><strong>Direct developer use</strong> - Inspect findings in the terminal, TUI, or dashboard and decide what to tackle next</li>
-<li><strong>Structured handoff</strong> - Export markdown or JSON for automation, AI tools, CI, or downstream systems</li>
-</ul>
-<h3 id="complexity-signals"><a class="header" href="#complexity-signals">Complexity Signals</a></h3>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Signal</th><th>What It Measures</th><th>Why It Matters</th></tr>
-</thead>
-<tbody>
-<tr><td>Cyclomatic</td><td>Decision points (if, match, loop)</td><td>Number of execution paths</td></tr>
-<tr><td>Cognitive</td><td>Readability difficulty</td><td>How hard code is to understand</td></tr>
-<tr><td>Nesting</td><td>Indentation depth</td><td>Compound complexity</td></tr>
-<tr><td>Lines</td><td>Function length</td><td>Scope of changes needed</td></tr>
-</tbody>
-</table>
-</div>
-<h3 id="coverage-signals"><a class="header" href="#coverage-signals">Coverage Signals</a></h3>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Signal</th><th>What It Measures</th><th>Why It Matters</th></tr>
-</thead>
-<tbody>
-<tr><td>Line coverage</td><td>% of lines executed by tests</td><td>Basic test coverage</td></tr>
-<tr><td>Branch coverage</td><td>% of branches taken</td><td>Edge case coverage</td></tr>
-<tr><td>Function coverage</td><td>Whether function is tested at all</td><td>Critical gap detection</td></tr>
-</tbody>
-</table>
-</div>
-<h3 id="coupling-signals"><a class="header" href="#coupling-signals">Coupling Signals</a></h3>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Signal</th><th>What It Measures</th><th>Why It Matters</th></tr>
-</thead>
-<tbody>
-<tr><td>Fan-in</td><td>Functions that call this function</td><td>Impact of changes</td></tr>
-<tr><td>Fan-out</td><td>Functions this function calls</td><td>Dependency risk</td></tr>
-<tr><td>Call depth</td><td>Distance from entry points</td><td>Integration complexity</td></tr>
-</tbody>
-</table>
-</div>
-<h3 id="quality-signals"><a class="header" href="#quality-signals">Quality Signals</a></h3>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Signal</th><th>What It Measures</th><th>Why It Matters</th></tr>
-</thead>
-<tbody>
-<tr><td>Entropy</td><td>Pattern variety in code</td><td>False positive filtering</td></tr>
-<tr><td>Purity</td><td>Side effect presence</td><td>Testability indicator</td></tr>
-<tr><td>Dead code</td><td>Unused functions</td><td>Cleanup candidates</td></tr>
-</tbody>
-</table>
-</div>
-<h2 id="what-debtmap-doesnt-do"><a class="header" href="#what-debtmap-doesnt-do">What Debtmap Doesn’t Do</a></h2>
-<p>Debtmap is a <strong>sensor</strong>, not a prescriber. It measures and reports; it doesn’t tell you what to do.</p>
-<h3 id="no-fix-suggestions"><a class="header" href="#no-fix-suggestions">No Fix Suggestions</a></h3>
-<p>Debtmap doesn’t say “split this function into 5 modules” or “add 8 unit tests.” Those decisions require understanding the business context, architectural constraints, and team preferences that only humans (or AI with proper context) can evaluate.</p>
-<h3 id="no-should-statements"><a class="header" href="#no-should-statements">No “Should” Statements</a></h3>
-<p>Debtmap doesn’t say “you should refactor this” or “consider extracting a helper function.” It reports facts: “complexity: 18, coverage: 0%, called by 12 functions.” The AI or developer decides what to do with that information.</p>
-<h3 id="no-impact-predictions"><a class="header" href="#no-impact-predictions">No Impact Predictions</a></h3>
-<p>Debtmap doesn’t claim “refactoring this will reduce bugs by 40%.” Such predictions are speculative. Debtmap reports what it can measure accurately and leaves interpretation to the consumer.</p>
-<h2 id="comparison-with-alternatives"><a class="header" href="#comparison-with-alternatives">Comparison with Alternatives</a></h2>
-<h3 id="vs-static-analysis-tools-sonarqube-codeclimate"><a class="header" href="#vs-static-analysis-tools-sonarqube-codeclimate">vs Static Analysis Tools (SonarQube, CodeClimate)</a></h3>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Aspect</th><th>Traditional Tools</th><th>Debtmap</th></tr>
-</thead>
-<tbody>
-<tr><td>Output</td><td>Recommendations</td><td>Signals</td></tr>
-<tr><td>Audience</td><td>Humans</td><td>AI + Humans</td></tr>
-<tr><td>Format</td><td>Dashboards</td><td>JSON/Markdown</td></tr>
-<tr><td>Speed</td><td>Minutes</td><td>Seconds</td></tr>
-<tr><td>Focus</td><td>“Fix this”</td><td>“Here’s what exists”</td></tr>
-</tbody>
-</table>
-</div>
-<p>Debtmap is designed to work well for developers directly and to hand off cleanly to automation when needed.</p>
-<h3 id="vs-linters-clippy-eslint"><a class="header" href="#vs-linters-clippy-eslint">vs Linters (Clippy, ESLint)</a></h3>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Aspect</th><th>Linters</th><th>Debtmap</th></tr>
-</thead>
-<tbody>
-<tr><td>Focus</td><td>Style/idioms</td><td>Complexity/debt</td></tr>
-<tr><td>Scope</td><td>Line-level</td><td>Function-level</td></tr>
-<tr><td>Output</td><td>Warnings</td><td>Prioritized signals</td></tr>
-<tr><td>Coverage</td><td>Not integrated</td><td>Core feature</td></tr>
-</tbody>
-</table>
-</div>
-<p>Linters catch code style issues. Debtmap identifies complexity hotspots. Use both.</p>
-<h3 id="can-debtmap-replace-sonarqube"><a class="header" href="#can-debtmap-replace-sonarqube">Can Debtmap Replace SonarQube?</a></h3>
-<p>For teams working primarily in Debtmap’s supported languages, often yes.</p>
-<p>Debtmap is a strong replacement when you want:</p>
-<ul>
-<li>Fast local analysis without running a server</li>
-<li>Terminal/TUI-first workflows for developers</li>
-<li>Built-in coverage-aware prioritization</li>
-<li>Structured outputs for CI, dashboards, and AI handoff</li>
-</ul>
-<p>SonarQube still has an advantage when you need:</p>
-<ul>
-<li>Broader language coverage across a large organization</li>
-<li>Centralized enterprise dashboards and policy management</li>
-<li>A server-centric workflow across many repositories</li>
-</ul>
-<h3 id="vs-coverage-tools-tarpaulin-pytest-cov"><a class="header" href="#vs-coverage-tools-tarpaulin-pytest-cov">vs Coverage Tools (Tarpaulin, pytest-cov)</a></h3>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Aspect</th><th>Coverage Tools</th><th>Debtmap</th></tr>
-</thead>
-<tbody>
-<tr><td>Output</td><td>Coverage %</td><td>Risk-prioritized gaps</td></tr>
-<tr><td>Complexity</td><td>Not considered</td><td>Core metric</td></tr>
-<tr><td>Context</td><td>None</td><td>File ranges for AI</td></tr>
-</tbody>
-</table>
-</div>
-<p>Coverage tools tell you what’s tested. Debtmap tells you what untested code is most risky.</p>
-<h2 id="how-debtmap-fits-in-your-workflow"><a class="header" href="#how-debtmap-fits-in-your-workflow">How Debtmap Fits in Your Workflow</a></h2>
-<h3 id="ai-assisted-development"><a class="header" href="#ai-assisted-development">AI-Assisted Development</a></h3>
-<pre><code class="language-bash"># Generate debt signals
-debtmap analyze . --format markdown --lcov coverage.lcov
-
-# Pipe to AI
-cat debt.md | claude "Fix the top item, read the suggested context first"
-</code></pre>
-<h3 id="cicd-integration"><a class="header" href="#cicd-integration">CI/CD Integration</a></h3>
-<pre><code class="language-bash"># Fail build if debt exceeds thresholds
-debtmap validate . --max-debt-density 10.0
-
-# Generate report for PR review
-debtmap analyze . --format json --output debt-report.json
-</code></pre>
-<h3 id="exploratory-analysis"><a class="header" href="#exploratory-analysis">Exploratory Analysis</a></h3>
-<pre><code class="language-bash"># Quick overview
-debtmap analyze . --top 10
-
-# Deep dive with coverage
-debtmap analyze . --lcov coverage.lcov --format terminal -vv
-</code></pre>
-<h2 id="key-insights"><a class="header" href="#key-insights">Key Insights</a></h2>
-<ol>
-<li><strong>Debtmap is a sensor</strong> - It measures, it doesn’t prescribe</li>
-<li><strong>AI does the thinking</strong> - Debtmap provides data, AI decides action</li>
-<li><strong>Context is key</strong> - Knowing what to read is as valuable as what to fix</li>
-<li><strong>Signals over interpretations</strong> - Raw metrics, not template advice</li>
-<li><strong>Speed matters</strong> - Fast enough for local development loops</li>
-</ol>
-<h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
-<p>Ready to try it? Head to <a href="getting-started.html">Getting Started</a> to install debtmap and run your first analysis.</p>
-<p>Want to integrate with your AI workflow? See <a href="llm-integration.html">LLM Integration</a> for detailed guidance.</p>
-<p>Want to understand how it works under the hood? See <a href="architecture.html">Architecture</a> for the analysis pipeline.</p>
+<p>The LCOV snapshot SHA-256 was <code>a8e4de9f57c611327d903bc37d6fce88fd43e6e29f4f18f95b492e5c38b4e0f4</code>. The final sorted <code>src</code> file SHA-256 manifest digest was <code>35480f131d8e5dc24372869a8ceee5c2a9eb92f46a2cd4f32234d664de29837a</code>. Local raw timing/profile receipts were retained under <code>/tmp/debtmap-effect-validation/paired-*</code>, final run identifiers 4–8.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="introduction.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="call-graph-analysis.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="getting-started.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="context-providers.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -415,11 +279,11 @@ debtmap analyze . --lcov coverage.lcov --format terminal -vv
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="introduction.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="call-graph-analysis.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="getting-started.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="context-providers.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

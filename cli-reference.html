@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-742af30f.js";
+            window.path_to_searchindex_js = "searchindex-dedc95d2.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-41409472.js"></script>
+        <script src="toc-94861fa4.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -343,6 +343,11 @@ Similar to <code>analyze</code> but enforces thresholds defined in configuration
 </ul>
 <p><strong>Description:</strong>
 Compares two analysis results and generates a diff showing improvements or regressions in code quality metrics.</p>
+<p>Requires matching analyzer versions and compatible analysis receipts with
+complete scope. Incompatible or unverifiable inputs exit nonzero, explain the
+reason on stderr, and do not emit or overwrite a comparison report. Regenerate
+both reports using the same Debtmap version and settings after an upgrade;
+legacy reports without receipts cannot establish comparable measurements.</p>
 <h3 id="validate-improvement"><a class="header" href="#validate-improvement"><code>validate-improvement</code></a></h3>
 <p>Validate that technical debt improvements meet quality thresholds.</p>
 <p><strong>Usage:</strong></p>

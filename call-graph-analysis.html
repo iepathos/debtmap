@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-742af30f.js";
+            window.path_to_searchindex_js = "searchindex-dedc95d2.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-41409472.js"></script>
+        <script src="toc-94861fa4.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -178,24 +178,75 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="call-graph-analysis"><a class="header" href="#call-graph-analysis">Call Graph Analysis</a></h1>
-<p>Debtmap constructs detailed call graphs to track function relationships and dependencies across your codebase. This enables critical path identification, circular dependency detection, and transitive coverage propagation.</p>
+<p>Debtmap constructs call graphs to track function relationships and dependencies across your codebase. This supports dependency analysis, circular dependency detection, and transitive coverage propagation.</p>
 <h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
 <p>Call graph analysis builds a comprehensive map of which functions call which other functions. This information powers several key features:</p>
 <ul>
-<li><strong>Critical path identification</strong> - Find frequently-called functions that deserve extra attention</li>
+<li><strong>Dependency analysis</strong> - Find functions with many direct callers or callees</li>
 <li><strong>Circular dependency detection</strong> - Identify problematic circular call patterns</li>
 <li><strong>Transitive coverage</strong> - Propagate test coverage through the call graph</li>
 <li><strong>Dependency visualization</strong> - See caller/callee relationships in output</li>
 <li><strong>Risk assessment</strong> - Factor calling patterns into priority scoring</li>
 </ul>
+<h3 id="immediate-dependency-metrics"><a class="header" href="#immediate-dependency-metrics">Immediate dependency metrics</a></h3>
+<p>Recursive calls remain in the graph, but a function does not count itself as an
+external caller or callee. Immediate neighborhood size counts distinct neighboring
+definitions across both directions: a mutually recursive neighbor counts once.
+Definitions are distinguished by their source identities before display names are
+formatted. Colliding display labels include source locations.</p>
+<p>Public JSON v3 retains the field names <code>blast_radius</code> and
+<code>production_blast_radius</code>. They report immediate neighborhood counts, not
+transitive impact. The production count unions production callers with direct
+callees. Historical records containing only display labels cannot recover exact
+definition identities; their fallback count deduplicates available labels and
+retains any unlabeled counts.</p>
+<p>Dependency degree alone does not establish a critical execution path and does
+not set <code>critical_path</code>. Human output reports factual neighbor counts without
+assigning impact severity from those counts.</p>
 <h2 id="call-graph-construction"><a class="header" href="#call-graph-construction">Call Graph Construction</a></h2>
-<p>Debtmap builds call graphs through a three-phase AST-based construction process:</p>
+<p>For Rust, Debtmap builds an immutable declaration index over all discovered
+source files before analyzing function bodies. Source readers capture each file once;
+both parsing passes use that snapshot:</p>
 <ol>
-<li><strong>Extract functions and collect unresolved calls</strong> - Parse each file to identify function definitions and call expressions</li>
-<li><strong>Resolve calls using CallResolver and PathResolver</strong> - Match call expressions to function definitions within the same file</li>
-<li><strong>Final cross-file resolution</strong> - Resolve remaining calls across module boundaries</li>
+<li><strong>Index declarations</strong> — Parse batches of at most 200 files and retain owned
+type syntax, aliases, fields, imports, callable signatures, receiver forms, module
+relationships, and definition locations. Finalize the index after every batch
+has contributed declarations; it contains no ASTs or spans.</li>
+<li><strong>Collect source facts</strong> — Reparse bounded batches against the complete index,
+tracking lexical bindings and supported receiver types. Drop each batch before
+resetting span storage. File ordering and batch boundaries do not restrict lookup.</li>
+<li><strong>Record outcomes</strong> — Add an ordinary edge when declaration evidence justifies a
+target; otherwise preserve the call and its admissible possible targets separately.</li>
 </ol>
-<p>This multi-phase approach ensures accurate resolution while handling complex scenarios like trait methods, macros, and module imports.</p>
+<p>The standard <code>analyze</code> command also uses this resolver when its graph is built from
+cached extraction data. Rust extraction retains a source snapshot so that the complete
+declaration index can be reconstructed before resolving bodies. Older cache records
+without source snapshots preserve uncertain method calls instead of recovering edges
+through name-only matching. Public JSON output does not expose the internal snapshot.
+Rust extraction, metrics, and cached graphs use the same module-qualified function
+names, including multiple inline modules on one source line. Current extraction
+records support Postcard round trips with present or absent source snapshots; this
+does not provide migration for older binary cache layouts.
+Keeping these snapshots costs source-sized storage. Graph construction parses each
+snapshot twice, once for owned declarations and once for body analysis; it avoids
+retaining an entire workspace AST or parsing separately for each function. Resolution totals are available in existing debug logs with
+<code>RUST_LOG=debtmap=debug</code>.</p>
+<p>Git-history context retains qualified names as cache keys and searches the source
+declaration spelling, such as <code>fn run</code> for <code>Worker::run</code>. A completed history preload
+also remembers missing results, allowing cached file-history fallback without
+repeating the repository scan during scoring. This history search remains based on
+textual occurrences; it does not distinguish same-named historical declarations
+within one file. Function-scoring progress advances as metrics finish.</p>
+<p>Definition identity includes its file, name, line, and optional zero-based identifier
+column. Rust extraction and metric adapters populate the same columns, distinguishing
+same-line implementations without changing display names. Older JSON records default
+missing columns to absent; a legacy lookup selects a definition only when unique.
+Type identity additionally preserves its lexical module. Printed
+names are display values. A dotted call cannot select a free function or an
+associated function without a receiver. Known receiver constraints remain in force
+through import lookup and fallback handling: <code>Timeline</code> never matches <code>PyTimeline</code>
+merely because their names have a common suffix. A unique method name alone does
+not establish a resolved edge.</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Example: Debtmap tracks these relationships
@@ -211,16 +262,143 @@ fn validate_input(input: &amp;str) -&gt; Result&lt;()&gt; {
 <span class="boring">}</span></code></pre>
 <p><strong>Source</strong>: Example pattern from tests/call_graph_comprehensive_test.rs:48-94</p>
 <h3 id="resolution-mechanisms"><a class="header" href="#resolution-mechanisms">Resolution Mechanisms</a></h3>
-<p>The call graph analyzer handles complex resolution scenarios:</p>
+<p>The bounded Rust resolver supports:</p>
 <ul>
-<li><strong>Trait method resolution</strong> - Resolves trait method calls to implementations using struct prefixes (e.g., <code>Processor::process</code>)</li>
-<li><strong>Macro expansion tracking</strong> - Classifies and tracks calls within macros (collection, formatting, assertion, and logging macros)</li>
-<li><strong>Module path resolution</strong> - Resolves fully-qualified paths across module boundaries</li>
-<li><strong>Cross-file resolution</strong> - Matches unresolved calls (marked with line 0) to actual function definitions</li>
+<li>Parameters, <code>self</code>/<code>Self</code>, annotated and inferred locals, local aliases,
+references, dereferences of known references, and parentheses.</li>
+<li>Struct literals, declared unit structs, tuple-struct constructors with matching
+arity, named and tuple fields, and known
+function/method return chains. Local async declarations propagate their output
+through <code>.await</code>.</li>
+<li>Explicit module paths and imports when the discovered source establishes one
+declaration identity. Type import aliases retain declaration identities. Module <code>#[path]</code> attributes normalize <code>.</code>
+and <code>..</code> for lookup while preserving the discovered file’s identity. Absolute
+external paths such as <code>::std</code> do not select similarly named local modules. Local
+declarations and explicit imports shadow globs in the relevant namespace; conflicts
+retain admissible owner constraints rather than selecting one declaration.</li>
+<li>Constants and statics use their declared value types. Enums and type aliases
+do not establish unit-struct values merely by sharing a name.</li>
+<li>Direct generic substitution from explicit arguments and known receiver arguments
+into fields and return types. Lifetimes do not become part of a type name; const
+arguments are retained without evaluation. A declared <code>new() -&gt; Other</code> returns
+<code>Other</code>, irrespective of its constructor-like name.</li>
+<li>Inherent methods and concrete trait implementations whose owner, trait scope,
+and requirements are established. Explicit trait qualification distinguishes
+competing implementation bodies from trait declarations and retains the enclosing
+impl’s <code>Self</code> substitution. Dynamic and generic trait bounds retain declaration
+identities from their original lexical context through fields, aliases, returns,
+and substitutions. Unavailable bounds retain that context and diagnostic reason.</li>
+<li>Primitive receiver identities, references, aliases, and lexical type shadowing.
+A primitive receiver excludes incompatible nominal owners; explicit qualification
+may resolve a local trait implementation. Dotted primitive calls remain uncertain
+because library inherent-method precedence is not indexed.</li>
 </ul>
-<p><strong>Source</strong>: Resolution mechanisms from src/analyzers/call_graph/trait_handling.rs, src/analyzers/call_graph/macro_expansion.rs, src/analyzers/call_graph/path_resolver.rs</p>
+<p>Bindings follow lexical scope. An initializer sees the previous binding; an
+unknown inner binding shadows an outer known binding. Unsupported pattern bindings
+introduce unknown facts. Assignments update inferred types or preserve explicit
+constraints with uncertainty; branch joins require agreement. Loops conservatively
+invalidate inferred facts they modify. Conditions carry distinct successful and
+unsuccessful binding states through <code>&amp;&amp;</code>, <code>||</code>, <code>if</code>, and <code>while</code>, so successful
+let-chain bindings reach their branch. Block items have separate type and value
+shadows with block-wide item scope.
+Tuple annotations retain each component’s declared owner when initializer facts
+are unavailable. A contradictory component remains constrained uncertainty without
+making unrelated owners possible or invalidating an agreeing sibling.</p>
+<p>Project declarations named <code>clone</code>, <code>get</code>, or <code>any</code> receive the same receiver
+checks as other methods. Their names alone do not establish library ownership.
+Existing supported macro argument scanning, function-pointer tracking, and framework
+registrations remain separate inputs to graph construction. Trait enhancement
+consumes shared call uncertainty and cannot recreate ordinary method edges through
+weaker name matching. Sequential, parallel, and cached-source builders accumulate
+enhancement metadata across batches and finalize it once against existing canonical
+definitions. Unmatched legacy metadata remains diagnostic; it creates no ghost node.
+Public <code>RustCallGraphBuilder::build()</code> also finalizes collected enhancement. Explicit
+finalization followed by <code>build()</code> performs one pass; collecting more metadata
+requires another pass without duplicating Visit patterns. The effects entry point
+seeds canonical definitions from its supplied AST before applying enhancement.</p>
+<h3 id="possible-calls-and-dead-code"><a class="header" href="#possible-calls-and-dead-code">Possible Calls and Dead Code</a></h3>
+<p><code>CallGraph</code> retains uncertain calls with caller and call-site identity, lexical
+module, query, available receiver information, sorted deduplicated candidate
+identities, and a reason. Reasons distinguish unknown receivers, ambiguous
+identities, unsupported type operations, unavailable definitions, and analysis
+limits. Zero-candidate calls remain available for diagnostics. Repeated merges
+preserve distinct sites and do not duplicate identical records.
+Legacy extraction summaries without columns carry a separate occurrence ordinal,
+so repeated calls on one line remain distinct without fabricated source positions.
+Loading legacy graph records deduplicates edges and evidence and rebuilds indexes.
+Sequential and parallel conversions also retain legacy entry-point and test flags.</p>
+<p>Ordinary <code>get_callers</code> and <code>get_callees</code> queries return resolved relationships.
+Possible targets do not increase caller/dependency counts or propagate coverage,
+purity, or ordinary graph scores. Internal consumers can use <code>uncertain_calls</code>,
+<code>get_possible_callers</code>, <code>get_possible_callees</code>, and
+<code>get_transitive_possible_callees</code> to inspect uncertainty explicitly.</p>
+<p>The caller-based dead-code classifier withholds <code>DeadCode</code> when an admissible
+possible caller exists. Enhanced reachability analysis follows both resolved and
+possible relations from its existing live roots, protecting reachable descendants.
+An uncertain call in unreachable code does not become a new root. Definitely-live
+queries retain their existing resolved semantics. Zero-candidate calls cannot
+protect unrelated functions; missing project targets remain a limitation of
+syntax-based dead-code analysis.</p>
+<h3 id="accuracy-limits"><a class="header" href="#accuracy-limits">Accuracy Limits</a></h3>
+<p>This is a bounded source resolver, not Rust’s type checker. Dynamic dispatch and
+unresolved generic trait receivers retain possible implementation targets.
+Trait paths with generic or associated arguments and reference-owned trait impls
+remain uncertain. Trait declarations without bodies are not graph nodes; default
+trait bodies are not instantiated for concrete impls that omit an override. Nested
+glob reexports are unsupported. An explicitly qualified or imported unavailable
+receiver excludes unrelated project methods; a bare unavailable receiver may retain
+a possible target found only by method name. Custom
+<code>Deref</code>, blanket-impl solving, associated-type projection, arbitrary coercions,
+general <code>?</code>/wrapper inference, and const-generic evaluation remain unsupported.
+Block-local item declarations and imports are not indexed as independent lexical
+module contexts; calls requiring those contexts remain uncertain. Receiver checks
+respect those block-local shadows in qualified types and trait bounds inside
+<code>dyn T</code>, excluding unrelated module-level targets. Reference projection preserves
+these constraints; associated-call owner and trait arguments use the same lexical
+type lowering. Alias bodies, fields and returns retain their declaration context.
+Generic arguments
+are not inferred from arbitrary argument constraints, including tuple-constructor
+arguments. Constructors supply a nominal type without manufacturing a callable node.
+Value lookup considers functions, constructors and constants together, so mixed
+glob bindings remain ambiguous even when only one has a callable body. Renamed
+free-function imports retain their resolved declaration identity.
+Loop analysis does not compute a fixed point. Alias and substitution
+expansion stops at 32 levels; recursive aliases and other incomplete facts remain
+uncertain instead of triggering a name-only guess.</p>
+<p>Existing source discovery remains authoritative. The resolver does not invoke
+Cargo project builds or metadata, download dependencies, execute build scripts, or
+introduce general macro expansion. It does not use rust-analyzer. Ambiguous crate,
+module, or configuration contexts may remain unresolved; filenames alone do not
+establish cross-crate ownership.</p>
+<p>These internal graph changes do not add fields to public JSON v3 output. Internal
+serialized graphs in self-describing formats such as JSON preserve uncertainty and
+evidence; older JSON graphs load with empty uncertainty. The existing graph serializer
+does not support a postcard round trip, so binary-format compatibility is not claimed.
+Caller counts and debt rankings can change as incorrect edges are removed or supported
+calls are recovered.</p>
+<p>The labeled regression corpus is in <code>tests/data/rust_method_resolution/</code>. Its
+exact-edge precision and recall describe those fixtures only, not arbitrary Rust
+projects. The additional identity, receiver, lexical, and workspace-boundary regression
+targets cover the nine reviewed gaps, including exact possible-target sets and
+199/200/201/401-file workspaces. The existing Criterion call-graph benchmark measures
+sequential and parallel Rust workspace construction at those boundaries:</p>
+<pre><code class="language-bash">cargo bench --offline --profile dev --bench call_graph_bench -- rust_workspace_resolution
+</code></pre>
+<p>The <a href="../../docs/benchmarks/rust-resolution-nine-gaps.html">measured repair report</a>
+records five warmed debug runs on identical frozen repository and synthetic inputs,
+including context/LCOV, phase timings, peak memory, and the full CLI commands with
+the interactive explorer disabled. Fixture and boundary benchmarks do not establish
+repository-scale performance.</p>
+<p>The <a href="../../docs/rust-resolution-gap-test-matrix.html">systematic gap matrix</a> adds
+451 identity, expression and namespace cases, plus independent compiler
+classifications and harness rejection checks. These targets run in
+<code>just test-integration</code>; the selected fast <code>just test</code> suite alone does not run
+them. The <a href="../../docs/benchmarks/rust-resolution-gap-repairs.html">follow-up performance report</a>
+records the comparison against the committed matrix baseline.</p>
 <h3 id="parallel-construction"><a class="header" href="#parallel-construction">Parallel Construction</a></h3>
-<p>Call graph construction runs in parallel by default for improved performance. You can disable parallel processing with <code>--no-parallel</code> for debugging purposes, though this affects overall analysis performance, not just call graph construction.</p>
+<p>Sequential and parallel Rust builders use the same complete workspace resolution.
+Parallel conversion preserves resolved edge evidence, node role evidence, and
+uncertain calls. Call graph construction runs in parallel by default for improved performance. You can disable parallel processing with <code>--no-parallel</code> for debugging purposes, though this affects overall analysis performance, not just call graph construction.</p>
 <h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
 <p>Call graph behavior is controlled through two configuration sections:</p>
 <h3 id="analysis-settings"><a class="header" href="#analysis-settings">Analysis Settings</a></h3>
@@ -407,7 +585,7 @@ debtmap analyze . --no-parallel
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="context-providers.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="rust-effect-analysis.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -421,7 +599,7 @@ debtmap analyze . --no-parallel
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="context-providers.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="rust-effect-analysis.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>
