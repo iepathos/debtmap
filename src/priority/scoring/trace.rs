@@ -54,15 +54,17 @@ pub struct ScoreStep {
     pub input: f64,
     pub operation: ScoreOperation,
     pub output: f64,
+    pub details: Vec<String>,
 }
 
 impl ScoreStep {
     /// Include preprocessing operands before the scalar scoring operation.
     pub fn explanation_lines(&self) -> Vec<String> {
-        let mut lines = match self.operation {
+        let mut lines = self.details.clone();
+        lines.extend(match self.operation {
             ScoreOperation::Complexity(inputs) => inputs.preprocessing_lines(),
             _ => Vec::new(),
-        };
+        });
         lines.push(self.to_string());
         lines
     }
@@ -73,7 +75,13 @@ impl ScoreStep {
             input,
             operation,
             output,
+            details: Vec::new(),
         }
+    }
+
+    pub fn with_details(mut self, details: Vec<String>) -> Self {
+        self.details = details;
+        self
     }
 
     /// Re-evaluate a recorded operation for consistency checks.
@@ -155,10 +163,15 @@ mod tests {
                 weights: [0.2, 0.5, 0.3],
             },
             16.3,
-        );
+        )
+        .with_details(vec!["Purity assessment: LocallyPure".into()]);
         assert!((step.calculated_output() - 16.3).abs() < 1e-10);
         assert!(step.to_string().contains("0.2000"));
         assert!(step.to_string().contains("16.3000"));
+        assert_eq!(
+            step.explanation_lines()[0],
+            "Purity assessment: LocallyPure"
+        );
     }
 
     #[test]

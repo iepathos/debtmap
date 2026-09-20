@@ -88,6 +88,7 @@ fn populate_purity(
     }
 
     let purity_info = PurityInfo {
+        assessment: None,
         is_pure: purity.is_pure,
         confidence: purity.confidence,
         impurity_reasons,

@@ -9,6 +9,7 @@
 mod criticality;
 mod cross_file;
 mod dependencies;
+mod effects;
 mod graph_operations;
 mod pattern_detection;
 #[cfg(test)]

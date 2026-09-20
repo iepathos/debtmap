@@ -202,6 +202,9 @@ pub fn analyze_purity<Env: ProgressReporter>(
     env.phase_progress(0.8);
 
     state.results.enriched_metrics = Some(propagator.apply_results(&enriched_metrics));
+    if let Some(call_graph) = state.results.call_graph.as_mut() {
+        call_graph.replace_with_propagated_effect_assessments(propagator.assessments());
+    }
 
     state.transition_to(AnalysisPhase::PurityComplete);
     env.phase_complete();

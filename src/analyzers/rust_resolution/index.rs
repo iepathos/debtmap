@@ -86,6 +86,8 @@ pub struct Callable {
     pub is_test: bool,
     pub substitutions: Substitutions,
     pub const_parameters: Vec<String>,
+    /// Parameter invoked by a supported transparent wrapper body.
+    pub invoked_parameter: Option<usize>,
 }
 
 impl Callable {
@@ -139,6 +141,7 @@ struct ValueDeclaration {
     ty: TypeSyntax,
     line: usize,
     column: usize,
+    is_static: bool,
 }
 
 #[derive(Clone)]
@@ -158,6 +161,7 @@ pub struct WorkspaceIndex {
     value_paths: HashMap<Vec<String>, Vec<usize>>,
     callables: Vec<Callable>,
     imports: Vec<Import>,
+    macro_declarations: Vec<DeclarationId>,
     contexts: HashMap<PathBuf, Vec<Context>>,
     roots: HashMap<PathBuf, HashSet<PathBuf>>,
     workspace_membership: HashMap<PathBuf, usize>,
@@ -306,6 +310,49 @@ impl WorkspaceIndex {
             .into_iter()
             .flatten()
             .map(|position| &self.imports[*position])
+    }
+
+    /// Resolve an explicitly imported path for reviewed external models.
+    /// Project declarations are still looked up before models at call sites.
+    pub(super) fn external_path(&self, path: &syn::Path, context: &Context) -> Vec<String> {
+        let names: Vec<_> = path
+            .segments
+            .iter()
+            .map(|part| part.ident.to_string())
+            .collect();
+        let Some(first) = names.first() else {
+            return names;
+        };
+        self.context_imports(context)
+            .find(|import| !import.glob && import.alias == *first)
+            .map(|import| {
+                import
+                    .path
+                    .iter()
+                    .cloned()
+                    .chain(names.iter().skip(1).cloned())
+                    .collect()
+            })
+            .unwrap_or(names)
+    }
+
+    /// Conservative macro namespace check; uncertain imports never establish std identity.
+    pub(super) fn standard_macro(&self, path: &syn::Path, context: &Context) -> Option<String> {
+        let names = self.external_path(path, context);
+        let name = names.last()?.clone();
+        let explicit = names.as_slice() == ["std", name.as_str()];
+        let bare = names.len() == 1 && path.segments.len() == 1;
+        let shadowed = self
+            .macro_declarations
+            .iter()
+            .any(|id| id.name == name && self.same_workspace(&id.file, &context.file));
+        let imported = self.context_imports(context).any(|import| import.glob);
+        let std_shadowed = path.leading_colon.is_none()
+            && self.module_paths.iter().any(|module| {
+                module.module.last().is_some_and(|name| name == "std")
+                    && self.same_workspace(&module.file, &context.file)
+            });
+        ((explicit && !std_shadowed) || (bare && !shadowed && !imported)).then_some(name)
     }
 
     fn module_imports(&self, module: &[String]) -> impl Iterator<Item = &Import> {

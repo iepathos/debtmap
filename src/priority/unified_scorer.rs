@@ -437,7 +437,7 @@ pub fn calculate_unified_priority_with_role(
 
     let complexity_inputs = ComplexityInputs::for_function(
         func,
-        calculate_purity_adjustment(func),
+        graph_purity_adjustment(func, func_id, call_graph),
         is_orchestrator_candidate,
         crate::config::get_config(),
     );
@@ -599,6 +599,31 @@ pub fn calculate_unified_priority_with_role(
 
 // Helper functions for calculate_unified_priority_with_debt
 
+fn graph_purity_adjustment(func: &FunctionMetrics, id: &FunctionId, graph: &CallGraph) -> f64 {
+    use crate::analysis::effect_evidence::EffectClassification as Class;
+    if crate::core::Language::from_path(&func.file) != crate::core::Language::Rust {
+        return calculate_purity_adjustment(func);
+    }
+    let Some(assessment) = graph.effect_assessment(id) else {
+        return 1.0;
+    };
+    // Unpropagated invocation facts alone cannot establish a discount.
+    if !graph.effect_assessments_are_propagated() && assessment.dependencies().next().is_some() {
+        return 1.0;
+    }
+    match (
+        assessment.classification(),
+        func.purity_confidence.unwrap_or(0.0) > 0.8,
+    ) {
+        (Class::StrictlyPure, true) => 0.70,
+        (Class::StrictlyPure, false) => 0.80,
+        (Class::LocallyPure, true) => 0.75,
+        (Class::LocallyPure, false) => 0.85,
+        (Class::ReadOnly, _) => 0.90,
+        (Class::Impure | Class::Unknown, _) => 1.0,
+    }
+}
+
 /// Determine if a function is trivial based on complexity and role.
 ///
 /// Trivial functions are simple enough that they're not considered technical debt.
@@ -646,6 +671,14 @@ fn should_skip_as_non_debt(is_trivial: bool, has_coverage: bool) -> bool {
 /// - ReadOnly: 0.90 (good - reads but doesn't modify)
 /// - Impure: 1.0 (no bonus)
 fn calculate_purity_adjustment(func: &FunctionMetrics) -> f64 {
+    let rust_evidence = crate::core::Language::from_path(&func.file) != crate::core::Language::Rust
+        || func
+            .purity_reason
+            .as_deref()
+            .is_some_and(|reason| reason.starts_with("EffectEvidence:"));
+    if !rust_evidence {
+        return 1.0;
+    }
     // Try new purity_level field first
     if let Some(level) = func.purity_level {
         let confidence = func.purity_confidence.unwrap_or(0.0);
@@ -671,8 +704,10 @@ fn calculate_purity_adjustment(func: &FunctionMetrics) -> f64 {
         };
     }
 
-    // Fallback to legacy is_pure field for backward compatibility
-    if func.is_pure == Some(true) {
+    // Other-language compatibility only. Rust legacy booleans are not evidence.
+    if crate::core::Language::from_path(&func.file) != crate::core::Language::Rust
+        && func.is_pure == Some(true)
+    {
         // Old code path - treat as StrictlyPure
         if func.purity_confidence.unwrap_or(0.0) > 0.8 {
             0.70
@@ -950,59 +985,21 @@ pub fn is_dead_code_with_exclusions(
 /// Returns a factor in range 0.0-1.0 where lower values reduce priority.
 /// Based on PuritySpectrum classification derived from data flow graph.
 fn calculate_purity_factor(func_id: &FunctionId, data_flow: &DataFlowGraph) -> f64 {
-    // Get purity info from data flow analysis
-    let purity_info = data_flow.get_purity_info(func_id);
+    use crate::analysis::effect_evidence::EffectClassification;
 
-    // Get mutation analysis
-    let mutation_info = data_flow.get_mutation_info(func_id);
-
-    // Get I/O operations
-    let io_ops = data_flow.get_io_operations(func_id);
-
-    // Classify on purity spectrum (spec 257: use binary signals)
-    let spectrum = if let Some(purity) = purity_info {
-        if purity.is_pure && purity.confidence > 0.8 {
-            // Check if truly pure or just locally pure using binary signals
-            if let Some(mutations) = mutation_info {
-                if mutations.has_mutations {
-                    // Has local mutations but doesn't escape
-                    PuritySpectrum::LocallyPure
-                } else {
-                    // No mutations at all
-                    PuritySpectrum::StrictlyPure
-                }
-            } else {
-                PuritySpectrum::StrictlyPure
-            }
-        } else if purity.is_pure {
-            // Lower confidence purity
-            PuritySpectrum::LocallyPure
-        } else {
-            // Not pure - check I/O isolation
-            classify_io_isolation(io_ops)
-        }
-    } else {
-        // No purity info - assume impure
-        PuritySpectrum::Impure
-    };
-
-    spectrum.score_multiplier()
-}
-
-/// Classify I/O isolation level based on I/O operations
-fn classify_io_isolation(io_ops: Option<&Vec<crate::data_flow::IoOperation>>) -> PuritySpectrum {
-    match io_ops {
-        None => PuritySpectrum::Impure,
-        Some(ops) if ops.is_empty() => PuritySpectrum::Impure,
-        Some(ops) => {
-            // If I/O operations are concentrated (few unique types), likely isolated
-            let unique_types: HashSet<&String> = ops.iter().map(|op| &op.operation_type).collect();
-            if unique_types.len() <= 2 && ops.len() <= 3 {
-                PuritySpectrum::IOIsolated
-            } else {
-                PuritySpectrum::IOMixed
-            }
-        }
+    match data_flow
+        .get_purity_info(func_id)
+        .and_then(|purity| purity.assessment.as_ref())
+        .map(|assessment| assessment.classification())
+    {
+        Some(EffectClassification::StrictlyPure) => 0.0,
+        Some(EffectClassification::LocallyPure) => 0.3,
+        Some(
+            EffectClassification::ReadOnly
+            | EffectClassification::Impure
+            | EffectClassification::Unknown,
+        )
+        | None => 1.0,
     }
 }
 
@@ -1143,19 +1140,22 @@ pub fn calculate_unified_priority_with_data_flow_and_role(
 
     // Apply adjustment to final score
     let adjusted_score = base_score.final_score * combined_adjustment;
-    base_score.score_trace.push(ScoreStep::new(
-        "Data-flow weighted blend",
-        base_score.final_score,
-        ScoreOperation::WeightedBlend {
-            factors: [purity_factor, refactorability_factor, pattern_factor],
-            weights: [
-                config.purity_weight,
-                config.refactorability_weight,
-                config.pattern_weight,
-            ],
-        },
-        adjusted_score,
-    ));
+    base_score.score_trace.push(
+        ScoreStep::new(
+            "Data-flow weighted blend",
+            base_score.final_score,
+            ScoreOperation::WeightedBlend {
+                factors: [purity_factor, refactorability_factor, pattern_factor],
+                weights: [
+                    config.purity_weight,
+                    config.refactorability_weight,
+                    config.pattern_weight,
+                ],
+            },
+            adjusted_score,
+        )
+        .with_details(purity_trace_details(func_id, data_flow)),
+    );
 
     // Update score with data flow factors
     base_score.final_score = adjusted_score;
@@ -1164,6 +1164,50 @@ pub fn calculate_unified_priority_with_data_flow_and_role(
     base_score.pattern_factor = Some(pattern_factor);
 
     base_score
+}
+
+fn purity_trace_details(func_id: &FunctionId, data_flow: &DataFlowGraph) -> Vec<String> {
+    use crate::analysis::effect_evidence::EffectClassification;
+
+    let Some(assessment) = data_flow
+        .get_purity_info(func_id)
+        .and_then(|purity| purity.assessment.as_ref())
+    else {
+        return vec![
+            "Purity assessment: Unknown (effect evidence unavailable); no discount granted.".into(),
+        ];
+    };
+    let classification = assessment.classification();
+    let observed = assessment
+        .observed()
+        .map(|effect| format!("{:?}: {}", effect.kind, effect.detail))
+        .collect::<Vec<_>>();
+    let unresolved = assessment
+        .unresolved()
+        .map(|behavior| format!("{:?}: {}", behavior.reason, behavior.detail))
+        .collect::<Vec<_>>();
+    let decision = match classification {
+        EffectClassification::StrictlyPure | EffectClassification::LocallyPure => {
+            "complete evidence qualifies for a purity discount"
+        }
+        EffectClassification::ReadOnly | EffectClassification::Impure => {
+            "the classification receives no data-flow purity discount"
+        }
+        EffectClassification::Unknown => "incomplete evidence cannot qualify for a purity discount",
+    };
+    vec![
+        format!("Purity assessment: {classification:?}; {decision}."),
+        format!("Observed effects: {}", evidence_list(&observed)),
+        format!("Unresolved behavior: {}", evidence_list(&unresolved)),
+    ]
+}
+
+fn evidence_list(values: &[String]) -> String {
+    if values.is_empty() {
+        "none".into()
+    } else {
+        values.join("; ")
+    }
 }
 
 #[cfg(test)]

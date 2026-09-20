@@ -34,6 +34,11 @@ impl CallGraph {
         for call in other.uncertain_calls {
             self.record_uncertain_call(call);
         }
+        for (id, assessment) in other.effect_assessments {
+            self.record_effect_assessment(id, assessment);
+        }
+        // Merging may introduce a previously unavailable dependency body.
+        self.effect_assessments_propagated = false;
     }
 
     pub fn add_function(

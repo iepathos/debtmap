@@ -3,6 +3,7 @@
 use crate::collections::{HashMap, HashSet, Vector};
 use crate::core::Language;
 use serde::{Deserialize, Deserializer, Serialize};
+use std::collections::BTreeMap;
 use std::path::{Component, Path, PathBuf};
 
 /// Stable cross-language function identity. Source line is intentionally absent.
@@ -293,6 +294,11 @@ pub struct CallGraph {
     pub(crate) edge_evidence: Vector<CallEdgeEvidence>,
     #[serde(default)]
     pub(crate) uncertain_calls: Vector<UncertainCall>,
+    #[serde(default, with = "function_id_btree_map")]
+    pub(crate) effect_assessments:
+        BTreeMap<FunctionId, crate::analysis::effect_evidence::EffectAssessment>,
+    #[serde(skip)]
+    pub(crate) effect_assessments_propagated: bool,
     #[serde(skip)]
     pub(crate) possible_caller_index: HashMap<FunctionId, HashSet<FunctionId>>,
     #[serde(skip)]
@@ -322,6 +328,13 @@ struct SerializedCallGraph {
     edge_evidence: Vector<CallEdgeEvidence>,
     #[serde(default)]
     uncertain_calls: Vector<UncertainCall>,
+    #[serde(default, with = "function_id_btree_map")]
+    effect_assessments: BTreeMap<FunctionId, crate::analysis::effect_evidence::EffectAssessment>,
+    // Consume the historical fields in binary formats, then rebuild these indexes.
+    #[serde(default, rename = "caller_index", with = "function_id_map")]
+    _caller_index: HashMap<FunctionId, HashSet<FunctionId>>,
+    #[serde(default, rename = "callee_index", with = "function_id_map")]
+    _callee_index: HashMap<FunctionId, HashSet<FunctionId>>,
 }
 
 impl<'de> Deserialize<'de> for CallGraph {
@@ -347,6 +360,9 @@ impl<'de> Deserialize<'de> for CallGraph {
         }
         for call in serialized.uncertain_calls {
             graph.record_uncertain_call(call);
+        }
+        for (id, assessment) in serialized.effect_assessments {
+            graph.record_effect_assessment(id, assessment);
         }
         Ok(graph)
     }
@@ -431,6 +447,10 @@ mod function_id_map {
         D: Deserializer<'de>,
         V: Deserialize<'de>,
     {
+        if !deserializer.is_human_readable() {
+            return Vec::<(FunctionId, V)>::deserialize(deserializer)
+                .map(|entries| entries.into_iter().collect());
+        }
         match MapRepresentation::deserialize(deserializer)? {
             MapRepresentation::Lossless(entries) => Ok(entries.into_iter().collect()),
             MapRepresentation::Legacy(entries) => Ok(deserialize_legacy(entries)),
@@ -458,6 +478,30 @@ mod function_id_map {
     }
 }
 
+// JSON object keys cannot represent structured identities. A sorted sequence
+// remains lossless in JSON and deterministic in every supported format.
+mod function_id_btree_map {
+    use super::*;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S, V>(map: &BTreeMap<FunctionId, V>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+        V: Serialize,
+    {
+        map.iter().collect::<Vec<_>>().serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D, V>(deserializer: D) -> Result<BTreeMap<FunctionId, V>, D::Error>
+    where
+        D: Deserializer<'de>,
+        V: Deserialize<'de>,
+    {
+        Vec::<(FunctionId, V)>::deserialize(deserializer)
+            .map(|entries| entries.into_iter().collect())
+    }
+}
+
 impl Default for CallGraph {
     fn default() -> Self {
         Self::new()
@@ -472,6 +516,8 @@ impl CallGraph {
             edges: Vector::new(),
             edge_evidence: Vector::new(),
             uncertain_calls: Vector::new(),
+            effect_assessments: BTreeMap::new(),
+            effect_assessments_propagated: false,
             possible_caller_index: HashMap::new(),
             possible_callee_index: HashMap::new(),
             edge_set: HashSet::new(),

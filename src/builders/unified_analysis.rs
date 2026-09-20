@@ -131,7 +131,7 @@ pub fn perform_unified_analysis_with_options(
         &call_graph,
     );
 
-    let enriched_metrics = run_purity_stage(&enriched_metrics, &call_graph);
+    let enriched_metrics = run_purity_stage(&enriched_metrics, &mut call_graph);
     let risk_analyzer = load_context_stage(ContextStageOptions {
         project_path: options.project_path,
         enable_context: options.enable_context,
@@ -367,14 +367,20 @@ fn coverage_stage_metric(coverage_data: Option<&risk::lcov::LcovData>) -> &'stat
 
 fn run_purity_stage(
     enriched_metrics: &[crate::core::FunctionMetrics],
-    call_graph: &CallGraph,
+    call_graph: &mut CallGraph,
 ) -> Vec<crate::core::FunctionMetrics> {
     report_stage_start(3);
     let enriched_metrics = {
         time_span!("purity_analysis", parent: "unified_analysis");
         let _span = info_span!("purity_analysis").entered();
         info!("Analyzing function purity");
-        let result = core::orchestration::run_purity_propagation(enriched_metrics, call_graph);
+        let (result, assessments) = core::orchestration::run_purity_propagation_with_assessments(
+            enriched_metrics,
+            call_graph,
+        );
+        if let Some(assessments) = assessments {
+            call_graph.replace_with_propagated_effect_assessments(assessments);
+        }
         debug!(functions = result.len(), "Purity analysis complete");
         result
     };

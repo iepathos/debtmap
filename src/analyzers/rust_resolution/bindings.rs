@@ -11,6 +11,8 @@ struct Binding {
     fact: TypeFact,
     declared: Option<TypeFact>,
     origin: FactOrigin,
+    callable: Option<crate::priority::call_graph::FunctionId>,
+    closure: Option<usize>,
 }
 
 #[derive(Clone, Debug)]
@@ -78,12 +80,16 @@ impl Bindings {
                     } else {
                         FactOrigin::Propagation
                     },
+                    callable: None,
+                    closure: None,
                 },
             );
         }
     }
     pub fn assign(&mut self, name: &str, fact: TypeFact) {
         if let Some(binding) = self.scopes.iter_mut().rev().find_map(|s| s.get_mut(name)) {
+            binding.callable = None;
+            binding.closure = None;
             binding.fact = match &binding.declared {
                 Some(declared) if !compatible(declared, &fact) => TypeFact::Uncertain {
                     constraint: Box::new(declared.clone()),
@@ -110,6 +116,18 @@ impl Bindings {
                     .iter()
                     .filter_map(|b| b.scopes.get(depth)?.get(name))
                     .collect();
+                if values.len() != branches.len()
+                    || values
+                        .iter()
+                        .any(|value| value.callable != binding.callable)
+                {
+                    binding.callable = None;
+                }
+                if values.len() != branches.len()
+                    || values.iter().any(|value| value.closure != binding.closure)
+                {
+                    binding.closure = None;
+                }
                 binding.fact = match values.first() {
                     Some(first)
                         if values.len() == branches.len()
@@ -136,7 +154,55 @@ impl Bindings {
                 && binding.declared.is_none()
             {
                 binding.fact = unknown();
+                binding.callable = None;
+                binding.closure = None;
             }
         }
+    }
+
+    pub fn bind_callable(&mut self, name: &str, target: crate::priority::call_graph::FunctionId) {
+        if let Some(binding) = self.scopes.last_mut().and_then(|scope| scope.get_mut(name)) {
+            binding.callable = Some(target);
+        }
+    }
+
+    pub fn callable(&self, name: &str) -> Option<&crate::priority::call_graph::FunctionId> {
+        self.scopes
+            .iter()
+            .rev()
+            .find_map(|scope| scope.get(name))?
+            .callable
+            .as_ref()
+    }
+
+    pub fn bind_closure(&mut self, name: &str, closure: usize) {
+        if let Some(binding) = self.scopes.last_mut().and_then(|scope| scope.get_mut(name)) {
+            binding.closure = Some(closure);
+        }
+    }
+
+    pub fn closure(&self, name: &str) -> Option<usize> {
+        self.scopes
+            .iter()
+            .rev()
+            .find_map(|scope| scope.get(name))?
+            .closure
+    }
+
+    pub fn captures_unchanged(&self, current: &Self) -> bool {
+        self.scopes
+            .iter()
+            .flat_map(|scope| scope.keys())
+            .all(|name| {
+                let visible = |bindings: &Self| {
+                    bindings
+                        .scopes
+                        .iter()
+                        .rev()
+                        .find_map(|scope| scope.get(name))
+                        .cloned()
+                };
+                visible(self) == visible(current)
+            })
     }
 }

@@ -32,23 +32,50 @@ fn populate_extracted_facts(
 }
 
 fn populate_metric_purity(graph: &mut DataFlowGraph, metrics: &[FunctionMetrics]) {
+    let assessments =
+        crate::analysis::purity_propagation::propagate_graph_assessments(graph.call_graph());
     for metric in metrics {
         let function = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line)
             .with_column(metric.column);
-        graph.set_purity_info(function, purity_from_metric(metric));
+        let assessment = assessments.get(&function).cloned();
+        graph.set_purity_info(function, purity_from_metric(metric, assessment));
     }
 }
 
-fn purity_from_metric(metric: &FunctionMetrics) -> PurityInfo {
-    let is_pure = metric.is_pure.unwrap_or(false);
+fn purity_from_metric(
+    metric: &FunctionMetrics,
+    assessment: Option<crate::analysis::effect_evidence::EffectAssessment>,
+) -> PurityInfo {
+    let is_pure = assessment
+        .as_ref()
+        .map(|evidence| {
+            evidence.classification()
+                == crate::analysis::effect_evidence::EffectClassification::StrictlyPure
+        })
+        .unwrap_or_else(|| metric.is_pure.unwrap_or(false));
     PurityInfo {
+        impurity_reasons: assessment
+            .as_ref()
+            .map(assessment_reasons)
+            .unwrap_or_default(),
+        assessment,
         is_pure,
         confidence: metric.purity_confidence.unwrap_or(0.0),
-        impurity_reasons: (!is_pure)
-            .then(|| "Function may have side effects".to_string())
-            .into_iter()
-            .collect(),
     }
+}
+
+fn assessment_reasons(
+    assessment: &crate::analysis::effect_evidence::EffectAssessment,
+) -> Vec<String> {
+    assessment
+        .observed()
+        .map(|effect| effect.detail.clone())
+        .chain(
+            assessment
+                .unresolved()
+                .map(|behavior| format!("Unresolved: {}", behavior.detail)),
+        )
+        .collect()
 }
 
 #[cfg(test)]
@@ -70,5 +97,72 @@ mod tests {
         assert!(purity.is_pure);
         assert_eq!(purity.confidence, 0.9);
         assert!(purity.impurity_reasons.is_empty());
+    }
+
+    #[test]
+    fn source_assessment_is_authoritative_in_data_flow() {
+        let file = PathBuf::from("source.rs");
+        let metric = FunctionMetrics::new("known".to_string(), file.clone(), 4);
+        let function = FunctionId::new(file, metric.name.clone(), metric.line);
+        let mut calls = CallGraph::new();
+        calls.add_function(function.clone(), false, false, 1, 1);
+        calls.record_effect_assessment(
+            function.clone(),
+            crate::analysis::effect_evidence::EffectAssessment::complete(),
+        );
+
+        let graph = build_data_flow_graph(&[metric], &calls, None);
+
+        assert_eq!(
+            graph
+                .get_purity_info(&function)
+                .and_then(|purity| purity.assessment.as_ref())
+                .map(|assessment| assessment.classification()),
+            Some(crate::analysis::effect_evidence::EffectClassification::StrictlyPure)
+        );
+    }
+
+    #[test]
+    fn data_flow_uses_propagated_callee_assessment() {
+        use crate::analysis::effect_evidence::{
+            EffectAssessment, EffectDependency, EffectProvenance, ObservedEffect,
+            ObservedEffectKind,
+        };
+
+        let file = PathBuf::from("source.rs");
+        let caller = FunctionId::new(file.clone(), "caller".into(), 4);
+        let callee = FunctionId::new(file.clone(), "callee".into(), 8);
+        let mut calls = CallGraph::new();
+        calls.add_function(caller.clone(), false, false, 1, 1);
+        calls.add_function(callee.clone(), false, false, 1, 1);
+        calls.record_effect_assessment(
+            caller.clone(),
+            EffectAssessment::complete().with_dependency(EffectDependency {
+                target: callee.clone(),
+                provenance: EffectProvenance::source(caller.clone(), 5, Some(4)),
+            }),
+        );
+        calls.record_effect_assessment(
+            callee.clone(),
+            EffectAssessment::complete().with_effect(ObservedEffect {
+                kind: ObservedEffectKind::Io,
+                detail: "file read".into(),
+                provenance: EffectProvenance::source(callee.clone(), 9, Some(4)),
+            }),
+        );
+        let metrics = [
+            FunctionMetrics::new("caller".into(), file.clone(), 4),
+            FunctionMetrics::new("callee".into(), file, 8),
+        ];
+
+        let graph = build_data_flow_graph(&metrics, &calls, None);
+
+        assert_eq!(
+            graph
+                .get_purity_info(&caller)
+                .and_then(|purity| purity.assessment.as_ref())
+                .map(|assessment| assessment.classification()),
+            Some(crate::analysis::effect_evidence::EffectClassification::Impure)
+        );
     }
 }

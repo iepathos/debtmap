@@ -26,6 +26,20 @@ pub enum UnknownReason {
     AnalysisLimit,
 }
 
+/// Reviewed standard-library receiver identities used by effect models.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub enum ModelType {
+    Vec,
+    HashMap,
+    HashSet,
+    String,
+    Option,
+    Result,
+    File,
+    TcpStream,
+    Cursor,
+}
+
 /// Bounds retain declaration identity or the lexical origin of missing knowledge.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum TraitBoundFact {
@@ -67,6 +81,10 @@ pub enum TypeFact {
         inner: Box<TypeFact>,
     },
     Primitive(PrimitiveType),
+    Modeled {
+        kind: ModelType,
+        arguments: Vec<TypeFact>,
+    },
     Generic(String),
     BoundedGeneric {
         name: String,
@@ -138,9 +156,9 @@ impl TypeFact {
             | Self::UnavailablePath(_)
             | Self::Uncertain { .. } => false,
             Self::Reference { inner, .. } | Self::Future(inner) => inner.is_known(),
-            Self::Nominal { arguments, .. } | Self::Tuple(arguments) => {
-                arguments.iter().all(Self::is_known)
-            }
+            Self::Nominal { arguments, .. }
+            | Self::Modeled { arguments, .. }
+            | Self::Tuple(arguments) => arguments.iter().all(Self::is_known),
             Self::Const(_) | Self::Primitive(_) => true,
         }
     }
@@ -168,7 +186,7 @@ impl TypeFact {
 
     pub fn has_receiver_identity(&self) -> bool {
         match self {
-            Self::Nominal { .. } | Self::Primitive(_) => true,
+            Self::Nominal { .. } | Self::Modeled { .. } | Self::Primitive(_) => true,
             Self::Reference { inner, .. } => inner.has_receiver_identity(),
             _ => false,
         }

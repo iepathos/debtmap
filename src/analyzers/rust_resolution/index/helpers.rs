@@ -44,6 +44,7 @@ pub(super) fn make_callable(
             .const_params()
             .map(|parameter| parameter.ident.to_string())
             .collect(),
+        invoked_parameter: None,
     }
 }
 

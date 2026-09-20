@@ -18,6 +18,7 @@ fn graph(columns: &[usize]) -> DataFlowGraph {
 
 fn purity() -> PurityInfo {
     PurityInfo {
+        assessment: None,
         is_pure: true,
         confidence: 1.0,
         impurity_reasons: vec![],

@@ -54,12 +54,17 @@ impl Body<'_> {
             .last()
             .map(|segment| self.scoped_arguments(&segment.arguments, depth + 1))
             .unwrap_or_default();
-        self.index.type_from_path_arguments(
+        let project = self.index.type_from_path_arguments(
             path,
-            arguments,
+            arguments.clone(),
             &self.callable.context,
             &self.substitutions,
-        )
+        );
+        if !permits_external_model(&project) {
+            return project;
+        }
+        let external = self.index.external_path(path, &self.callable.context);
+        super::super::models::modeled_type(&external, arguments).unwrap_or(project)
     }
 
     pub(in crate::analyzers::rust_resolution) fn scoped_arguments(
@@ -104,6 +109,17 @@ impl Body<'_> {
                 .segments
                 .first()
                 .is_some_and(|segment| self.bindings.type_shadowed(&segment.ident.to_string()))
+    }
+}
+
+fn permits_external_model(fact: &TypeFact) -> bool {
+    match fact {
+        TypeFact::Unknown(UnknownReason::UnavailableDefinition) => true,
+        TypeFact::Uncertain { constraint, reason } => {
+            matches!(reason, UnknownReason::UnavailableDefinition)
+                && matches!(constraint.as_ref(), TypeFact::UnavailablePath(_))
+        }
+        _ => false,
     }
 }
 

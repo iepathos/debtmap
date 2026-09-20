@@ -9,6 +9,7 @@ fn id(column: Option<usize>) -> FunctionId {
 
 fn purity(is_pure: bool) -> PurityInfo {
     PurityInfo {
+        assessment: None,
         is_pure,
         confidence: 1.0,
         impurity_reasons: vec![],

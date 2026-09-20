@@ -282,11 +282,15 @@ pub mod format {
         }
     }
 
-    /// Format purity analysis section (returns None if no purity data)
+    /// Format purity analysis without treating missing evidence as impurity.
     pub fn purity(purity: Option<&PurityAnalysis>) -> Option<String> {
-        let p = purity?;
         let mut out = String::new();
         write_section_heading(&mut out, "Purity Analysis");
+        let Some(p) = purity else {
+            writeln!(out, "- Purity Level: Unknown").unwrap();
+            writeln!(out, "- Evidence: incomplete or unavailable").unwrap();
+            return Some(out);
+        };
         writeln!(out, "- Is Pure: {}", p.is_pure).unwrap();
         if let Some(ref level) = p.purity_level {
             writeln!(out, "- Purity Level: {}", level).unwrap();

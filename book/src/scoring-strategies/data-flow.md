@@ -28,54 +28,39 @@ Each factor ranges from 0.0 to 1.0, where lower values reduce the final priority
 
 ## Purity Spectrum
 
-The purity spectrum classifies functions into five levels based on their side effects and mutation behavior. Pure functions receive the lowest priority multipliers since they represent minimal technical debt.
+Rust scoring consumes the same typed effect assessment used by propagation and reporting. A known classification is granted only when the supported analysis is complete; unresolved behavior is represented as `Unknown` rather than being folded into `Impure` or overridden by confidence.
 
 ### Classification Levels
 
 | Level | Multiplier | Description |
 |-------|------------|-------------|
-| `StrictlyPure` | 0.0 | No mutations, no I/O, referentially transparent |
-| `LocallyPure` | 0.3 | Pure interface but uses local mutations internally |
-| `IOIsolated` | 0.6 | I/O operations clearly separated from logic |
-| `IOMixed` | 0.9 | I/O mixed with business logic |
-| `Impure` | 1.0 | Mutable state, side effects throughout |
-
-**Source**: `src/priority/unified_scorer.rs:64-94` (`PuritySpectrum` enum)
+| `StrictlyPure` | 0.0 | Complete supported analysis with no modeled effects |
+| `LocallyPure` | 0.3 | Complete analysis with local mutation only |
+| `ReadOnly` | 1.0 | Complete analysis with external reads but no writes or I/O |
+| `Impure` | 1.0 | Confirmed external write, I/O, or modeled nondeterminism |
+| `Unknown` | 1.0 | Incomplete analysis, retaining any effects already observed |
 
 ### Classification Algorithm
 
-The purity factor is calculated by analyzing three sources of information from the data flow graph:
+The assessment contains three independent parts:
 
-1. **Purity Analysis Results**: High-confidence purity (>80%) indicates strict or local purity
-2. **Mutation Analysis**: Tracks whether a function has local mutations
-3. **I/O Operations**: Identifies I/O patterns for non-pure functions
+1. **Observed effects**: local mutation, external read/write, confirmed I/O, and modeled nondeterminism
+2. **Unresolved behavior**: unresolved or ambiguous calls, unknown receivers, unsupported syntax or dispatch, callback uncertainty, and unavailable bodies
+3. **Provenance**: the owning definition, exact source location, resolved declaration/model identity, and propagation dependency
 
 ```rust
-// Classification logic (simplified)
-if purity.is_pure && purity.confidence > 0.8 {
-    if mutations.has_mutations {
-        PuritySpectrum::LocallyPure  // 0.3 multiplier
-    } else {
-        PuritySpectrum::StrictlyPure // 0.0 multiplier
-    }
-} else if purity.is_pure {
-    PuritySpectrum::LocallyPure      // 0.3 multiplier
-} else {
-    classify_io_isolation(io_ops)    // 0.6-1.0 multiplier
+match assessment.classification() {
+    StrictlyPure => 0.0,
+    LocallyPure => 0.3,
+    ReadOnly | Impure | Unknown => 1.0,
 }
 ```
 
-**Source**: `src/priority/unified_scorer.rs:878-918` (`calculate_purity_factor`)
+Confidence can describe supporting analysis, but cannot promote incomplete evidence to a known classification. Adding unresolved behavior cannot newly qualify a function for a purity discount.
 
 ### I/O Isolation Classification
 
-For impure functions, the system evaluates I/O isolation based on concentration:
-
-- **IOIsolated (0.6)**: At most 2 unique I/O operation types and 3 total operations
-- **IOMixed (0.9)**: More than 2 unique types or more than 3 operations
-- **Impure (1.0)**: No I/O information available
-
-**Source**: `src/priority/unified_scorer.rs:921-935` (`classify_io_isolation`)
+`IOIsolated` and `IOMixed` remain readable legacy enum values, but fresh analysis does not infer them from operation counts. Structural I/O-isolation analysis is not implemented, so confirmed I/O receives the neutral `Impure` factor of 1.0.
 
 ## Purity Level vs Purity Spectrum
 
@@ -84,13 +69,11 @@ Debtmap uses two related but distinct purity classifications:
 | Aspect | PurityLevel | PuritySpectrum |
 |--------|-------------|----------------|
 | **Purpose** | Analysis classification | Scoring multiplier |
-| **Levels** | 4 (StrictlyPure, LocallyPure, ReadOnly, Impure) | 5 (adds IOIsolated, IOMixed) |
+| **Levels** | 5 including internal Unknown | Known levels plus legacy-readable IOIsolated/IOMixed |
 | **Usage** | `src/analysis/purity_analysis.rs` | `src/priority/unified_scorer.rs` |
 | **Focus** | Categorizing purity type | Assigning debt priority |
 
-**PurityLevel** (from purity analysis) describes *what kind* of function this is. **PuritySpectrum** (for scoring) determines *how much* this affects debt priority, with finer granularity for I/O patterns.
-
-**Source**: `src/analysis/purity_analysis.rs:32-43` (`PurityLevel`), `src/priority/unified_scorer.rs:64-94` (`PuritySpectrum`)
+The public `PurityLevel` schema remains unchanged. Internal `Unknown` is represented by omission in compatible JSON fields, while scoring uses the typed assessment directly. Only `StrictlyPure` projects to the historical `is_pure: true` boolean.
 
 ## Pattern Factor
 

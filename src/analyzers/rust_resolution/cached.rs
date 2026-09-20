@@ -75,6 +75,9 @@ fn remap_graph(graph: CallGraph, extracted: &HashMap<PathBuf, ExtractedFileData>
         call.candidates = call.candidates.iter().map(identity).collect();
         remapped.record_uncertain_call(call);
     }
+    for (id, assessment) in graph.effect_assessments() {
+        remapped.record_effect_assessment(identity(id), assessment.remap_identities(identity));
+    }
     remapped
 }
 

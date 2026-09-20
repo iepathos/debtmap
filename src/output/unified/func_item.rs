@@ -11,43 +11,8 @@ use super::patterns::{extract_complexity_pattern, extract_pattern_data};
 use super::priority::Priority;
 #[cfg(debug_assertions)]
 use super::priority::assert_priority_invariants;
-use crate::core::PurityLevel;
 use crate::priority::{DebtType, FunctionRole, UnifiedDebtItem};
 use serde::{Deserialize, Serialize};
-
-/// Generate side effects description based on purity level.
-///
-/// This provides human-readable reasons for why a function is not strictly pure,
-/// derived from the `PurityLevel` classification.
-fn generate_side_effects_from_purity(
-    is_pure: bool,
-    purity_level: Option<PurityLevel>,
-) -> Option<Vec<String>> {
-    if is_pure {
-        return None;
-    }
-
-    let effects = match purity_level {
-        Some(PurityLevel::Impure) => {
-            vec!["Has side effects (I/O, mutations, or external state modification)".to_string()]
-        }
-        Some(PurityLevel::ReadOnly) => {
-            vec!["Reads external state (but does not modify it)".to_string()]
-        }
-        Some(PurityLevel::LocallyPure) => {
-            vec!["Has local mutations only (no external side effects)".to_string()]
-        }
-        Some(PurityLevel::StrictlyPure) => {
-            // Shouldn't happen if is_pure is false, but handle gracefully
-            return None;
-        }
-        None => {
-            vec!["Function may have side effects".to_string()]
-        }
-    };
-
-    Some(effects)
-}
 
 /// Function-level debt item in unified format
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -197,12 +162,13 @@ impl FunctionDebtItemOutput {
                     .purity_level
                     .as_ref()
                     .map(|level| format!("{:?}", level));
-                let side_effects = generate_side_effects_from_purity(is_pure, item.purity_level);
                 PurityAnalysis {
                     is_pure,
                     confidence: item.purity_confidence.unwrap_or(0.0),
                     purity_level,
-                    side_effects,
+                    // The public compatibility item does not carry source evidence;
+                    // do not fabricate effects from a classification label.
+                    side_effects: None,
                 }
             }),
             dependencies: {

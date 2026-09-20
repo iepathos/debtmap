@@ -40,6 +40,17 @@ impl ValueBindings<'_> {
 }
 
 impl WorkspaceIndex {
+    pub(in crate::analyzers::rust_resolution) fn has_static_candidate(
+        &self,
+        path: &syn::Path,
+        context: &Context,
+    ) -> bool {
+        self.value_bindings(path, context)
+            .values
+            .iter()
+            .any(|value| value.is_static)
+    }
+
     fn value_bindings(&self, path: &syn::Path, context: &Context) -> ValueBindings<'_> {
         let segments = resolution_segments(path);
         let paths = self.resolve_value_paths(&segments, context);

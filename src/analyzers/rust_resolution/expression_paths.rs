@@ -37,6 +37,27 @@ impl<'a> Body<'a> {
     }
 
     pub(super) fn lookup_invocation(&self, path: &syn::ExprPath) -> (Lookup<'a>, bool) {
+        if let Some(target) = path
+            .path
+            .get_ident()
+            .and_then(|name| self.bindings.callable(&name.to_string()))
+            .and_then(|id| {
+                self.index
+                    .callables()
+                    .iter()
+                    .find(|callable| callable.id == *id)
+            })
+        {
+            return (
+                Lookup {
+                    candidates: vec![target],
+                    justified: true,
+                    provenance: crate::priority::call_graph::CallEdgeProvenance::AstDirect,
+                    reason: None,
+                },
+                false,
+            );
+        }
         if self.path_shadowed(&path.path) {
             return (Lookup::default(), false);
         }
@@ -49,10 +70,6 @@ impl<'a> Body<'a> {
         }
         self.index
             .value_call_lookup(&path.path, &self.callable.context)
-    }
-
-    pub(super) fn lookup_path(&self, path: &syn::ExprPath) -> Lookup<'a> {
-        self.lookup_invocation(path).0
     }
 
     pub(super) fn associated_query(&self, path: &syn::ExprPath) -> Option<AssociatedQuery> {

@@ -76,6 +76,11 @@ impl WorkspaceIndex {
         for value in &mut self.values {
             rebase_context(&mut value.context, &bases);
         }
+        for declaration in &mut self.macro_declarations {
+            if let Some(prefix) = bases.get(&declaration.file) {
+                declaration.module = qualified_path(prefix, &declaration.module);
+            }
+        }
         for import in &mut self.imports {
             rebase_context(&mut import.context, &bases);
         }

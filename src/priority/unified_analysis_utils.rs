@@ -173,18 +173,29 @@ impl UnifiedAnalysisUtils for UnifiedAnalysis {
     }
 
     fn populate_purity_analysis(&mut self, metrics: &[crate::core::FunctionMetrics]) {
+        let assessments = crate::analysis::purity_propagation::propagate_graph_assessments(
+            self.data_flow_graph.call_graph(),
+        );
         for metric in metrics {
             let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line)
                 .with_column(metric.column);
+            let assessment = assessments.get(&func_id).cloned();
+            let is_pure = assessment
+                .as_ref()
+                .map(|evidence| {
+                    evidence.classification()
+                        == crate::analysis::effect_evidence::EffectClassification::StrictlyPure
+                })
+                .unwrap_or_else(|| metric.is_pure.unwrap_or(false));
 
             let purity_info = PurityInfo {
-                is_pure: metric.is_pure.unwrap_or(false),
+                impurity_reasons: assessment
+                    .as_ref()
+                    .map(assessment_reasons)
+                    .unwrap_or_default(),
+                assessment,
+                is_pure,
                 confidence: metric.purity_confidence.unwrap_or(0.0),
-                impurity_reasons: if !metric.is_pure.unwrap_or(false) {
-                    vec!["Function may have side effects".to_string()]
-                } else {
-                    vec![]
-                },
             };
 
             self.data_flow_graph.set_purity_info(func_id, purity_info);
@@ -237,6 +248,20 @@ impl UnifiedAnalysisUtils for UnifiedAnalysis {
             })
             .collect();
     }
+}
+
+fn assessment_reasons(
+    assessment: &crate::analysis::effect_evidence::EffectAssessment,
+) -> Vec<String> {
+    assessment
+        .observed()
+        .map(|effect| effect.detail.clone())
+        .chain(
+            assessment
+                .unresolved()
+                .map(|behavior| format!("Unresolved: {}", behavior.detail)),
+        )
+        .collect()
 }
 
 #[cfg(test)]

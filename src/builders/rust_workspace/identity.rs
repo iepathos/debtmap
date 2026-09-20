@@ -106,5 +106,8 @@ fn remap(source: CallGraph, ids: &HashMap<FunctionId, FunctionId>) -> CallGraph 
         uncertain.candidates = uncertain.candidates.iter().map(identity).collect();
         graph.record_uncertain_call(uncertain);
     }
+    for (id, assessment) in source.effect_assessments() {
+        graph.record_effect_assessment(identity(id), assessment.remap_identities(identity));
+    }
     graph
 }

@@ -41,12 +41,10 @@ pub fn classify_function_role(
     // Note: AST is not available at this level, so we pass None
     // Full AST-based detection will be integrated when threading syn::ItemFn
     classify_by_rules(func, func_id, call_graph, None).unwrap_or_else(|| {
-        // BUG-001 fix: Use purity analysis to prevent impure I/O functions from being
-        // classified as PureLogic. If function is impure, classify as Unknown instead.
-        if is_impure_function(func) {
-            FunctionRole::Unknown
-        } else {
+        if has_complete_pure_logic_evidence(func, func_id, call_graph) {
             FunctionRole::PureLogic
+        } else {
+            FunctionRole::Unknown
         }
     })
 }
@@ -118,7 +116,7 @@ fn classify_by_rules(
         return Some(FunctionRole::Orchestrator);
     }
 
-    None // Will default to PureLogic
+    None // The fallback requires complete purity evidence.
 }
 
 // Pure function to check if a function is an entry point
@@ -134,22 +132,39 @@ fn is_entry_point(func_id: &FunctionId, call_graph: &CallGraph) -> bool {
         })
 }
 
-/// Check if a function is impure based on purity analysis (BUG-001 fix).
-///
-/// Used to prevent impure functions from being classified as PureLogic.
-/// A function is considered impure if:
-/// - `purity_level` is `Some(Impure)`
-/// - `is_pure` is `Some(false)` (legacy field)
-fn is_impure_function(func: &FunctionMetrics) -> bool {
+/// Pure logic requires a complete known classification, not merely the absence
+/// of an explicit impurity marker.
+fn has_complete_pure_logic_evidence(
+    func: &FunctionMetrics,
+    func_id: &FunctionId,
+    call_graph: &CallGraph,
+) -> bool {
+    use crate::analysis::effect_evidence::EffectClassification;
     use crate::core::PurityLevel;
 
-    // Check new purity_level field first
-    if let Some(level) = func.purity_level {
-        return level == PurityLevel::Impure;
+    if let Some(assessment) = call_graph.effect_assessment(func_id) {
+        if !call_graph.effect_assessments_are_propagated()
+            && assessment.dependencies().next().is_some()
+        {
+            return false;
+        }
+        return matches!(
+            assessment.classification(),
+            EffectClassification::StrictlyPure | EffectClassification::LocallyPure
+        );
     }
 
-    // Fallback to legacy is_pure field
-    func.is_pure == Some(false)
+    let supported_metric_evidence =
+        crate::core::Language::from_path(&func.file) != crate::core::Language::Rust;
+    supported_metric_evidence
+        && matches!(
+            func.purity_level,
+            Some(PurityLevel::StrictlyPure | PurityLevel::LocallyPure)
+        )
+        && !matches!(
+            (func.purity_level, func.is_pure),
+            (Some(PurityLevel::StrictlyPure), Some(false))
+        )
 }
 
 /// Detect simple accessor/getter methods (spec 125)
@@ -255,9 +270,9 @@ mod tests {
             is_trait_method: false,
             in_test_module: false,
             entropy_score: None,
-            is_pure: None,
-            purity_confidence: None,
-            purity_reason: None,
+            is_pure: Some(true),
+            purity_confidence: Some(1.0),
+            purity_reason: Some("EffectEvidence: observed=[]; unresolved=[]".into()),
             call_dependencies: None,
             detected_patterns: None,
             upstream_callers: None,
@@ -266,7 +281,7 @@ mod tests {
             adjusted_complexity: None,
             composition_metrics: None,
             language_specific: None,
-            purity_level: None,
+            purity_level: Some(crate::core::PurityLevel::StrictlyPure),
             error_swallowing_count: None,
             error_swallowing_patterns: None,
             entropy_analysis: None,
@@ -346,17 +361,71 @@ mod tests {
         // Test that high nesting disqualifies I/O orchestration
         func.nesting = 4;
         let role = classify_function_role(&func, &func_id, &graph);
-        assert_eq!(role, FunctionRole::PureLogic);
+        assert_eq!(role, FunctionRole::Unknown);
     }
 
     #[test]
     fn test_pure_logic_classification() {
-        let graph = CallGraph::new();
+        let mut graph = CallGraph::new();
         let func = create_test_metrics("calculate_risk", 8, 12, 60);
         let func_id = FunctionId::new(PathBuf::from("calc.rs"), "calculate_risk".to_string(), 20);
+        graph.record_effect_assessment(
+            func_id.clone(),
+            crate::analysis::effect_evidence::EffectAssessment::complete(),
+        );
 
         let role = classify_function_role(&func, &func_id, &graph);
         assert_eq!(role, FunctionRole::PureLogic);
+    }
+
+    #[test]
+    fn pure_logic_fallback_requires_supported_purity_evidence() {
+        let graph = CallGraph::new();
+        let id = FunctionId::new(PathBuf::from("calc.rs"), "calculate_risk".into(), 20);
+
+        for level in [None, Some(crate::core::PurityLevel::ReadOnly)] {
+            let mut func = create_test_metrics("calculate_risk", 8, 12, 60);
+            func.purity_level = level;
+            func.is_pure = None;
+            assert_eq!(
+                classify_function_role(&func, &id, &graph),
+                FunctionRole::Unknown
+            );
+        }
+    }
+
+    #[test]
+    fn contradictory_strict_purity_does_not_grant_pure_logic_role() {
+        let graph = CallGraph::new();
+        let id = FunctionId::new(PathBuf::from("calc.rs"), "calculate_risk".into(), 20);
+        let mut func = create_test_metrics("calculate_risk", 8, 12, 60);
+        func.is_pure = Some(false);
+
+        assert_eq!(
+            classify_function_role(&func, &id, &graph),
+            FunctionRole::Unknown
+        );
+    }
+
+    #[test]
+    fn typed_unknown_evidence_overrides_legacy_strict_label() {
+        let mut graph = CallGraph::new();
+        let id = FunctionId::new(PathBuf::from("calc.rs"), "calculate_risk".into(), 20);
+        graph.add_function(id.clone(), false, false, 1, 1);
+        graph.record_effect_assessment(
+            id.clone(),
+            crate::analysis::effect_evidence::EffectAssessment::unknown_for(
+                id.clone(),
+                crate::analysis::effect_evidence::UnresolvedReason::UnresolvedCall,
+                "unknown call",
+            ),
+        );
+        let func = create_test_metrics("calculate_risk", 8, 12, 60);
+
+        assert_eq!(
+            classify_function_role(&func, &id, &graph),
+            FunctionRole::Unknown
+        );
     }
 
     #[test]
@@ -411,8 +480,8 @@ mod tests {
         let role = classify_function_role(&func, &func_id, &graph);
         assert_eq!(
             role,
-            FunctionRole::PureLogic,
-            "Formatting function should be PureLogic, not Orchestrator"
+            FunctionRole::Unknown,
+            "Formatting without effect evidence must not imply purity or orchestration"
         );
 
         // Verify it doesn't match delegation pattern
@@ -565,8 +634,8 @@ mod tests {
         let role = classify_function_role(&func, &func_id, &graph);
         assert_eq!(
             role,
-            FunctionRole::PureLogic,
-            "Function with complexity > 5 should be PureLogic, not Orchestrator"
+            FunctionRole::Unknown,
+            "High complexity rules out orchestration but does not establish purity"
         );
     }
 

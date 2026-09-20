@@ -20,17 +20,21 @@ mod call_graph_adapter;
 mod known_pure_functions;
 mod metrics;
 
-pub use cache::PurityCache;
+pub use cache::{PURITY_MODEL_VERSION, PurityCache, hash_deps, hash_deps_with_assessments};
 pub use call_graph_adapter::PurityCallGraphAdapter;
 pub use known_pure_functions::{
     CalleeEvidence, CalleePurity, aggregate_callee_purity, resolve_callee_purity,
 };
 
+use crate::analysis::effect_evidence::{
+    EffectAssessment, EffectClassification, ObservedEffect, UnresolvedBehavior, UnresolvedReason,
+};
 use crate::analysis::purity_analysis::{PurityAnalysis, PurityAnalyzer, PurityLevel};
 use crate::core::FunctionMetrics;
 use crate::priority::call_graph::FunctionId;
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use dashmap::DashMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Result of purity propagation for a function
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -38,6 +42,9 @@ pub struct PurityResult {
     pub level: PurityLevel,
     pub confidence: f64,
     pub reason: PurityReason,
+    /// Authoritative internal assessment. `level` is a compatibility projection.
+    #[serde(default)]
+    pub assessment: EffectAssessment,
 }
 
 /// Reason for purity classification
@@ -60,6 +67,12 @@ pub enum PurityReason {
 
     /// Unknown dependencies
     UnknownDeps { count: usize },
+
+    /// Evidence-backed result with observed effects and unresolved behavior kept separate.
+    Evidence {
+        observed: Vec<String>,
+        unresolved: Vec<String>,
+    },
 }
 
 impl PurityResult {
@@ -81,6 +94,10 @@ impl PurityResult {
             level: analysis.purity,
             confidence: 1.0,
             reason,
+            assessment: EffectAssessment::unknown(
+                UnresolvedReason::LegacyEvidence,
+                "legacy purity analysis has no semantic effect evidence",
+            ),
         }
     }
 }
@@ -98,14 +115,6 @@ pub struct PurityPropagator {
     purity_analyzer: PurityAnalyzer,
 }
 
-struct DependencyPuritySummary {
-    all_deps_pure: bool,
-    aggregated_confidence: f64,
-    impure_reasons: Vec<String>,
-    max_depth: usize,
-    unknown_count: usize,
-}
-
 impl PurityPropagator {
     /// Create a new purity propagator
     pub fn new(call_graph: PurityCallGraphAdapter, purity_analyzer: PurityAnalyzer) -> Self {
@@ -118,29 +127,41 @@ impl PurityPropagator {
 
     /// Propagate purity information through all functions
     pub fn propagate(&mut self, functions: &[FunctionMetrics]) -> Result<()> {
-        // Phase 1: Initial purity analysis using existing PurityAnalyzer
+        self.cache.clear();
+        let mut intrinsic = BTreeMap::new();
         for func in functions {
-            let initial = self.analyze_intrinsic_purity(func)?;
             let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line)
                 .with_column(func.column);
-            self.cache.insert(func_id, initial);
+            let initial = self.analyze_intrinsic_purity(func, &func_id)?;
+            intrinsic.insert(func_id, initial);
         }
-
-        // Phase 2: Propagate purity bottom-up
-        let sorted = self.call_graph.topological_sort()?;
-
-        for func_id in sorted {
-            if self.cache.contains_key(&func_id) {
-                self.propagate_for_function(&func_id)?;
-            }
+        let assessments = intrinsic
+            .iter()
+            .map(|(id, result)| (id.clone(), result.assessment.clone()))
+            .collect();
+        for (id, assessment) in propagate_assessment_map(&assessments) {
+            let confidence = intrinsic
+                .get(&id)
+                .map(|result| result.confidence)
+                .unwrap_or(1.0);
+            self.cache
+                .insert(id, result_from_assessment(assessment, confidence));
         }
 
         Ok(())
     }
 
     /// Analyze intrinsic purity using existing PurityAnalyzer
-    fn analyze_intrinsic_purity(&self, func: &FunctionMetrics) -> Result<PurityResult> {
-        Ok(metrics::intrinsic_purity(func))
+    fn analyze_intrinsic_purity(
+        &self,
+        func: &FunctionMetrics,
+        func_id: &FunctionId,
+    ) -> Result<PurityResult> {
+        Ok(self
+            .call_graph
+            .effect_assessment(func_id)
+            .map(|assessment| result_from_assessment(assessment, 1.0))
+            .unwrap_or_else(|| metrics::intrinsic_purity(func)))
     }
 
     /// Apply each definition's complete purity fact without losing refined levels.
@@ -157,357 +178,304 @@ impl PurityPropagator {
             .collect()
     }
 
-    /// Propagate purity for a single function
-    ///
-    /// Uses call graph and known pure std functions (Spec 261) to propagate
-    /// purity information from callees to callers.
-    fn propagate_for_function(&mut self, func_id: &FunctionId) -> Result<()> {
-        let result = self.cached_result(func_id)?;
-        let deps = self.call_graph.get_dependencies(func_id);
-        let result = if self.call_graph.is_in_cycle(func_id) {
-            propagate_recursive_result(result)
-        } else if deps.is_empty() {
-            result
-        } else {
-            let callee_evidence = self.callee_evidence(&deps);
-            let summary = self.dependency_summary(&deps, &callee_evidence);
-            propagate_dependency_result(result, summary)
-        };
-
-        self.cache.insert(func_id.clone(), result);
-        Ok(())
-    }
-
-    fn cached_result(&self, func_id: &FunctionId) -> Result<PurityResult> {
-        self.cache
-            .get(func_id)
-            .map(|result| result.clone())
-            .ok_or_else(|| anyhow!("Function not in cache"))
-    }
-
-    fn callee_evidence(&self, deps: &[FunctionId]) -> Vec<CalleeEvidence> {
-        deps.iter()
-            .map(|dep_id| CalleeEvidence {
-                callee_name: dep_id.name.clone(),
-                callee_purity: resolve_callee_purity(
-                    &dep_id.name,
-                    None,
-                    self.cached_callee_purity(dep_id),
-                ),
-            })
-            .collect()
-    }
-
-    fn cached_callee_purity(&self, dep_id: &FunctionId) -> Option<(bool, f64)> {
-        self.cache.get(dep_id).map(|result| {
-            let is_pure = result.level == PurityLevel::StrictlyPure;
-            (is_pure, result.confidence)
-        })
-    }
-
-    fn dependency_summary(
-        &self,
-        deps: &[FunctionId],
-        evidence: &[CalleeEvidence],
-    ) -> DependencyPuritySummary {
-        let (all_deps_pure, aggregated_confidence, impure_reasons) =
-            aggregate_callee_purity(evidence);
-
-        DependencyPuritySummary {
-            all_deps_pure,
-            aggregated_confidence,
-            impure_reasons,
-            max_depth: self.max_dependency_depth(deps),
-            unknown_count: count_unknown_dependencies(evidence),
-        }
-    }
-
-    fn max_dependency_depth(&self, deps: &[FunctionId]) -> usize {
-        deps.iter()
-            .filter_map(|dep_id| self.cache.get(dep_id))
-            .filter_map(|result| propagated_depth(&result.reason))
-            .max()
-            .unwrap_or(0)
-    }
-
     /// Get the purity result for a function
     pub fn get_result(&self, func_id: &FunctionId) -> Option<PurityResult> {
         self.cache.get(func_id).map(|r| r.clone())
     }
-}
 
-fn propagate_recursive_result(mut result: PurityResult) -> PurityResult {
-    if is_recursion_eligible_pure(&result.level) {
-        result.reason = PurityReason::RecursivePure;
-        result.confidence *= 0.7;
-        return result;
+    pub(crate) fn assessments(&self) -> BTreeMap<FunctionId, EffectAssessment> {
+        self.cache
+            .iter()
+            .map(|entry| (entry.key().clone(), entry.assessment.clone()))
+            .collect()
     }
-
-    result.level = PurityLevel::Impure;
-    result.reason = PurityReason::RecursiveWithSideEffects;
-    result.confidence = 0.95;
-    result
 }
 
-fn propagate_dependency_result(
-    result: PurityResult,
-    summary: DependencyPuritySummary,
-) -> PurityResult {
-    if !summary.all_deps_pure {
-        return propagated_impure_result(summary);
+/// Propagate the same typed summaries used by scoring and reporting.
+pub(crate) fn propagate_graph_assessments(
+    graph: &crate::priority::call_graph::CallGraph,
+) -> BTreeMap<FunctionId, EffectAssessment> {
+    if graph.effect_assessments_are_propagated() {
+        return graph
+            .effect_assessments()
+            .map(|(id, assessment)| (id.clone(), assessment.clone()))
+            .collect();
     }
-
-    if summary.unknown_count > 0 {
-        return propagated_unknown_result(result, &summary);
-    }
-
-    if has_pure_dependencies(&result, &summary) {
-        return propagated_pure_result(result, &summary);
-    }
-
-    result
+    let intrinsic = graph
+        .effect_assessments()
+        .map(|(id, assessment)| (id.clone(), assessment.clone()))
+        .collect();
+    propagate_assessment_map(&intrinsic)
 }
 
-fn is_recursion_eligible_pure(level: &PurityLevel) -> bool {
-    matches!(level, PurityLevel::StrictlyPure | PurityLevel::LocallyPure)
-}
-
-fn has_pure_dependencies(result: &PurityResult, summary: &DependencyPuritySummary) -> bool {
-    summary.all_deps_pure
-        && result.level != PurityLevel::Impure
-        && summary.impure_reasons.is_empty()
-}
-
-fn propagated_pure_result(
-    mut result: PurityResult,
-    summary: &DependencyPuritySummary,
-) -> PurityResult {
-    let depth = summary.max_depth + 1;
-    let depth_confidence = 0.9_f64.powi(depth as i32);
-
-    // Pure dependencies do not erase intrinsic local mutation or external reads.
-    result.reason = PurityReason::PropagatedFromDeps { depth };
-    result.confidence =
-        (result.confidence.min(summary.aggregated_confidence) * depth_confidence).clamp(0.5, 1.0);
-    result
-}
-
-fn propagated_impure_result(summary: DependencyPuritySummary) -> PurityResult {
-    PurityResult {
-        level: PurityLevel::Impure,
-        confidence: summary.aggregated_confidence,
-        reason: PurityReason::SideEffects {
-            effects: summary.impure_reasons,
+fn propagate_assessment_map(
+    intrinsic: &BTreeMap<FunctionId, EffectAssessment>,
+) -> BTreeMap<FunctionId, EffectAssessment> {
+    let mut current = intrinsic.clone();
+    let dependents = intrinsic.iter().fold(
+        BTreeMap::<FunctionId, BTreeSet<FunctionId>>::new(),
+        |mut result, (caller, assessment)| {
+            for dependency in assessment.dependencies() {
+                if intrinsic.contains_key(&dependency.target) {
+                    result
+                        .entry(dependency.target.clone())
+                        .or_default()
+                        .insert(caller.clone());
+                }
+            }
+            result
         },
+    );
+    for component in invocation_components(intrinsic) {
+        let mut pending = component.clone();
+        while let Some(id) = pending.pop_first() {
+            let Some(base) = intrinsic.get(&id) else {
+                continue;
+            };
+            let assessment = base
+                .dependencies()
+                .fold(base.clone(), |result, dependency| {
+                    let summary = current
+                        .get(&dependency.target)
+                        .map(|callee| dependency_assessment(dependency, callee))
+                        .unwrap_or_else(|| missing_dependency(dependency));
+                    result.merge(&summary)
+                });
+            if current.get(&id) != Some(&assessment) {
+                current.insert(id.clone(), assessment);
+                if let Some(callers) = dependents.get(&id) {
+                    pending.extend(callers.intersection(&component).cloned());
+                }
+            }
+        }
     }
+    current
 }
 
-fn propagated_unknown_result(
-    mut result: PurityResult,
-    summary: &DependencyPuritySummary,
-) -> PurityResult {
-    result.reason = PurityReason::UnknownDeps {
-        count: summary.unknown_count,
+/// Callee-first components; recursion is solved only by monotonically joining facts.
+fn invocation_components(
+    intrinsic: &BTreeMap<FunctionId, EffectAssessment>,
+) -> Vec<BTreeSet<FunctionId>> {
+    let mut graph = petgraph::graph::DiGraph::<&FunctionId, ()>::new();
+    let nodes: BTreeMap<_, _> = intrinsic
+        .keys()
+        .map(|id| (id, graph.add_node(id)))
+        .collect();
+    for (id, assessment) in intrinsic {
+        for dependency in assessment.dependencies() {
+            if let Some(target) = nodes.get(&dependency.target) {
+                graph.add_edge(nodes[id], *target, ());
+            }
+        }
+    }
+    petgraph::algo::kosaraju_scc(&graph)
+        .into_iter()
+        .map(|component| {
+            component
+                .into_iter()
+                .map(|node| graph[node].clone())
+                .collect()
+        })
+        .collect()
+}
+
+fn dependency_assessment(
+    dependency: &crate::analysis::effect_evidence::EffectDependency,
+    callee: &EffectAssessment,
+) -> EffectAssessment {
+    let observed_kinds: BTreeSet<_> = callee.observed().map(|effect| effect.kind).collect();
+    let observed = observed_kinds
+        .into_iter()
+        .fold(EffectAssessment::complete(), |result, kind| {
+            let mut provenance = dependency.provenance.clone();
+            provenance.dependency = Some(dependency.target.clone());
+            result.with_effect(ObservedEffect {
+                kind,
+                detail: format!("{kind:?} in {}", dependency.target.name),
+                provenance,
+            })
+        });
+    let unresolved_reasons: BTreeSet<_> = callee
+        .unresolved()
+        .map(|unresolved| unresolved.reason)
+        .collect();
+    unresolved_reasons
+        .into_iter()
+        .fold(observed, |result, reason| {
+            let mut provenance = dependency.provenance.clone();
+            provenance.dependency = Some(dependency.target.clone());
+            result.with_unresolved(UnresolvedBehavior {
+                reason,
+                detail: format!("{reason:?} in {}", dependency.target.name),
+                provenance,
+            })
+        })
+}
+
+fn missing_dependency(
+    dependency: &crate::analysis::effect_evidence::EffectDependency,
+) -> EffectAssessment {
+    EffectAssessment::complete().with_unresolved(UnresolvedBehavior {
+        reason: UnresolvedReason::UnavailableBody,
+        detail: format!("body unavailable for {}", dependency.target.name),
+        provenance: dependency.provenance.clone(),
+    })
+}
+
+fn result_from_assessment(assessment: EffectAssessment, confidence: f64) -> PurityResult {
+    let level = match assessment.classification() {
+        EffectClassification::StrictlyPure => PurityLevel::StrictlyPure,
+        EffectClassification::LocallyPure => PurityLevel::LocallyPure,
+        EffectClassification::ReadOnly => PurityLevel::ReadOnly,
+        EffectClassification::Impure | EffectClassification::Unknown => PurityLevel::Impure,
     };
-    result.confidence = (result.confidence * summary.aggregated_confidence).clamp(0.3, 1.0);
-    result
-}
-
-fn propagated_depth(reason: &PurityReason) -> Option<usize> {
-    match reason {
-        PurityReason::PropagatedFromDeps { depth } => Some(*depth),
-        _ => None,
+    let observed = assessment
+        .observed()
+        .map(|effect| effect.detail.clone())
+        .collect();
+    let unresolved = assessment
+        .unresolved()
+        .map(|behavior| behavior.detail.clone())
+        .collect();
+    PurityResult {
+        level,
+        confidence,
+        reason: PurityReason::Evidence {
+            observed,
+            unresolved,
+        },
+        assessment,
     }
-}
-
-fn count_unknown_dependencies(evidence: &[CalleeEvidence]) -> usize {
-    evidence
-        .iter()
-        .filter(|entry| matches!(entry.callee_purity, CalleePurity::Unknown))
-        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::analysis::effect_evidence::{
+        EffectDependency, EffectProvenance, ObservedEffectKind,
+    };
 
-    fn result(level: PurityLevel, confidence: f64) -> PurityResult {
-        PurityResult {
-            level,
-            confidence,
-            reason: PurityReason::Intrinsic,
-        }
+    fn id(name: &str, line: usize) -> FunctionId {
+        FunctionId::new("src/lib.rs".into(), name.into(), line)
     }
 
-    fn summary(
-        all_deps_pure: bool,
-        aggregated_confidence: f64,
-        impure_reasons: Vec<String>,
-        max_depth: usize,
-        unknown_count: usize,
-    ) -> DependencyPuritySummary {
-        DependencyPuritySummary {
-            all_deps_pure,
-            aggregated_confidence,
-            impure_reasons,
-            max_depth,
-            unknown_count,
-        }
-    }
-
-    #[test]
-    fn recursive_pure_result_keeps_purity_with_penalty() {
-        let propagated = propagate_recursive_result(result(PurityLevel::StrictlyPure, 0.9));
-
-        assert_eq!(propagated.level, PurityLevel::StrictlyPure);
-        assert_eq!(propagated.reason, PurityReason::RecursivePure);
-        assert!((propagated.confidence - 0.63).abs() < f64::EPSILON);
-    }
-
-    #[test]
-    fn recursive_impure_result_marks_side_effect_cycle() {
-        let propagated = propagate_recursive_result(result(PurityLevel::Impure, 0.4));
-
-        assert_eq!(propagated.level, PurityLevel::Impure);
-        assert_eq!(propagated.reason, PurityReason::RecursiveWithSideEffects);
-        assert!((propagated.confidence - 0.95).abs() < f64::EPSILON);
-    }
-
-    #[test]
-    fn pure_dependencies_set_depth_and_confidence() {
-        let propagated = propagate_dependency_result(
-            result(PurityLevel::LocallyPure, 0.95),
-            summary(true, 0.9, Vec::new(), 2, 0),
-        );
-
-        assert_eq!(propagated.level, PurityLevel::LocallyPure);
-        assert_eq!(
-            propagated.reason,
-            PurityReason::PropagatedFromDeps { depth: 3 }
-        );
-        assert!(propagated.confidence < 0.95);
-    }
-
-    #[test]
-    fn pure_dependencies_preserve_external_reads() {
-        let propagated = propagate_dependency_result(
-            result(PurityLevel::ReadOnly, 0.9),
-            summary(true, 0.9, Vec::new(), 0, 0),
-        );
-        assert_eq!(propagated.level, PurityLevel::ReadOnly);
-    }
-
-    #[test]
-    fn intrinsic_refined_levels_survive_metric_propagation() {
-        for level in [
-            crate::core::PurityLevel::StrictlyPure,
-            crate::core::PurityLevel::LocallyPure,
-            crate::core::PurityLevel::ReadOnly,
-            crate::core::PurityLevel::Impure,
-        ] {
-            let mut metric = FunctionMetrics::new("leaf".into(), "leaf.rs".into(), 1);
-            metric.purity_level = Some(level);
-            metric.is_pure = Some(level == crate::core::PurityLevel::StrictlyPure);
-            metric.purity_confidence = Some(0.9);
-            let graph = crate::priority::call_graph::CallGraph::new();
-            let metrics =
-                crate::builders::unified_analysis_phases::orchestration::run_purity_propagation(
-                    &[metric],
-                    &graph,
-                );
-            assert_eq!(metrics[0].purity_level, Some(level));
-            assert_eq!(
-                metrics[0].is_pure,
-                Some(level == crate::core::PurityLevel::StrictlyPure)
-            );
-            // A second pass must not erase the refined result either.
-            let repeated =
-                crate::builders::unified_analysis_phases::orchestration::run_purity_propagation(
-                    &metrics, &graph,
-                );
-            assert_eq!(repeated[0].purity_level, Some(level));
-        }
-    }
-
-    #[test]
-    fn applying_results_preserves_same_line_definition_identity() {
-        let mut first = FunctionMetrics::new("method".into(), "same_line.rs".into(), 1);
-        first.column = Some(5);
-        first.purity_level = Some(crate::core::PurityLevel::StrictlyPure);
-        first.is_pure = Some(true);
-        first.purity_confidence = Some(0.9);
-        let second = FunctionMetrics {
-            column: Some(40),
-            purity_level: Some(crate::core::PurityLevel::Impure),
-            is_pure: Some(false),
-            ..first.clone()
-        };
-        let propagated =
-            crate::builders::unified_analysis_phases::orchestration::run_purity_propagation(
-                &[first, second],
-                &crate::priority::call_graph::CallGraph::new(),
-            );
-        assert_eq!(propagated[0].column, Some(5));
-        assert_eq!(propagated[0].is_pure, Some(true));
-        assert_eq!(
-            propagated[0].purity_level,
-            Some(crate::core::PurityLevel::StrictlyPure)
-        );
-        assert_eq!(propagated[1].column, Some(40));
-        assert_eq!(propagated[1].is_pure, Some(false));
-        assert_eq!(
-            propagated[1].purity_level,
-            Some(crate::core::PurityLevel::Impure)
-        );
-    }
-
-    #[test]
-    fn impure_dependencies_override_current_result() {
-        let propagated = propagate_dependency_result(
-            result(PurityLevel::StrictlyPure, 0.95),
-            summary(
-                false,
-                0.95,
-                vec!["Calls impure function: write".into()],
-                0,
-                0,
-            ),
-        );
-
-        assert_eq!(propagated.level, PurityLevel::Impure);
-        assert_eq!(
-            propagated.reason,
-            PurityReason::SideEffects {
-                effects: vec!["Calls impure function: write".into()]
+    fn assessment(classification: EffectClassification, owner: &FunctionId) -> EffectAssessment {
+        let provenance = EffectProvenance::source(owner.clone(), owner.line, owner.column);
+        match classification {
+            EffectClassification::StrictlyPure => EffectAssessment::complete(),
+            EffectClassification::LocallyPure => {
+                effect(ObservedEffectKind::LocalMutation, provenance)
             }
-        );
+            EffectClassification::ReadOnly => effect(ObservedEffectKind::ExternalRead, provenance),
+            EffectClassification::Impure => effect(ObservedEffectKind::Io, provenance),
+            EffectClassification::Unknown => {
+                EffectAssessment::complete().with_unresolved(UnresolvedBehavior {
+                    reason: UnresolvedReason::UnsupportedDispatch,
+                    detail: "unknown".into(),
+                    provenance,
+                })
+            }
+        }
+    }
+
+    fn effect(kind: ObservedEffectKind, provenance: EffectProvenance) -> EffectAssessment {
+        EffectAssessment::complete().with_effect(ObservedEffect {
+            kind,
+            detail: format!("{kind:?}"),
+            provenance,
+        })
     }
 
     #[test]
-    fn unknown_dependencies_reduce_confidence_without_changing_level() {
-        let propagated = propagate_dependency_result(
-            result(PurityLevel::StrictlyPure, 0.8),
-            summary(true, 0.9, Vec::new(), 0, 2),
-        );
-
-        assert_eq!(propagated.level, PurityLevel::StrictlyPure);
-        assert_eq!(propagated.reason, PurityReason::UnknownDeps { count: 2 });
-        assert!(propagated.confidence < 0.8);
-    }
-
-    #[test]
-    fn counts_unknown_dependencies_from_evidence() {
-        let evidence = vec![
-            CalleeEvidence {
-                callee_name: "external".into(),
-                callee_purity: CalleePurity::Unknown,
-            },
-            CalleeEvidence {
-                callee_name: "len".into(),
-                callee_purity: CalleePurity::KnownPure,
-            },
+    fn every_caller_callee_combination_preserves_the_lattice_and_unknown() {
+        let classes = [
+            EffectClassification::StrictlyPure,
+            EffectClassification::LocallyPure,
+            EffectClassification::ReadOnly,
+            EffectClassification::Impure,
+            EffectClassification::Unknown,
         ];
+        let caller = id("caller", 1);
+        let callee = id("callee", 2);
+        let dependency = EffectDependency {
+            target: callee.clone(),
+            provenance: EffectProvenance::source(caller.clone(), 3, Some(4)),
+        };
+        for left in classes {
+            for right in classes {
+                let propagated = assessment(left, &caller).join(&dependency_assessment(
+                    &dependency,
+                    &assessment(right, &callee),
+                ));
+                let expected = if left == EffectClassification::Impure
+                    || right == EffectClassification::Impure
+                {
+                    EffectClassification::Impure
+                } else if left == EffectClassification::Unknown
+                    || right == EffectClassification::Unknown
+                {
+                    EffectClassification::Unknown
+                } else if left == EffectClassification::ReadOnly
+                    || right == EffectClassification::ReadOnly
+                {
+                    EffectClassification::ReadOnly
+                } else if left == EffectClassification::LocallyPure
+                    || right == EffectClassification::LocallyPure
+                {
+                    EffectClassification::LocallyPure
+                } else {
+                    EffectClassification::StrictlyPure
+                };
+                assert_eq!(
+                    propagated.classification(),
+                    expected,
+                    "{left:?} + {right:?}"
+                );
+            }
+        }
+    }
 
-        assert_eq!(count_unknown_dependencies(&evidence), 1);
+    #[test]
+    fn missing_dependency_is_unknown_not_impure() {
+        let dependency = EffectDependency {
+            target: id("missing", 9),
+            provenance: EffectProvenance::source(id("caller", 1), 3, Some(4)),
+        };
+        assert_eq!(
+            missing_dependency(&dependency).classification(),
+            EffectClassification::Unknown
+        );
+    }
+
+    #[test]
+    fn propagation_keeps_source_facts_once_and_uses_compact_dependency_summaries() {
+        let caller = id("caller", 1);
+        let callee = id("callee", 10);
+        let dependency = EffectDependency {
+            target: callee.clone(),
+            provenance: EffectProvenance::source(caller, 3, Some(4)),
+        };
+        let callee_assessment =
+            [11, 12]
+                .into_iter()
+                .fold(EffectAssessment::complete(), |assessment, line| {
+                    assessment.with_effect(ObservedEffect {
+                        kind: ObservedEffectKind::Io,
+                        detail: format!("I/O at line {line}"),
+                        provenance: EffectProvenance::source(callee.clone(), line, Some(8)),
+                    })
+                });
+
+        let propagated = dependency_assessment(&dependency, &callee_assessment);
+
+        assert_eq!(callee_assessment.observed().count(), 2);
+        let summaries: Vec<_> = propagated.observed().collect();
+        assert_eq!(summaries.len(), 1);
+        assert_eq!(summaries[0].provenance.owner.name, "caller");
+        assert_eq!(
+            summaries[0].provenance.dependency.as_ref(),
+            Some(&dependency.target)
+        );
+        assert_eq!(summaries[0].detail, "Io in callee");
     }
 }

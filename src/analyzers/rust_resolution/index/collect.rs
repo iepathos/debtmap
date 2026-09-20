@@ -6,6 +6,18 @@ impl WorkspaceIndex {
     pub(super) fn collect_types(&mut self, items: &[syn::Item], context: &Context) {
         for item in items {
             match item {
+                syn::Item::Macro(item) if item.ident.is_some() => {
+                    if let Some(ident) = &item.ident {
+                        let position = ident.span().start();
+                        self.macro_declarations.push(DeclarationId {
+                            file: context.file.clone(),
+                            module: context.module.clone(),
+                            name: ident.to_string(),
+                            line: position.line,
+                            column: position.column,
+                        });
+                    }
+                }
                 syn::Item::Struct(item) => self.add_type(
                     context,
                     &item.ident,
@@ -62,6 +74,7 @@ impl WorkspaceIndex {
                     self.collect_imports(&item.tree, context, &prefix);
                 }
                 syn::Item::Const(item) => self.values.push(ValueDeclaration {
+                    is_static: false,
                     context: context.clone(),
                     name: item.ident.to_string(),
                     ty: TypeSyntax::from_syn(&item.ty),
@@ -69,6 +82,7 @@ impl WorkspaceIndex {
                     column: item.ident.span().start().column,
                 }),
                 syn::Item::Static(item) => self.values.push(ValueDeclaration {
+                    is_static: true,
                     context: context.clone(),
                     name: item.ident.to_string(),
                     ty: TypeSyntax::from_syn(&item.ty),
@@ -191,7 +205,9 @@ impl WorkspaceIndex {
         for item in items {
             match item {
                 syn::Item::Fn(item) => {
-                    let call = make_callable(context, inline, &item.sig, &item.attrs, true);
+                    let mut call = make_callable(context, inline, &item.sig, &item.attrs, true);
+                    call.invoked_parameter =
+                        super::super::callbacks::invoked_parameter(&item.sig, &item.block);
                     self.callables.push(call);
                 }
                 syn::Item::Impl(item) => self.collect_impl(item, context, inline),
@@ -234,6 +250,8 @@ impl WorkspaceIndex {
                 true,
             );
             call.owner_syntax = Some(owner_syntax.clone());
+            call.invoked_parameter =
+                super::super::callbacks::invoked_parameter(&method.sig, &method.block);
             call.trait_path = item
                 .trait_
                 .as_ref()
@@ -282,6 +300,10 @@ impl WorkspaceIndex {
                 method.default.is_some(),
             );
             call.kind = CallableKind::TraitDeclaration;
+            call.invoked_parameter = method
+                .default
+                .as_ref()
+                .and_then(|body| super::super::callbacks::invoked_parameter(&method.sig, body));
             call.owner = Some(TypeFact::SelfType);
             call.trait_path = Some(vec![item.ident.to_string()]);
             call.requirements_known = false;

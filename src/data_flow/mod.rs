@@ -74,6 +74,9 @@ pub struct IoOperation {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PurityInfo {
+    /// Typed effect evidence. When present, this is authoritative for consumers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assessment: Option<crate::analysis::effect_evidence::EffectAssessment>,
     /// Whether the function is pure (no side effects)
     pub is_pure: bool,
     /// Confidence level in the purity analysis (0.0 to 1.0)
@@ -465,6 +468,7 @@ mod tests {
         let func_id = create_test_function_id("pure_func");
 
         let purity = PurityInfo {
+            assessment: None,
             is_pure: true,
             confidence: 0.95,
             impurity_reasons: vec![],

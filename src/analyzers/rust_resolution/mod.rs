@@ -5,11 +5,17 @@ mod bindings;
 mod block_items;
 mod body;
 pub(crate) mod cached;
+mod callbacks;
 mod conditions;
+#[cfg(test)]
+mod effect_completeness_tests;
+#[cfg(test)]
+mod effect_tests;
 mod expression_paths;
 mod expressions;
 mod flow;
 pub(crate) mod index;
+mod models;
 pub(crate) mod types;
 mod visitor;
 pub(crate) mod workspace;

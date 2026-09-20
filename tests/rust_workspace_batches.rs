@@ -23,12 +23,13 @@ fn corpus(root: &Path, count: usize) -> Vec<(PathBuf, String)> {
     }));
     files.push((
         root.join("remote.rs"),
-        "pub struct Remote;\nimpl Remote { pub fn run(&self) {} }\n".into(),
+        "pub struct Remote;\nimpl Remote { pub fn run(&self) { let _ = std::fs::read(\"input\"); } }\n"
+            .into(),
     ));
     files
 }
 
-fn normalized(graph: &CallGraph) -> [Vec<String>; 3] {
+fn normalized(graph: &CallGraph) -> [Vec<String>; 4] {
     let mut nodes: Vec<_> = graph
         .get_all_functions()
         .map(|id| {
@@ -49,10 +50,15 @@ fn normalized(graph: &CallGraph) -> [Vec<String>; 3] {
         .uncertain_calls()
         .map(|call| serde_json::to_string(call).unwrap())
         .collect();
+    let mut effects: Vec<_> = graph
+        .effect_assessments()
+        .map(|evidence| format!("{evidence:?}"))
+        .collect();
     nodes.sort();
     evidence.sort();
     uncertain.sort();
-    [nodes, evidence, uncertain]
+    effects.sort();
+    [nodes, evidence, uncertain, effects]
 }
 
 fn check_edge(graph: &CallGraph, root: &Path) {
@@ -66,6 +72,18 @@ fn check_edge(graph: &CallGraph, root: &Path) {
     assert_eq!(targets[0].line, 2);
     assert_eq!(targets[0].column, Some(21));
     assert!(!graph.uncertain_calls().any(|call| &call.caller == caller));
+    let caller_assessment = graph.effect_assessment(caller).expect("caller evidence");
+    assert_eq!(
+        caller_assessment.dependencies().next().unwrap().target,
+        targets[0]
+    );
+    assert_eq!(
+        graph
+            .effect_assessment(&targets[0])
+            .expect("callee evidence")
+            .classification(),
+        debtmap::analysis::effect_evidence::EffectClassification::Impure
+    );
 }
 
 // Stable permutation, independent of the hash-map seed and input order.

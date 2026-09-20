@@ -1,22 +1,50 @@
 //! Translate propagation results and metric purity as one coherent fact.
 
-use super::{PurityReason, PurityResult};
+use super::PurityResult;
+use crate::analysis::effect_evidence::{
+    EffectAssessment, EffectClassification, EffectProvenance, ObservedEffect, ObservedEffectKind,
+    UnresolvedReason,
+};
 use crate::analysis::purity_analysis::PurityLevel;
-use crate::core::{FunctionMetrics, PurityLevel as MetricPurityLevel};
+use crate::core::{FunctionMetrics, Language, PurityLevel as MetricPurityLevel};
+use crate::priority::call_graph::FunctionId;
 
 pub(super) fn intrinsic_purity(metric: &FunctionMetrics) -> PurityResult {
-    let Some(level) = intrinsic_level(metric) else {
-        return PurityResult {
-            level: PurityLevel::Impure,
-            confidence: 0.3,
-            reason: PurityReason::UnknownDeps { count: 0 },
-        };
+    let owner = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line)
+        .with_column(metric.column);
+    let confidence = metric.purity_confidence.map(f64::from).unwrap_or(0.3);
+    let assessment = if Language::from_path(&metric.file) == Language::Rust {
+        EffectAssessment::unknown_for(
+            owner,
+            UnresolvedReason::LegacyEvidence,
+            "legacy Rust purity fields have no semantic effect evidence",
+        )
+    } else {
+        intrinsic_level(metric)
+            .map(|level| assessment_from_level(level, owner.clone()))
+            .unwrap_or_else(|| {
+                EffectAssessment::unknown_for(
+                    owner,
+                    UnresolvedReason::LegacyEvidence,
+                    "purity evidence is absent",
+                )
+            })
     };
-    PurityResult {
-        level,
-        confidence: metric.purity_confidence.map(f64::from).unwrap_or(0.3),
-        reason: PurityReason::Intrinsic,
-    }
+    super::result_from_assessment(assessment, confidence)
+}
+
+fn assessment_from_level(level: PurityLevel, owner: FunctionId) -> EffectAssessment {
+    let kind = match level {
+        PurityLevel::StrictlyPure => return EffectAssessment::complete(),
+        PurityLevel::LocallyPure => ObservedEffectKind::LocalMutation,
+        PurityLevel::ReadOnly => ObservedEffectKind::ExternalRead,
+        PurityLevel::Impure => ObservedEffectKind::ExternalWrite,
+    };
+    EffectAssessment::complete().with_effect(ObservedEffect {
+        kind,
+        detail: format!("legacy non-Rust {level:?} classification"),
+        provenance: EffectProvenance::source(owner.clone(), owner.line, owner.column),
+    })
 }
 
 fn intrinsic_level(metric: &FunctionMetrics) -> Option<PurityLevel> {
@@ -41,14 +69,35 @@ fn intrinsic_level(metric: &FunctionMetrics) -> Option<PurityLevel> {
 
 impl PurityResult {
     pub(super) fn apply_to_metric(&self, metric: &FunctionMetrics) -> FunctionMetrics {
+        let classification = self.assessment.classification();
         FunctionMetrics {
-            purity_level: Some(metric_level(&self.level)),
-            is_pure: Some(self.level == PurityLevel::StrictlyPure),
+            purity_level: metric_level(classification),
+            is_pure: match classification {
+                EffectClassification::StrictlyPure => Some(true),
+                EffectClassification::LocallyPure
+                | EffectClassification::ReadOnly
+                | EffectClassification::Impure => Some(false),
+                EffectClassification::Unknown => None,
+            },
             purity_confidence: Some(self.confidence as f32),
-            purity_reason: Some(format!("{:?}", self.reason)),
+            purity_reason: Some(effect_reason(&self.assessment)),
             ..metric.clone()
         }
     }
+}
+
+fn effect_reason(assessment: &EffectAssessment) -> String {
+    let observed = assessment
+        .observed()
+        .map(|effect| effect.detail.as_str())
+        .collect::<Vec<_>>()
+        .join(", ");
+    let unresolved = assessment
+        .unresolved()
+        .map(|behavior| behavior.detail.as_str())
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("EffectEvidence: observed=[{observed}]; unresolved=[{unresolved}]")
 }
 
 fn analysis_level(level: MetricPurityLevel) -> PurityLevel {
@@ -60,12 +109,13 @@ fn analysis_level(level: MetricPurityLevel) -> PurityLevel {
     }
 }
 
-fn metric_level(level: &PurityLevel) -> MetricPurityLevel {
+fn metric_level(level: EffectClassification) -> Option<MetricPurityLevel> {
     match level {
-        PurityLevel::StrictlyPure => MetricPurityLevel::StrictlyPure,
-        PurityLevel::LocallyPure => MetricPurityLevel::LocallyPure,
-        PurityLevel::ReadOnly => MetricPurityLevel::ReadOnly,
-        PurityLevel::Impure => MetricPurityLevel::Impure,
+        EffectClassification::StrictlyPure => Some(MetricPurityLevel::StrictlyPure),
+        EffectClassification::LocallyPure => Some(MetricPurityLevel::LocallyPure),
+        EffectClassification::ReadOnly => Some(MetricPurityLevel::ReadOnly),
+        EffectClassification::Impure => Some(MetricPurityLevel::Impure),
+        EffectClassification::Unknown => None,
     }
 }
 
@@ -91,56 +141,44 @@ mod tests {
             original.purity_confidence = Some(1.0);
             original.purity_reason = Some("stale".into());
             let result = PurityResult {
+                assessment: assessment_from_level(
+                    level.clone(),
+                    FunctionId::new(original.file.clone(), original.name.clone(), original.line),
+                ),
                 level: level.clone(),
                 confidence: 0.75,
-                reason: PurityReason::Intrinsic,
+                reason: super::super::PurityReason::Intrinsic,
             };
             let updated = result.apply_to_metric(&original);
             assert_eq!(updated.purity_level, Some(expected));
             assert_eq!(updated.is_pure, Some(level == PurityLevel::StrictlyPure));
             assert_eq!(updated.purity_confidence, Some(0.75));
-            assert_eq!(updated.purity_reason.as_deref(), Some("Intrinsic"));
+            assert!(
+                updated
+                    .purity_reason
+                    .as_deref()
+                    .unwrap()
+                    .starts_with("EffectEvidence:")
+            );
             assert_eq!(original.is_pure, Some(true));
-            assert_eq!(intrinsic_purity(&updated).level, level);
         }
     }
 
     #[test]
-    fn legacy_boolean_and_missing_evidence_keep_their_fallbacks() {
-        for (pure, confidence, level) in [
-            (Some(true), Some(0.9), PurityLevel::StrictlyPure),
-            (Some(false), Some(0.9), PurityLevel::Impure),
-            (Some(true), None, PurityLevel::Impure),
-            (None, None, PurityLevel::Impure),
-        ] {
-            let mut metric = metric();
-            metric.is_pure = pure;
-            metric.purity_confidence = confidence;
-            assert_eq!(intrinsic_purity(&metric).level, level);
-        }
-    }
-
-    #[test]
-    fn contradictory_strict_purity_is_conservative() {
-        for (level, pure) in [
-            (MetricPurityLevel::StrictlyPure, false),
-            (MetricPurityLevel::Impure, true),
-        ] {
-            let mut metric = metric();
-            metric.is_pure = Some(pure);
-            metric.purity_level = Some(level);
-            metric.purity_confidence = Some(0.95);
-            assert_eq!(intrinsic_purity(&metric).level, PurityLevel::Impure);
-        }
-    }
-
-    #[test]
-    fn missing_evidence_cannot_gain_confidence_from_an_unmatched_field() {
+    fn rust_legacy_fields_remain_unknown_even_with_high_confidence() {
         let mut metric = metric();
+        metric.is_pure = Some(true);
+        metric.purity_level = Some(MetricPurityLevel::StrictlyPure);
         metric.purity_confidence = Some(0.95);
         let result = intrinsic_purity(&metric);
         assert_eq!(result.level, PurityLevel::Impure);
-        assert_eq!(result.confidence, 0.3);
-        assert_eq!(result.reason, PurityReason::UnknownDeps { count: 0 });
+        assert!((result.confidence - 0.95).abs() < 1e-6);
+        assert_eq!(
+            result.assessment.classification(),
+            EffectClassification::Unknown
+        );
+        let updated = result.apply_to_metric(&metric);
+        assert_eq!(updated.purity_level, None);
+        assert_eq!(updated.is_pure, None);
     }
 }

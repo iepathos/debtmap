@@ -47,6 +47,7 @@ impl Fact {
             Self::Purity => graph.set_purity_info(
                 id,
                 PurityInfo {
+                    assessment: None,
                     is_pure: false,
                     confidence: 1.0,
                     impurity_reasons: vec![marker],
