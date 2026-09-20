@@ -48,7 +48,11 @@ The LCOV-backed report for `CallResolver::resolve_call_outcome` reports unknown 
 
 Validation includes the classification join matrix; property tests for normalized joins and uncertainty; callable references, bound closures and wrapper variants; shadowed/aliased models; JSON and Postcard evidence round trips; public v3/v4 contracts; both propagation paths; and direct/cached, sequential/parallel workspace cases at 199, 200, 201, and 401 files.
 
-The final offline debug gates passed: 6,252 fast tests (ten existing skips), 541 bounded integration tests (one existing skip), 58 focused pipeline tests, formatting, and strict Clippy across all targets and features.
+The initial offline debug gates passed: 6,252 fast tests (ten existing skips), 541 bounded integration tests (one existing skip), 58 focused pipeline tests, formatting, and strict Clippy across all targets and features. These bounded suites did not cover every integration target run by `just coverage-lcov`.
+
+The subsequent coverage run exposed lost source queries for uncertain shadowed calls and stale role/model expectations. The follow-up preserves the original callable query without resolving the call, makes absolute standard-library type aliases agree with directly qualified types, and checks missing evidence as `Unknown`. The three affected integration targets pass all 33 tests.
+
+Follow-up validation on 2026-09-19 ran the actual `CARGO_NET_OFFLINE=true just coverage-lcov`: 7,602 tests passed across 192 binaries, zero failed, and 44 existing tests were ignored. LCOV export completed successfully at `target/coverage/lcov.info`; no tests were excluded and the recipe was unchanged. Formatting, all 6,252 fast tests (ten existing skips), and strict offline all-target/all-feature Clippy also passed. The originally reported library failure did not reproduce in ordinary libtest, the instrumented library binary, or the full coverage run; its cause remains unconfirmed.
 
 ### Debug microbenchmarks
 

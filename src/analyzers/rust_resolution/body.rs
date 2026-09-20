@@ -235,24 +235,25 @@ impl<'a> Body<'a> {
     }
 
     pub(super) fn record_indirect_invocation(&mut self, expr: &syn::Expr) {
+        let callable = match expr {
+            syn::Expr::Call(call) => &*call.func,
+            expression => expression,
+        };
+        let query = quote::quote!(#callable).to_string();
         let position = expr.span().start();
         let site = CallSite {
             file: self.callable.id.file.clone(),
             line: position.line,
             column: Some(position.column),
         };
-        self.record_unresolved(
-            &site,
-            "indirect callable invocation",
-            UnresolvedReason::CallbackInvocation,
-        );
+        self.record_unresolved(&site, &query, UnresolvedReason::CallbackInvocation);
         self.graph.record_uncertain_call(UncertainCall {
             caller: self.callable.id.clone(),
             call_site: site,
             call_ordinal: None,
             lexical_module: self.callable.context.module.join("::"),
             call_type: CallType::Callback,
-            query: "indirect callable invocation".into(),
+            query,
             receiver: None,
             candidates: Vec::new(),
             reason: UncertaintyReason::UnavailableDefinition,

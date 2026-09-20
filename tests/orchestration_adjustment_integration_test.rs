@@ -85,8 +85,8 @@ fn test_non_orchestrator_no_adjustment() {
     let role = classify_function_role(&func, &func_id, &call_graph);
     assert_eq!(
         role,
-        FunctionRole::PureLogic,
-        "Should be classified as pure logic"
+        FunctionRole::Unknown,
+        "Missing evidence cannot establish pure logic"
     );
 
     // Calculate unified score
@@ -95,7 +95,7 @@ fn test_non_orchestrator_no_adjustment() {
     // Verify no adjustment was applied
     assert!(
         score.adjustment_applied.is_none(),
-        "No adjustment should be applied to pure logic"
+        "No orchestration adjustment should be applied to an unknown role"
     );
     assert!(
         score.pre_adjustment_score.is_none(),

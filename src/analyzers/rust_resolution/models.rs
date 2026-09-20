@@ -8,7 +8,8 @@ use crate::analysis::effect_evidence::{
 
 pub(super) fn modeled_type(path: &[String], arguments: Vec<TypeFact>) -> Option<TypeFact> {
     let rooted = path
-        .first()
+        .iter()
+        .find(|part| part.as_str() != "::")
         .is_some_and(|part| matches!(part.as_str(), "std" | "core" | "alloc"));
     let prelude =
         path.len() == 1 && matches!(path[0].as_str(), "Vec" | "String" | "Option" | "Result");

@@ -1,4 +1,5 @@
 //! Regressions for verified Rust namespace, qualification, and module-path findings.
+use debtmap::analysis::effect_evidence::EffectClassification;
 use debtmap::analyzers::rust_call_graph::extract_call_graph_multi_file;
 use debtmap::builders::parallel_call_graph::build_call_graph_from_extracted;
 use debtmap::extraction::UnifiedFileExtractor;
@@ -54,15 +55,31 @@ fn const_and_static_values_are_not_confused_with_enum_or_alias_types() {
 fn external_absolute_paths_and_imports_do_not_resolve_local_std_symbols() {
     let source = "mod std { pub mod string { pub struct String; impl String { pub fn len(&self) -> usize { 42 } } } pub mod mem { pub fn drop() {} } }\nuse ::std::string::String as ExternalString;\nfn absolute(s: &::std::string::String) { s.len(); }\nfn imported(s: &ExternalString) { s.len(); }\nfn function() { ::std::mem::drop(1); }\n";
     for graph in graphs(&[("src/lib.rs", source)]) {
-        for caller in ["absolute", "imported", "function"] {
+        for caller in ["absolute", "imported"] {
             assert!(targets(&graph, caller).is_empty(), "{caller}");
-            let calls: Vec<_> = graph
-                .uncertain_calls()
-                .filter(|call| call.caller.name == caller)
-                .collect();
-            assert_eq!(calls.len(), 1, "{caller}");
-            assert!(calls[0].candidates.is_empty(), "{caller}");
+            assert!(
+                !graph
+                    .uncertain_calls()
+                    .any(|call| call.caller.name == caller),
+                "{caller}"
+            );
+            let id = graph
+                .get_all_functions()
+                .find(|id| id.name == caller)
+                .unwrap();
+            assert_eq!(
+                graph.effect_assessment(id).unwrap().classification(),
+                EffectClassification::StrictlyPure,
+                "{caller}"
+            );
         }
+        assert!(targets(&graph, "function").is_empty());
+        let calls: Vec<_> = graph
+            .uncertain_calls()
+            .filter(|call| call.caller.name == "function")
+            .collect();
+        assert_eq!(calls.len(), 1);
+        assert!(calls[0].candidates.is_empty());
     }
 }
 
