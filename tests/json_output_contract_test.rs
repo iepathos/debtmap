@@ -175,7 +175,7 @@ fn cli_json_matches_v4_schema_with_receipt_and_details() {
 }
 
 #[test]
-fn compare_consumes_v3_and_rejects_unknown_versions() {
+fn compare_reads_v3_but_withholds_unverifiable_trends_and_rejects_unknown_versions() {
     let directory = tempfile::tempdir().unwrap();
     let output_path = directory.path().join("comparison.json");
     let output = Command::new(env!("CARGO_BIN_EXE_debtmap"))
@@ -190,16 +190,12 @@ fn compare_consumes_v3_and_rejects_unknown_versions() {
         .output()
         .unwrap();
     assert!(
-        output.status.success(),
+        !output.status.success(),
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    let comparison: Value =
-        serde_json::from_str(&fs::read_to_string(output_path).unwrap()).unwrap();
-    assert_eq!(
-        comparison["project_health"]["after"]["total_debt_score"],
-        75.0
-    );
+    assert!(String::from_utf8_lossy(&output.stderr).contains("receipt"));
+    assert!(!output_path.exists());
 
     let mixed_output = Command::new(env!("CARGO_BIN_EXE_debtmap"))
         .args(["compare", "--before"])
@@ -214,10 +210,11 @@ fn compare_consumes_v3_and_rejects_unknown_versions() {
         .output()
         .unwrap();
     assert!(
-        mixed_output.status.success(),
+        !mixed_output.status.success(),
         "{}",
         String::from_utf8_lossy(&mixed_output.stderr)
     );
+    assert!(String::from_utf8_lossy(&mixed_output.stderr).contains("receipt"));
 
     let unsupported = directory.path().join("unsupported.json");
     let mut report = load_json("tests/fixtures/output/unified-v3-minimal.json");

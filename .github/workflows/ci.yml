@@ -111,6 +111,8 @@ jobs:
           --test cli_output_format_integration_test \
           --test config_contract_integration_test \
           --test json_output_contract_test \
+          --test compare_integration_test \
+          --test compare_safety_test \
           --test parallel_sequential_equivalence_test \
           --test data_flow_identity_matrix \
           --test rust_resolution_constraint_matrix \

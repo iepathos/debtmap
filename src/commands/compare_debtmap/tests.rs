@@ -29,6 +29,7 @@ use std::path::PathBuf;
 
 fn create_empty_output() -> DebtmapJsonInput {
     DebtmapJsonInput {
+        analyzer_version: Some("0.22.0".to_string()),
         items: vec![],
         total_impact: ImpactMetrics {
             complexity_reduction: 0.0,
@@ -40,12 +41,13 @@ fn create_empty_output() -> DebtmapJsonInput {
         debt_density: 0.0,
         total_lines_of_code: 0,
         overall_coverage: None,
-        receipt: None,
+        receipt: comparable_output().receipt,
     }
 }
 
 fn create_output_with_items(items: Vec<UnifiedDebtItemOutput>) -> DebtmapJsonInput {
     DebtmapJsonInput {
+        analyzer_version: Some("0.22.0".to_string()),
         items,
         total_impact: ImpactMetrics {
             complexity_reduction: 0.0,
@@ -57,7 +59,7 @@ fn create_output_with_items(items: Vec<UnifiedDebtItemOutput>) -> DebtmapJsonInp
         debt_density: 0.0,
         total_lines_of_code: 1000,
         overall_coverage: None,
-        receipt: None,
+        receipt: comparable_output().receipt,
     }
 }
 
@@ -149,6 +151,7 @@ fn create_test_debt_item(
 
 fn create_test_output(items: Vec<UnifiedDebtItemOutput>) -> DebtmapJsonInput {
     DebtmapJsonInput {
+        analyzer_version: Some("0.22.0".to_string()),
         items,
         total_impact: ImpactMetrics {
             risk_reduction: 0.0,
@@ -160,8 +163,15 @@ fn create_test_output(items: Vec<UnifiedDebtItemOutput>) -> DebtmapJsonInput {
         debt_density: 0.0,
         total_lines_of_code: 1000,
         overall_coverage: Some(50.0),
-        receipt: None,
+        receipt: comparable_output().receipt,
     }
+}
+
+fn comparable_output() -> DebtmapJsonInput {
+    super::parse_debtmap_json(include_str!(
+        "../../../tests/fixtures/output/unified-v4-minimal.json"
+    ))
+    .unwrap()
 }
 
 #[test]
@@ -180,6 +190,157 @@ fn incompatible_receipts_do_not_produce_improvement_claims() {
         result.comparability.status,
         super::ComparabilityStatus::Incompatible
     );
+}
+
+fn comparison_fixture() -> serde_json::Value {
+    serde_json::from_str(include_str!(
+        "../../../tests/fixtures/output/unified-v4-minimal.json"
+    ))
+    .unwrap()
+}
+
+fn validate_resolved_item(
+    before: &serde_json::Value,
+    after: &serde_json::Value,
+) -> super::ValidationResult {
+    let mut before = super::parse_debtmap_json(&before.to_string()).unwrap();
+    let after = super::parse_debtmap_json(&after.to_string()).unwrap();
+    before.items = vec![create_test_debt_item("src/test.rs", "resolved", 1, 10.0)];
+    perform_validation(&before, &after).unwrap()
+}
+
+fn assert_comparison_withheld(
+    result: &super::ValidationResult,
+    expected: super::ComparabilityStatus,
+) {
+    assert_eq!(result.comparability.status, expected);
+    assert_eq!(result.status, "non_comparable");
+    assert_eq!(result.completion_percentage, 0.0);
+    assert!(result.improvements.is_empty());
+    assert!(!result.comparability.reasons.is_empty());
+    assert_eq!(result.remaining_issues, result.comparability.reasons);
+}
+
+#[test]
+fn different_analyzer_versions_withhold_improvement_claims() {
+    let before = comparison_fixture();
+    let mut after = before.clone();
+    after["metadata"]["debtmap_version"] = "0.24.0".into();
+
+    assert_comparison_withheld(
+        &validate_resolved_item(&before, &after),
+        super::ComparabilityStatus::Incompatible,
+    );
+}
+
+#[test]
+fn empty_analyzer_version_withholds_improvement_claims() {
+    let before = comparison_fixture();
+    let mut after = before.clone();
+    after["metadata"]["debtmap_version"] = "".into();
+
+    assert_comparison_withheld(
+        &validate_resolved_item(&before, &after),
+        super::ComparabilityStatus::Unknown,
+    );
+}
+
+#[test]
+fn missing_receipt_withholds_improvement_claims() {
+    let before = comparison_fixture();
+    let mut after = before.clone();
+    after.as_object_mut().unwrap().remove("receipt");
+
+    assert_comparison_withheld(
+        &validate_resolved_item(&before, &after),
+        super::ComparabilityStatus::Unknown,
+    );
+}
+
+#[test]
+fn incomplete_scope_withholds_improvement_claims() {
+    let before = comparison_fixture();
+    for scope in ["partial", "limited", "unknown"] {
+        let mut after = before.clone();
+        after["receipt"]["scope"]["status"] = scope.into();
+        assert_comparison_withheld(
+            &validate_resolved_item(&before, &after),
+            super::ComparabilityStatus::Unknown,
+        );
+    }
+}
+
+#[test]
+fn legacy_reports_withhold_improvement_claims() {
+    let report = serde_json::json!({ "items": [] });
+    assert_comparison_withheld(
+        &validate_resolved_item(&report, &report),
+        super::ComparabilityStatus::Unknown,
+    );
+}
+
+#[test]
+fn changed_policy_with_unchanged_fingerprint_withholds_improvement_claims() {
+    let before = comparison_fixture();
+    let mut after = before.clone();
+    after["receipt"]["policy"]["complexity_threshold"] = 99.into();
+
+    assert_comparison_withheld(
+        &validate_resolved_item(&before, &after),
+        super::ComparabilityStatus::Incompatible,
+    );
+}
+
+#[test]
+fn changed_analysis_pass_setting_withholds_improvement_claims() {
+    let before = comparison_fixture();
+    let mut after = before.clone();
+    after["receipt"]["execution"]["multi_pass"] = true.into();
+
+    assert_comparison_withheld(
+        &validate_resolved_item(&before, &after),
+        super::ComparabilityStatus::Incompatible,
+    );
+}
+
+#[test]
+fn known_version_difference_overrides_missing_receipt() {
+    let before = comparison_fixture();
+    let mut after = before.clone();
+    after.as_object_mut().unwrap().remove("receipt");
+    after["metadata"]["debtmap_version"] = "0.24.0".into();
+    let result = validate_resolved_item(&before, &after);
+
+    assert_comparison_withheld(&result, super::ComparabilityStatus::Incompatible);
+    assert!(
+        result
+            .comparability
+            .reasons
+            .iter()
+            .any(|r| r.contains("receipt"))
+    );
+}
+
+#[test]
+fn comparable_receipts_allow_improvement_across_execution_and_revision_changes() {
+    let before = comparison_fixture();
+    let mut after = before.clone();
+    after["metadata"]["generated_at"] = "2026-09-20T00:00:00Z".into();
+    after["receipt"]["execution"]["parallel"] = true.into();
+    after["receipt"]["execution"]["jobs"] = 4.into();
+    after["receipt"]["source_revision"] = serde_json::json!({"commit": "new", "dirty": false});
+    after["receipt"]["reference_time"] = "2026-09-20T00:00:00Z".into();
+    after["receipt"]["scope"]["analyzed_files"] = 2.into();
+    after["receipt"]["scope"]["discovered_files"] = 2.into();
+    after["receipt"]["scope"]["total_loc"] = 30.into();
+    let result = validate_resolved_item(&before, &after);
+
+    assert_eq!(
+        result.comparability.status,
+        super::ComparabilityStatus::Comparable
+    );
+    assert_eq!(result.status, "complete");
+    assert!(!result.improvements.is_empty());
 }
 
 // =============================================================================

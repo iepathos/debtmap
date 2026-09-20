@@ -4,7 +4,9 @@
 //! which compares two analysis results and generates a diff report.
 
 use crate::cli::args::OutputFormat;
-use crate::commands::compare_debtmap::{DebtmapJsonInput, parse_debtmap_json};
+use crate::commands::compare_debtmap::{
+    ComparabilityStatus, DebtmapJsonInput, assess_comparability, parse_debtmap_json,
+};
 use crate::comparison::{Comparator, ComparisonResult, DebtTrend, PlanParser, TargetStatus};
 use crate::priority::UnifiedAnalysis;
 use anyhow::Result;
@@ -20,11 +22,22 @@ fn resolve_compare_target(
         .map(|from_plan| from_plan.or(target_location))
 }
 
-/// Load a debtmap JSON analysis file and convert it to [`UnifiedAnalysis`].
-fn load_analysis_from_path(path: &Path) -> Result<UnifiedAnalysis> {
+/// Load report provenance before projecting measurements into [`UnifiedAnalysis`].
+fn load_analysis_from_path(path: &Path) -> Result<DebtmapJsonInput> {
     let content = std::fs::read_to_string(path)?;
-    let json = parse_debtmap_json(&content)?;
-    Ok(json_to_analysis(json))
+    parse_debtmap_json(&content)
+}
+
+/// Withhold trends when differences could reflect measurement changes instead of code.
+fn require_comparable_reports(before: &DebtmapJsonInput, after: &DebtmapJsonInput) -> Result<()> {
+    let assessment = assess_comparability(before, after);
+    anyhow::ensure!(
+        assessment.status == ComparabilityStatus::Comparable,
+        "Cannot compare reports ({:?}): {}. Regenerate both reports with the same Debtmap version and analysis settings, using complete analysis scopes. No comparison report was written.",
+        assessment.status,
+        assessment.reasons.join("; ")
+    );
+    Ok(())
 }
 
 /// Serialize a comparison result for JSON or Markdown output.
@@ -75,9 +88,14 @@ pub fn handle_compare_command(
     let target = resolve_compare_target(plan, target_location)?;
     let before_results = load_analysis_from_path(before)?;
     let after_results = load_analysis_from_path(after)?;
-    let comparison = Comparator::new(before_results, after_results, target)
-        .with_source_paths(before.display().to_string(), after.display().to_string())
-        .compare()?;
+    require_comparable_reports(&before_results, &after_results)?;
+    let comparison = Comparator::new(
+        json_to_analysis(before_results),
+        json_to_analysis(after_results),
+        target,
+    )
+    .with_source_paths(before.display().to_string(), after.display().to_string())
+    .compare()?;
     write_comparison_output(&comparison, format, output)
 }
 

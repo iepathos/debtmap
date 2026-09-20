@@ -16,6 +16,9 @@ use std::path::PathBuf;
 /// This supports parsing the unified JSON format produced by `debtmap analyze`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DebtmapJsonInput {
+    /// Analyzer identity retained internally without changing the public report schema.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub analyzer_version: Option<String>,
     pub items: Vec<UnifiedDebtItemOutput>,
     #[serde(default = "default_impact_metrics")]
     pub total_impact: ImpactMetrics,
@@ -39,6 +42,8 @@ pub(crate) fn parse_debtmap_json(contents: &str) -> anyhow::Result<DebtmapJsonIn
         {
             let output: UnifiedOutput = serde_json::from_value(value)?;
             Ok(DebtmapJsonInput {
+                analyzer_version: Some(output.metadata.debtmap_version)
+                    .filter(|version| !version.trim().is_empty()),
                 receipt: output.receipt,
                 items: output.items,
                 total_impact: default_impact_metrics(),

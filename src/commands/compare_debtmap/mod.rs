@@ -21,12 +21,14 @@
 //! 4. Prints summary (I/O)
 
 mod analysis;
+mod comparability;
 mod io;
 mod messages;
 mod scoring;
 pub mod types;
 
 // Re-export public types
+pub(crate) use comparability::assess_comparability;
 pub(crate) use types::parse_debtmap_json;
 pub use types::{
     AnalysisSummary, Comparability, ComparabilityStatus, CompareConfig, DebtmapJsonInput,
@@ -73,7 +75,7 @@ fn perform_validation(before: &Input, after: &Input) -> Result<ValidationResult>
     let before_summary = create_summary(before);
     let after_summary = create_summary(after);
     let comparability = assess_comparability(before, after);
-    if comparability.status == ComparabilityStatus::Incompatible {
+    if comparability.status != ComparabilityStatus::Comparable {
         return Ok(non_comparable_result(
             before_summary,
             after_summary,
@@ -112,71 +114,6 @@ fn perform_validation(before: &Input, after: &Input) -> Result<ValidationResult>
         before_summary,
         after_summary,
     })
-}
-
-fn assess_comparability(before: &Input, after: &Input) -> Comparability {
-    let (Some(before), Some(after)) = (&before.receipt, &after.receipt) else {
-        return Comparability {
-            status: ComparabilityStatus::Unknown,
-            reasons: vec!["One or both reports do not contain an analysis receipt".to_string()],
-        };
-    };
-    let reasons = incompatible_receipt_reasons(before, after);
-    if !reasons.is_empty() {
-        return Comparability {
-            status: ComparabilityStatus::Incompatible,
-            reasons,
-        };
-    }
-    assess_scope_comparability(before, after)
-}
-
-fn incompatible_receipt_reasons(
-    before: &crate::output::unified::AnalysisReceipt,
-    after: &crate::output::unified::AnalysisReceipt,
-) -> Vec<String> {
-    [
-        (
-            before.policy_fingerprint != after.policy_fingerprint,
-            "Analysis policies differ",
-        ),
-        (
-            before.evidence != after.evidence,
-            "Loaded or requested evidence differs",
-        ),
-        (
-            before.selection != after.selection,
-            "Output selection policies differ",
-        ),
-        (
-            before.analysis_target != after.analysis_target,
-            "Analysis targets differ",
-        ),
-    ]
-    .into_iter()
-    .filter(|(differs, _)| *differs)
-    .map(|(_, reason)| reason.to_string())
-    .collect()
-}
-
-fn assess_scope_comparability(
-    before: &crate::output::unified::AnalysisReceipt,
-    after: &crate::output::unified::AnalysisReceipt,
-) -> Comparability {
-    use crate::output::unified::ScopeStatus;
-    let complete =
-        before.scope.status == ScopeStatus::Complete && after.scope.status == ScopeStatus::Complete;
-    Comparability {
-        status: if complete {
-            ComparabilityStatus::Comparable
-        } else {
-            ComparabilityStatus::Unknown
-        },
-        reasons: (!complete)
-            .then(|| "One or both reports have incomplete or unknown scope".to_string())
-            .into_iter()
-            .collect(),
-    }
 }
 
 fn non_comparable_result(

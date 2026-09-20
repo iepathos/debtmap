@@ -85,6 +85,10 @@ The five wall-time samples were baseline `90.51, 97.06, 101.69, 94.54, 94.29` se
 
 The runtime and footprint investigation thresholds were exceeded. Investigation removed redundant propagation, replaced copied transitive explanation chains with compact call-site/category summaries, and reused owned maps during collection/propagation joins. Remaining costs include the new semantic collection itself and duplicated assessments across propagation snapshots, graph copies, and per-function data-flow records. Record keys also duplicate owned source identities. These are code-review findings, not allocation-profile attribution; an allocator-level profile was not performed. Git-history variability also affects whole-run timings. The remaining runtime/footprint regressions are explicitly unresolved performance limitations, not claimed passes of the thresholds.
 
+Release decision (2026-09-20): these measured costs are accepted for the upcoming
+release. This acceptance does not change the measurements or resolve the
+underlying performance limitations.
+
 Reproduce each measurement from the fixed input worktree with the respective debug binary:
 
 ```sh

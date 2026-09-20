@@ -82,6 +82,7 @@ test-integration:
         --test call_graph_extraction_test --test call_graph_improved_test \
         --test call_graph_resolution_test --test call_graph_cross_file_resolution_test \
         --test cognitive_complexity_tests --test complexity_comparison_test \
+        --test compare_integration_test --test compare_safety_test \
         --test complexity_module_tests --test complexity_tests \
         --test context_aware_integration_test --test context_aware_test --test core_ast_tests \
         --test core_display_tests --test core_metrics_tests --test core_monadic_tests \

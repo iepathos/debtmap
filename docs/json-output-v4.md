@@ -56,9 +56,14 @@ Consumers must not interpret nullable receipt fields as zero. A `limited`, `part
 scope is not proof of complete project coverage; the warning list explains loaded-evidence and
 scope limitations known at output time.
 
-The compare command accepts both v3 and v4. It marks v3 comparability as `unknown`, and v4 reports
-with different policy, evidence, selection, or target receipts as `incompatible`; incompatible
-reports do not produce improvement claims.
+The compare command can read both v3 and v4. Different analyzer versions (from
+`metadata.debtmap_version`), policies, evidence settings, selections, targets or multi-pass
+settings make reports `incompatible`. Missing analyzer identity or receipts, or incomplete
+scope, make comparability `unknown` unless a known incompatibility is also present.
+Neither state permits improvement claims: the CLI exits nonzero with reasons on stderr,
+without emitting or overwriting a comparison report. The automated validation API returns
+`non_comparable`, retains the comparability reasons, and withholds completion and improvement
+claims. Regenerate both baselines with the same analyzer version and settings after upgrading.
 
 Function items are findings. They do not contain generated refactoring recommendations in v4.
 Optional nested evidence is omitted when it was not computed.
