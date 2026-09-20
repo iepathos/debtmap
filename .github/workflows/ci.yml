@@ -53,6 +53,10 @@ jobs:
         cargo nextest run --lib \
           --test analyzer_tests --test complexity_tests --test core_metrics_tests \
           --test debt_tests --test entropy_tests \
+          --test rust_method_resolution_cached \
+          --test data_flow_identity_matrix \
+          --test rust_resolution_namespace_matrix \
+          --test compare_safety_test \
           --status-level fail --final-status-level slow
 
     - name: Configure vendored OpenSSL prerequisites (Windows)
@@ -76,6 +80,10 @@ jobs:
           --test analyzer_tests `
           --test complexity_tests --test core_metrics_tests `
           --test debt_tests --test entropy_tests `
+          --test rust_method_resolution_cached `
+          --test data_flow_identity_matrix `
+          --test rust_resolution_namespace_matrix `
+          --test compare_safety_test `
           --status-level fail --final-status-level slow
 
   integration:
