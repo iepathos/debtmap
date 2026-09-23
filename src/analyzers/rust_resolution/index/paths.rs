@@ -99,6 +99,9 @@ impl WorkspaceIndex {
         depth: usize,
         namespace: Namespace,
     ) -> Vec<Vec<String>> {
+        if self.declaration_shadows(import, context, namespace) {
+            return Vec::new();
+        }
         let targets = if import.path == [import.alias.clone()] {
             vec![relative_path(&import.path, &import.context.module)]
         } else {
@@ -115,6 +118,19 @@ impl WorkspaceIndex {
                     || !self.has_binding(path, context, other)
             })
             .collect()
+    }
+
+    /// A declaration already binds the alias in this namespace, so a non-glob import of the
+    /// same name cannot; following one back through the declaration only grows the path.
+    fn declaration_shadows(
+        &self,
+        import: &Import,
+        context: &Context,
+        namespace: Namespace,
+    ) -> bool {
+        let bound = qualified(&import.context.module, &import.alias);
+        self.has_binding(&bound, context, namespace)
+            && relative_path(&import.path, &import.context.module).starts_with(&bound)
     }
 
     fn expand_reexports(
