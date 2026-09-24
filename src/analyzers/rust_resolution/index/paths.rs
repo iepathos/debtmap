@@ -120,8 +120,8 @@ impl WorkspaceIndex {
             .collect()
     }
 
-    /// A declaration already binds the alias in this namespace, so a non-glob import of the
-    /// same name cannot; following one back through the declaration only grows the path.
+    /// Type declarations bind path prefixes, so following a same-named import back
+    /// through one only grows the path. Value bindings may be conditional alternatives.
     fn declaration_shadows(
         &self,
         import: &Import,
@@ -129,7 +129,8 @@ impl WorkspaceIndex {
         namespace: Namespace,
     ) -> bool {
         let bound = qualified(&import.context.module, &import.alias);
-        self.has_binding(&bound, context, namespace)
+        matches!(namespace, Namespace::Type)
+            && self.has_binding(&bound, context, namespace)
             && relative_path(&import.path, &import.context.module).starts_with(&bound)
     }
 
