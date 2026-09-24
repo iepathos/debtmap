@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.1] - 2026-09-24
+
+### Fixed
+
+- **Rust Re-export Resolution** - Stops recursive path expansion when a function is re-exported through a module with the same name, preventing excessive memory use during analysis ([#134](https://github.com/iepathos/debtmap/pull/134), thanks to [HardMax71](https://github.com/HardMax71))
+  - Preserves conditional value imports through same-named modules, retaining alternative call targets as uncertain instead of reporting an incorrect confirmed target
+
 ## [0.24.0] - 2026-09-20
 
 ### Added
