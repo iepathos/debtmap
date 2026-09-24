@@ -47,3 +47,26 @@ fn public_docs_describe_current_language_and_output_contracts() {
     assert!(getting_started.contains("Solidity `.sol`"));
     assert!(!architecture.contains("focused exclusively on Rust"));
 }
+
+#[test]
+fn pre_commit_hooks_manifest_exposes_validate_hooks() {
+    let manifest = include_str!("../.pre-commit-hooks.yaml");
+    assert!(manifest.contains("id: debtmap\n"));
+    assert!(manifest.contains("id: debtmap-system\n"));
+    assert!(manifest.contains("language: rust"));
+    assert!(manifest.contains("language: system"));
+    assert!(manifest.contains("entry: debtmap"));
+    assert!(manifest.contains("pass_filenames: false"));
+    assert!(manifest.contains("validate"));
+}
+
+#[test]
+fn public_docs_describe_pre_commit_consumption() {
+    let readme = include_str!("../README.md");
+    let validation_gates = include_str!("../book/src/validation-gates.md");
+    assert!(readme.contains("repo: https://github.com/iepathos/debtmap"));
+    assert!(readme.contains("id: debtmap"));
+    assert!(readme.contains("id: debtmap-system"));
+    assert!(validation_gates.contains(".pre-commit-config.yaml"));
+    assert!(validation_gates.contains("id: debtmap"));
+}

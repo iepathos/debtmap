@@ -1,0 +1,30 @@
+# Hooks that other repositories can consume:
+#
+#   repos:
+#     - repo: https://github.com/iepathos/debtmap
+#       rev: v0.23.0
+#       hooks:
+#         - id: debtmap
+#
+# `debtmap` installs this repository at the pinned `rev`.
+# `debtmap-system` uses a `debtmap` binary already on PATH.
+
+- id: debtmap
+  name: debtmap
+  description: Validate the repository against configured debtmap quality gates
+  language: rust
+  entry: debtmap
+  args: [validate, .]
+  pass_filenames: false
+  require_serial: true
+  files: (\.debtmap\.toml$)|(\.(rs|py|js|jsx|ts|tsx|go|sol)$)
+
+- id: debtmap-system
+  name: debtmap (system)
+  description: Validate using a pre-installed debtmap binary on PATH
+  language: system
+  entry: debtmap
+  args: [validate, .]
+  pass_filenames: false
+  require_serial: true
+  files: (\.debtmap\.toml$)|(\.(rs|py|js|jsx|ts|tsx|go|sol)$)
