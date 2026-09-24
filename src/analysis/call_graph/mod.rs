@@ -77,6 +77,7 @@ impl Default for AnalysisConfig {
 pub struct RustCallGraphBuilder {
     config: AnalysisConfig,
     enhanced_graph: RustCallGraph,
+    finalized: bool,
 }
 
 impl RustCallGraphBuilder {
@@ -84,6 +85,7 @@ impl RustCallGraphBuilder {
     pub fn new() -> Self {
         Self {
             config: AnalysisConfig::default(),
+            finalized: false,
             enhanced_graph: RustCallGraph {
                 base_graph: CallGraph::new(),
                 trait_registry: TraitRegistry::new(),
@@ -98,6 +100,7 @@ impl RustCallGraphBuilder {
     pub fn with_config(config: AnalysisConfig) -> Self {
         Self {
             config,
+            finalized: false,
             enhanced_graph: RustCallGraph {
                 base_graph: CallGraph::new(),
                 trait_registry: TraitRegistry::new(),
@@ -112,6 +115,7 @@ impl RustCallGraphBuilder {
     pub fn from_base_graph(base_graph: CallGraph) -> Self {
         Self {
             config: AnalysisConfig::default(),
+            finalized: false,
             enhanced_graph: RustCallGraph {
                 base_graph,
                 trait_registry: TraitRegistry::new(),
@@ -132,20 +136,10 @@ impl RustCallGraphBuilder {
     /// Phase 2: Analyze trait implementations and method dispatch
     pub fn analyze_trait_dispatch(&mut self, file_path: &Path, ast: &File) -> Result<&mut Self> {
         if self.config.enable_trait_analysis {
+            self.finalized = false;
             self.enhanced_graph
                 .trait_registry
                 .analyze_file(file_path, ast)?;
-
-            // Initialize the trait resolver for enhanced resolution
-            self.enhanced_graph.trait_registry.init_resolver();
-
-            // NOTE: detect_common_trait_patterns should be called ONCE after all files
-            // are processed, not once per file. See finalize_trait_analysis() method.
-
-            self.resolve_trait_method_calls()?;
-            self.mark_visit_trait_methods()?;
-            self.resolve_trait_object_calls()?;
-            self.resolve_generic_trait_bounds()?;
         }
         Ok(self)
     }
@@ -153,10 +147,10 @@ impl RustCallGraphBuilder {
     /// Phase 3: Analyze function pointers and closures
     pub fn analyze_function_pointers(&mut self, file_path: &Path, ast: &File) -> Result<&mut Self> {
         if self.config.enable_function_pointer_tracking {
+            self.finalized = false;
             self.enhanced_graph
                 .function_pointer_tracker
                 .analyze_file(file_path, ast)?;
-            self.resolve_function_pointer_calls()?;
         }
         Ok(self)
     }
@@ -168,10 +162,10 @@ impl RustCallGraphBuilder {
         ast: &File,
     ) -> Result<&mut Self> {
         if self.config.enable_framework_patterns {
+            self.finalized = false;
             self.enhanced_graph
                 .framework_patterns
                 .analyze_file(file_path, ast)?;
-            self.apply_framework_exclusions()?;
         }
         Ok(self)
     }
@@ -182,93 +176,104 @@ impl RustCallGraphBuilder {
         workspace_files: &[(PathBuf, File)],
     ) -> Result<&mut Self> {
         if self.config.enable_cross_module_analysis {
+            self.finalized = false;
             self.enhanced_graph
                 .cross_module_tracker
-                .analyze_workspace(workspace_files)?;
-            self.resolve_cross_module_calls()?;
+                .collect_workspace(workspace_files)?;
         }
         Ok(self)
     }
 
-    /// Finalize trait analysis after all files have been processed
-    /// This should be called ONCE after all per-file analysis is complete
+    /// Finalize collected enhancements. Repeated calls without new input are inert.
+    /// `build()` also performs this step; the result signature is retained for compatibility.
     pub fn finalize_trait_analysis(&mut self) -> Result<()> {
-        // Detect common trait patterns (Default, Clone, From, Into, constructors)
-        self.enhanced_graph
-            .trait_registry
-            .detect_common_trait_patterns(&mut self.enhanced_graph.base_graph);
-
-        // Resolve trait method calls after pattern detection
-        let _resolved_count = self
-            .enhanced_graph
-            .trait_registry
-            .resolve_trait_method_calls(&mut self.enhanced_graph.base_graph);
-
+        self.finalize_enhancements();
         Ok(())
     }
 
-    /// Complete the analysis and return the Rust-specific call graph
-    pub fn build(self) -> RustCallGraph {
+    fn finalize_enhancements(&mut self) {
+        if self.finalized {
+            return;
+        }
         self.enhanced_graph
-    }
-
-    /// Resolve trait method calls to their implementations
-    fn resolve_trait_method_calls(&mut self) -> Result<()> {
-        let trait_calls = self
-            .enhanced_graph
+            .cross_module_tracker
+            .finalize_workspace();
+        self.enhanced_graph
             .trait_registry
-            .get_unresolved_trait_calls();
-
-        for trait_call in trait_calls {
-            // Use enhanced resolution for better accuracy
-            let resolved_impls = self
-                .enhanced_graph
+            .canonicalize_definitions(&self.enhanced_graph.base_graph);
+        self.enhanced_graph.trait_registry.init_resolver();
+        self.mark_visit_trait_methods();
+        self.enhanced_graph
+            .framework_patterns
+            .canonicalize_definitions(&self.enhanced_graph.base_graph);
+        self.resolve_function_pointer_calls();
+        self.apply_framework_exclusions();
+        // Detect common trait patterns (Default, Clone, From, Into, constructors)
+        if self.config.enable_trait_analysis {
+            self.enhanced_graph
                 .trait_registry
-                .resolve_trait_call(&trait_call);
-
-            for implementation in resolved_impls {
-                // Add call edges from trait call to each implementation
-                let call = FunctionCall {
-                    caller: trait_call.caller.clone(),
-                    callee: implementation,
-                    call_type: CallType::Delegate, // Trait dispatch is delegation
-                };
-                self.enhanced_graph.base_graph.add_call(call);
-            }
+                .detect_common_trait_patterns(&mut self.enhanced_graph.base_graph);
         }
 
-        Ok(())
+        // Ordinary method outcomes are already recorded by the shared workspace
+        // resolver. Trait metadata must not promote unknown receivers to edges.
+        self.enhanced_graph
+            .trait_registry
+            .ingest_shared_uncertainty(&self.enhanced_graph.base_graph);
+
+        self.finalized = true;
+    }
+
+    /// Install authoritative workspace outcomes after collecting enhancement metadata.
+    pub(crate) fn merge_base_graph(&mut self, graph: CallGraph) {
+        self.finalized = false;
+        self.enhanced_graph.base_graph.merge(graph);
+    }
+
+    /// Finalize collected enhancements and return the Rust-specific call graph.
+    pub fn build(mut self) -> RustCallGraph {
+        self.finalize_enhancements();
+        self.enhanced_graph
     }
 
     /// Resolve function pointer and closure calls
-    fn resolve_function_pointer_calls(&mut self) -> Result<()> {
+    fn resolve_function_pointer_calls(&mut self) {
         let pointer_calls = self
             .enhanced_graph
             .function_pointer_tracker
             .get_function_pointer_calls();
 
         for pointer_call in pointer_calls {
-            if let Some(target_functions) = self
+            let targets = self
                 .enhanced_graph
                 .function_pointer_tracker
                 .resolve_pointer_targets(&pointer_call.pointer_id)
-            {
-                for target in target_functions {
-                    let call = FunctionCall {
-                        caller: pointer_call.caller.clone(),
-                        callee: target,
-                        call_type: CallType::Callback, // Function pointers are callbacks
-                    };
-                    self.enhanced_graph.base_graph.add_call(call);
-                }
+                .unwrap_or_default();
+            for target in targets {
+                self.add_known_pointer_call(&pointer_call.caller, &target);
             }
         }
+    }
 
-        Ok(())
+    fn add_known_pointer_call(&mut self, caller: &FunctionId, target: &FunctionId) {
+        let graph = &mut self.enhanced_graph.base_graph;
+        let (Some(caller), Some(callee)) =
+            (graph.find_function(caller), graph.find_function(target))
+        else {
+            log::debug!(
+                "Ignoring unmatched or ambiguous pointer metadata: {caller:?} -> {target:?}"
+            );
+            return;
+        };
+        graph.add_call(FunctionCall {
+            caller,
+            callee,
+            call_type: CallType::Callback,
+        });
     }
 
     /// Apply framework pattern exclusions to reduce false positives
-    fn apply_framework_exclusions(&mut self) -> Result<()> {
+    fn apply_framework_exclusions(&mut self) {
         let patterns = self
             .enhanced_graph
             .framework_patterns
@@ -293,76 +298,10 @@ impl RustCallGraphBuilder {
                 _ => {}
             }
         }
-
-        Ok(())
-    }
-
-    /// Resolve cross-module function calls
-    fn resolve_cross_module_calls(&mut self) -> Result<()> {
-        let cross_module_calls = self
-            .enhanced_graph
-            .cross_module_tracker
-            .get_cross_module_calls();
-
-        for cross_call in cross_module_calls {
-            if let Some(target_function) = self
-                .enhanced_graph
-                .cross_module_tracker
-                .resolve_module_call(&cross_call.module_path, &cross_call.function_name)
-            {
-                let call = FunctionCall {
-                    caller: cross_call.caller.clone(),
-                    callee: target_function,
-                    call_type: CallType::Direct,
-                };
-                self.enhanced_graph.base_graph.add_call(call);
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Resolve trait object calls (dyn Trait)
-    fn resolve_trait_object_calls(&mut self) -> Result<()> {
-        // Get the enhanced tracker to check for trait objects
-        let tracker = self.enhanced_graph.trait_registry.get_enhanced_tracker();
-
-        // For each trait with implementations, check if it's used as a trait object
-        for (trait_name, _) in tracker.traits.iter() {
-            let trait_object = crate::analyzers::trait_implementation_tracker::TraitObject {
-                trait_name: trait_name.clone(),
-                additional_bounds: crate::collections::Vector::new(),
-                lifetime: None,
-            };
-
-            // Resolve all methods that could be called on this trait object
-            let implementations = tracker.resolve_trait_object_call(
-                &trait_object.trait_name,
-                "", // Will be filled by actual method names
-            );
-
-            for impl_func in implementations {
-                // Mark these functions as reachable through trait objects
-                // This helps reduce false positives in dead code detection
-                self.enhanced_graph
-                    .base_graph
-                    .mark_as_trait_dispatch(impl_func);
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Resolve generic trait bounds
-    fn resolve_generic_trait_bounds(&mut self) -> Result<()> {
-        // This would analyze generic functions with trait bounds
-        // and resolve them to concrete implementations
-        // For now, this is a placeholder for future enhancement
-        Ok(())
     }
 
     /// Mark Visit trait methods as framework-managed
-    fn mark_visit_trait_methods(&mut self) -> Result<()> {
+    fn mark_visit_trait_methods(&mut self) {
         let visit_methods = self.enhanced_graph.trait_registry.get_visit_trait_methods();
 
         for method_id in visit_methods {
@@ -371,8 +310,6 @@ impl RustCallGraphBuilder {
                 .framework_patterns
                 .add_visit_trait_function(method_id);
         }
-
-        Ok(())
     }
 }
 
@@ -491,7 +428,9 @@ impl RustCallGraph {
 
     /// Identify potential dead code with reduced false positives
     pub fn get_potential_dead_code(&self) -> HashSet<FunctionId> {
-        let live_functions = self.get_live_functions();
+        let live_functions = self
+            .base_graph
+            .get_possible_reachable_functions(self.collect_initial_live_functions());
         let all_functions = self.base_graph.find_all_functions();
 
         all_functions

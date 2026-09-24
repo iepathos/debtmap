@@ -10,7 +10,7 @@ pub enum StabilityStatus {
     RelativelyStable,
 }
 
-/// Calculate bug density as a ratio of bug fixes to total commits.
+/// Calculate the message-labelled fix ratio, retained as `bug_density` in JSON.
 pub fn calculate_bug_density(bug_fix_count: usize, total_commits: usize) -> f64 {
     if total_commits > 0 {
         bug_fix_count as f64 / total_commits as f64
@@ -24,6 +24,23 @@ pub fn classify_risk_contribution(change_frequency: f64, bug_density: f64) -> f6
     let bug_contribution = bug_density * 1.5;
     let freq_contribution = (change_frequency / 20.0).min(0.5);
     (bug_contribution + freq_contribution).min(2.0)
+}
+
+/// Shrink history's contribution toward zero (a neutral 1x risk multiplier).
+///
+/// Five prior-equivalent observations give confidence `n / (n + 5)`: one
+/// observed modification receives 1/6 weight, five receive 1/2, and larger
+/// samples approach the original contribution. This is an explicit ranking
+/// policy, not a calibrated defect probability. Function samples exclude the
+/// introduction commit; file history uses all observed touching commits.
+pub fn sample_adjusted_contribution(
+    change_frequency: f64,
+    fix_labelled_ratio: f64,
+    observations: usize,
+) -> f64 {
+    const PRIOR_OBSERVATIONS: f64 = 5.0;
+    let confidence = observations as f64 / (observations as f64 + PRIOR_OBSERVATIONS);
+    classify_risk_contribution(change_frequency, fix_labelled_ratio) * confidence
 }
 
 /// Determine stability status from historical metrics.
@@ -51,7 +68,7 @@ pub fn format_stability_message(
 ) -> String {
     match status {
         StabilityStatus::HighlyUnstable => format!(
-            "Highly unstable: {:.1} changes/month, {:.0}% bug fixes",
+            "High history activity: {:.1} changes/month, {:.0}% fix-labelled commit ratio",
             change_frequency,
             bug_density * 100.0
         ),
@@ -59,7 +76,7 @@ pub fn format_stability_message(
             "Frequently changed: {change_frequency:.1} changes/month by {author_count} authors"
         ),
         StabilityStatus::BugProne => format!(
-            "Bug-prone: {:.0}% of commits are bug fixes",
+            "Frequent fix labels: {:.0}% fix-labelled commit ratio",
             bug_density * 100.0
         ),
         StabilityStatus::MatureStable => format!("Mature and stable: {age_days} days old"),

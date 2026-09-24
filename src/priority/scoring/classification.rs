@@ -20,7 +20,7 @@ pub fn is_dead_code(
     // FIRST: Check if function has incoming calls in the call graph
     // This includes event handlers bound via Bind() and other framework patterns
     let callers = call_graph.get_callers(func_id);
-    if !callers.is_empty() {
+    if !callers.is_empty() || !call_graph.get_possible_callers(func_id).is_empty() {
         return false;
     }
 
@@ -680,6 +680,7 @@ mod tests {
 
     fn create_test_function(name: &str, visibility: Option<&str>) -> FunctionMetrics {
         FunctionMetrics {
+            column: None,
             name: name.to_string(),
             file: PathBuf::from("test.rs"),
             line: 10,
@@ -711,9 +712,40 @@ mod tests {
     }
 
     #[test]
+    fn possible_caller_prevents_dead_code_without_becoming_resolved() {
+        use crate::priority::call_graph::{CallSite, UncertainCall, UncertaintyReason};
+        let func = create_test_function("unused_work", None);
+        let target = FunctionId::new(func.file.clone(), func.name.clone(), func.line)
+            .with_column(func.column);
+        let caller = FunctionId::new(func.file.clone(), "caller".into(), 1);
+        let mut graph = CallGraph::new();
+        graph.add_function(target.clone(), false, false, 1, 1);
+        graph.add_function(caller.clone(), false, false, 1, 1);
+        assert!(is_dead_code(&func, &graph, &target, None));
+        graph.record_uncertain_call(UncertainCall {
+            call_ordinal: None,
+            caller,
+            call_site: CallSite {
+                file: func.file.clone(),
+                line: 2,
+                column: None,
+            },
+            lexical_module: String::new(),
+            call_type: CallType::Direct,
+            query: "unused_work".into(),
+            receiver: None,
+            candidates: vec![target.clone()],
+            reason: UncertaintyReason::UnknownReceiver,
+        });
+        assert!(!is_dead_code(&func, &graph, &target, None));
+        assert!(graph.get_callers(&target).is_empty());
+    }
+
+    #[test]
     fn framework_role_prevents_dead_code_classification() {
         let func = create_test_function("callback", None);
-        let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
+        let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line)
+            .with_column(func.column);
         let mut graph = CallGraph::new();
         graph.add_function_with_evidence(
             func_id.clone(),
@@ -804,6 +836,7 @@ mod tests {
     fn test_event_handler_not_dead_code_when_bound() {
         // Create a Python event handler function
         let event_handler = FunctionMetrics {
+            column: None,
             name: "on_key_down".to_string(),
             file: PathBuf::from("test_panel.py"),
             line: 50,
@@ -866,6 +899,7 @@ mod tests {
         // Create a Python function that looks like a handler but isn't bound
         // Use a name that doesn't match framework patterns
         let unused_func = FunctionMetrics {
+            column: None,
             name: "process_data".to_string(), // Not a framework pattern
             file: PathBuf::from("test_panel.py"),
             line: 100,
@@ -911,6 +945,7 @@ mod tests {
     fn test_observer_method_not_dead_code_when_called() {
         // Create observer pattern methods
         let register_observer = FunctionMetrics {
+            column: None,
             name: "register_observer".to_string(),
             file: PathBuf::from("manager.py"),
             line: 20,
@@ -987,6 +1022,7 @@ mod tests {
 
         // Create functions that match the patterns from promptconstruct-frontend
         let on_paint = FunctionMetrics {
+            column: None,
             name: "on_paint".to_string(),
             file: PathBuf::from("conversation_panel.py"),
             line: 544,
@@ -1017,6 +1053,7 @@ mod tests {
         };
 
         let on_key_down = FunctionMetrics {
+            column: None,
             name: "on_key_down".to_string(),
             file: PathBuf::from("mainwindow.py"),
             line: 262,
@@ -1098,6 +1135,7 @@ mod tests {
         // Even if a function doesn't match any special patterns, if it has callers, it's not dead
 
         let unusual_name_func = FunctionMetrics {
+            column: None,
             name: "xyz123_unusual".to_string(), // Doesn't match any patterns
             file: PathBuf::from("module.py"),
             line: 100,
@@ -1573,7 +1611,8 @@ mod tests {
         func.entropy_score = Some(create_test_entropy_score(0.12)); // Low entropy = dispatcher
 
         let call_graph = CallGraph::new();
-        let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
+        let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line)
+            .with_column(func.column);
         let framework_exclusions = HashSet::new();
 
         let debt_types = classify_all_debt_types(

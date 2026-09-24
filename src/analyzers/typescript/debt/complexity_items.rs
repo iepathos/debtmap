@@ -141,6 +141,7 @@ mod tests {
         length: usize,
     ) -> FunctionMetrics {
         FunctionMetrics {
+            column: None,
             name: name.to_string(),
             file: PathBuf::from("test.js"),
             line: 10,

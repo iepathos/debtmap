@@ -392,6 +392,7 @@ mod tests {
 
     fn create_test_function(name: &str, file: &str) -> FunctionMetrics {
         FunctionMetrics {
+            column: None,
             name: name.to_string(),
             file: PathBuf::from(file),
             line: 10,

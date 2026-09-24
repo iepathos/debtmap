@@ -168,6 +168,7 @@ mod tests {
 
     fn create_test_metrics(rust_data: RustPatternResult) -> FunctionMetrics {
         FunctionMetrics {
+            column: None,
             name: "test_function".to_string(),
             file: PathBuf::from("test.rs"),
             line: 1,

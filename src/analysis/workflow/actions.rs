@@ -174,7 +174,6 @@ pub fn analyze_purity<Env: ProgressReporter>(
     };
     use crate::analysis::purity_analysis::PurityAnalyzer;
     use crate::analysis::purity_propagation::{PurityCallGraphAdapter, PurityPropagator};
-    use crate::priority::call_graph::FunctionId;
 
     // Create RustCallGraph wrapper
     let rust_graph = RustCallGraph {
@@ -202,27 +201,10 @@ pub fn analyze_purity<Env: ProgressReporter>(
 
     env.phase_progress(0.8);
 
-    // Apply propagation results to metrics
-    let final_metrics: Vec<_> = enriched_metrics
-        .iter()
-        .map(|metric| {
-            let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line);
-
-            if let Some(result) = propagator.get_result(&func_id) {
-                let mut updated = metric.clone();
-                updated.is_pure = Some(
-                    result.level == crate::analysis::purity_analysis::PurityLevel::StrictlyPure,
-                );
-                updated.purity_confidence = Some(result.confidence as f32);
-                updated.purity_reason = Some(format!("{:?}", result.reason));
-                updated
-            } else {
-                metric.clone()
-            }
-        })
-        .collect();
-
-    state.results.enriched_metrics = Some(final_metrics);
+    state.results.enriched_metrics = Some(propagator.apply_results(&enriched_metrics));
+    if let Some(call_graph) = state.results.call_graph.as_mut() {
+        call_graph.replace_with_propagated_effect_assessments(propagator.assessments());
+    }
 
     state.transition_to(AnalysisPhase::PurityComplete);
     env.phase_complete();

@@ -132,6 +132,7 @@ mod tests {
     #[test]
     fn test_classify_test_debt() {
         let test_func = FunctionMetrics {
+            column: None,
             name: "test_something".to_string(),
             file: std::path::PathBuf::from("tests/test.rs"),
             line: 10,
@@ -180,6 +181,7 @@ mod tests {
     fn test_generate_recommendation_returns_empty() {
         // Spec 262: Recommendations now return empty defaults
         let func = FunctionMetrics {
+            column: None,
             name: "test_func".to_string(),
             file: std::path::PathBuf::from("test.rs"),
             line: 1,
@@ -235,6 +237,7 @@ mod tests {
             contextual_risk_multiplier: None,
             pre_contextual_score: None,
             debt_type_multiplier: None,
+            score_trace: Vec::new(),
         };
 
         let recommendation =

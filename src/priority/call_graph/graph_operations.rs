@@ -9,29 +9,36 @@ use std::path::PathBuf;
 
 impl CallGraph {
     pub fn merge(&mut self, other: CallGraph) {
-        let evidence: std::collections::HashMap<_, _> = other
-            .edge_evidence
-            .iter()
-            .cloned()
-            .map(|evidence| (evidence.call.clone(), evidence))
-            .collect();
         // Merge nodes (use add_function to maintain indexes)
         // Sort nodes for deterministic merging order (Spec 214 fix)
         let mut sorted_nodes: Vec<_> = other.nodes.into_iter().collect();
         sorted_nodes.sort_by(|a, b| a.0.cmp(&b.0));
 
         for (id, node) in sorted_nodes {
-            self.add_function_with_evidence(id, node.role_evidence, node.complexity, node._lines);
+            self.add_function_with_evidence(
+                id,
+                node.effective_role_evidence(),
+                node.complexity,
+                node._lines,
+            );
         }
 
-        // Merge edges
+        for evidence in other.edge_evidence {
+            self.add_call_with_evidence(evidence);
+        }
         for call in other.edges {
-            if let Some(evidence) = evidence.get(&call) {
-                self.add_call_with_evidence(evidence.clone());
-            } else {
+            if !self.edge_set.contains(&call) {
                 self.add_call(call);
             }
         }
+        for call in other.uncertain_calls {
+            self.record_uncertain_call(call);
+        }
+        for (id, assessment) in other.effect_assessments {
+            self.record_effect_assessment(id, assessment);
+        }
+        // Merging may introduce a previously unavailable dependency body.
+        self.effect_assessments_propagated = false;
     }
 
     pub fn add_function(
@@ -76,7 +83,10 @@ impl CallGraph {
             .nodes
             .get(&id)
             .map(|node| {
-                crate::analysis::role_policy::merge_evidence(&node.role_evidence, &evidence)
+                crate::analysis::role_policy::merge_evidence(
+                    &node.effective_role_evidence(),
+                    &evidence,
+                )
             })
             .unwrap_or(evidence);
         let roles = crate::analysis::role_policy::classify_roles(&evidence);
@@ -89,7 +99,9 @@ impl CallGraph {
             complexity,
             _lines: lines,
         };
-        self.nodes.insert(id.clone(), node);
+        if self.nodes.insert(id.clone(), node).is_some() {
+            return;
+        }
 
         // Populate fuzzy index (name + file)
         let fuzzy_key = id.fuzzy_key();
@@ -133,8 +145,12 @@ impl CallGraph {
         let caller = call.caller.clone();
         let callee = call.callee.clone();
 
-        self.edges.push(call);
-        self.edge_evidence.push(evidence);
+        if self.edge_set.insert(call.clone()) {
+            self.edges.push(call);
+        }
+        if self.evidence_set.insert(evidence.clone()) {
+            self.edge_evidence.push(evidence);
+        }
 
         self.callee_index
             .entry(caller.clone())
@@ -294,15 +310,19 @@ impl CallGraph {
     /// Mark a function as being reachable through trait dispatch
     /// This helps reduce false positives in dead code detection
     pub fn mark_as_trait_dispatch(&mut self, func_id: FunctionId) {
-        // Ensure the function exists in the graph (use add_function to maintain indexes)
         if !self.nodes.contains_key(&func_id) {
-            self.add_function(func_id.clone(), false, false, 0, 0);
+            log::debug!("Unmatched trait enhancement metadata: {func_id:?}");
+            return;
         }
-
-        // Mark it as an entry point to prevent dead code false positives
-        if let Some(node) = self.nodes.get_mut(&func_id) {
-            node.is_entry_point = true;
-        }
+        self.add_role_evidence(
+            &func_id,
+            crate::analysis::role_policy::evidence_from_roles(
+                crate::analysis::role_policy::CodeRoles {
+                    is_entry_point: true,
+                    ..Default::default()
+                },
+            ),
+        );
     }
 
     pub fn is_entry_point(&self, func_id: &FunctionId) -> bool {
@@ -529,24 +549,63 @@ impl CallGraph {
         self.nodes.is_empty()
     }
 
+    /// Bridge legacy records only when the exact source identity is unique.
+    /// Unlike `find_function`, this never uses proximity or cross-file matching.
+    pub(crate) fn find_exact_or_unique_legacy(&self, query: &FunctionId) -> Option<FunctionId> {
+        if query.column.is_some() {
+            return self.nodes.contains_key(query).then(|| query.clone());
+        }
+        let mut matches = self
+            .fuzzy_index
+            .get(&query.fuzzy_key())?
+            .iter()
+            .filter(|id| {
+                id.file == query.file
+                    && id.name == query.name
+                    && id.line == query.line
+                    && (query.module_path.is_empty() || id.module_path == query.module_path)
+            });
+        let candidate = matches.next()?;
+        matches.next().is_none().then(|| candidate.clone())
+    }
+
     /// Find a function using fallback matching strategies
     /// Tries exact match first, then fuzzy match, then name-only match
     pub fn find_function(&self, query: &FunctionId) -> Option<FunctionId> {
+        if query.column.is_none()
+            && self.fuzzy_index.get(&query.fuzzy_key()).is_some_and(|ids| {
+                ids.iter()
+                    .filter(|id| id.line == query.line)
+                    .take(2)
+                    .count()
+                    > 1
+            })
+        {
+            return None;
+        }
         // 1. Try exact match (most common case)
         if self.nodes.contains_key(query) {
             return Some(query.clone());
         }
 
-        // 2. Try fuzzy match (name + file)
+        // A known file/name binding stays ambiguous when source locations tie.
         let fuzzy_key = query.fuzzy_key();
         if let Some(candidates) = self.fuzzy_index.get(&fuzzy_key) {
-            if candidates.len() == 1 {
+            if candidates.len() == 1
+                && (query.column.is_none()
+                    || candidates[0].column.is_none()
+                    || candidates[0].column == query.column)
+            {
                 return Some(candidates[0].clone());
             }
-            // Multiple candidates: try to disambiguate by line proximity
-            if let Some(best) = Self::disambiguate_by_line(candidates, query.line) {
-                return Some(best);
-            }
+            let candidates: Vec<_> = candidates
+                .iter()
+                .filter(|id| {
+                    query.column.is_none() || id.column.is_none() || id.column == query.column
+                })
+                .cloned()
+                .collect();
+            return Self::disambiguate_by_line(&candidates, query.line);
         }
 
         // 3. Try name-only match (cross-file)
@@ -567,10 +626,15 @@ impl CallGraph {
 
     /// Disambiguate between multiple candidates by line proximity
     fn disambiguate_by_line(candidates: &[FunctionId], target_line: usize) -> Option<FunctionId> {
-        candidates
+        let closest = candidates
             .iter()
-            .min_by_key(|func_id| target_line.abs_diff(func_id.line))
-            .cloned()
+            .map(|id| target_line.abs_diff(id.line))
+            .min()?;
+        let mut matching = candidates
+            .iter()
+            .filter(|id| target_line.abs_diff(id.line) == closest);
+        let candidate = matching.next()?;
+        matching.next().is_none().then(|| candidate.clone())
     }
 
     /// Disambiguate between multiple candidates by module path match
@@ -578,11 +642,11 @@ impl CallGraph {
         candidates: &[FunctionId],
         target_module: &str,
     ) -> Option<FunctionId> {
-        // First try exact module path match
-        candidates
+        let mut matching = candidates
             .iter()
-            .find(|func_id| func_id.module_path == target_module)
-            .cloned()
+            .filter(|id| id.module_path == target_module);
+        let candidate = matching.next()?;
+        matching.next().is_none().then(|| candidate.clone())
     }
 
     /// Find a function at a specific file and line location
@@ -607,11 +671,14 @@ impl CallGraph {
         functions: &[&FunctionId],
         target_line: usize,
     ) -> Option<FunctionId> {
-        functions
+        let nearest = functions
             .iter()
-            .filter(|func_id| func_id.line <= target_line)
-            .min_by_key(|func_id| target_line - func_id.line)
-            .map(|&func_id| func_id.clone())
+            .filter(|id| id.line <= target_line)
+            .map(|id| id.line)
+            .max()?;
+        let mut matches = functions.iter().filter(|id| id.line == nearest);
+        let candidate = matches.next()?;
+        matches.next().is_none().then(|| (*candidate).clone())
     }
 
     /// Check if a function is recursive (calls itself directly or through a cycle)

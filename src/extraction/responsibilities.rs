@@ -170,6 +170,7 @@ mod tests {
 
     fn function(name: &str, qualified_name: &str) -> ExtractedFunctionData {
         ExtractedFunctionData {
+            column: None,
             name: name.to_string(),
             qualified_name: qualified_name.to_string(),
             line: 1,

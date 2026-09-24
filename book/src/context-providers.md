@@ -222,19 +222,19 @@ max_depth = 5
 
 ## Git History Provider
 
-The Git History provider integrates version control data to detect change-prone code and bug patterns. Files with frequent changes and bug fixes indicate higher maintenance risk.
+The Git History provider uses version control activity and commit-message labels as maintenance signals. It does not count confirmed defects or estimate their probability.
 
 ### Metrics Collected
 
 The provider analyzes Git history to calculate:
 
 - **Change frequency**: Commits per month (recent activity indicator)
-- **Bug density**: Ratio of bug fix commits to total commits
+- **Fix-labelled commit ratio**: Share of observed commits matching the fix-message heuristic; the JSON field remains `bug_density`
 - **Age**: Days since first commit (maturity indicator)
 - **Author count**: Number of unique contributors (complexity indicator)
 - **Total commits**: Total number of commits to the file
 - **Last modified**: Timestamp of the most recent commit
-- **Stability score**: Weighted combination of churn, bug fixes, and age (0.0-1.0)
+- **Stability classification**: Heuristic label from change frequency, fix-labelled ratio, and age
 
 **What it analyzes:**
 - Commit frequency per file/function
@@ -242,49 +242,29 @@ The provider analyzes Git history to calculate:
 - Code churn (lines added/removed)
 - Recent activity
 
-### Risk Classification
+### Sample-aware Scoring Model
 
-The table below shows approximate contribution thresholds for understanding risk levels:
+The historical contribution is reduced toward neutral when few modifications have been observed (`src/risk/context/git_history/stability.rs`):
 
-| Category | Conditions | Contribution | Explanation |
-|----------|------------|--------------|-------------|
-| Very unstable | freq > 5.0 AND bug_density > 0.3 | 2.0 | High churn with many bug fixes |
-| Moderately unstable | freq > 2.0 OR bug_density > 0.2 | 1.0 | Frequent changes or bug-prone |
-| Slightly unstable | freq > 1.0 OR bug_density > 0.1 | 0.5 | Some instability |
-| Stable | freq ≤ 1.0 AND bug_density ≤ 0.1 | 0.1 | Low change rate, few bugs |
-
-#### Continuous Scoring Model
-
-The actual implementation uses a **continuous scoring formula** rather than discrete thresholds. This provides more accurate differentiation between risk levels (from `src/risk/context/git_history.rs:495`):
-
-```rust
-contribution = (bug_density * 1.5) + min(change_frequency / 20.0, 0.5)
+```text
+raw_contribution = min(1.5 * fix_labelled_ratio + min(changes_per_month / 20, 0.5), 2)
+confidence = observed_commits / (observed_commits + 5)
+history_contribution = raw_contribution * confidence
+history_only_multiplier = 1 + history_contribution
 ```
 
-**Scoring breakdown:**
+Five prior-equivalent observations are an explicit ranking policy, not a fitted statistical estimate. With no observations, history contributes zero. One observation gets 1/6 weight, five get 1/2 weight, and larger samples approach the original contribution. The contribution remains capped at 2.0. Other context providers can also contribute to the final multiplier.
 
-- **Bug density** (primary signal): Scales linearly from 0.0 to 1.5
-  - 0% bugs → 0.0 contribution
-  - 50% bugs → 0.75 contribution
-  - 100% bugs → 1.5 contribution
+For function history, both the ratio and confidence use modifications **after introduction**. The displayed total commit count includes introduction. File fallback uses all observed commits touching the file. Output retains the recorded ratio and labelled count instead of guessing its denominator from the displayed total.
 
-- **Change frequency** (secondary signal): Scales from 0.0 to 0.5, saturates at 10/month
-  - 0/month → 0.0
-  - 5/month → 0.25
-  - 10+/month → 0.5 (capped)
+| Observed modifications | Frequency | Fix-labelled ratio | Confidence | History-only multiplier |
+|------------------------|-----------|--------------------|------------|-------------------------|
+| 0 | 0/month | 0% | 0 | 1.00x |
+| 1 | 4.2/month | 100% | 1/6 | 1.285x |
+| 5 | 4.2/month | 100% | 1/2 | 1.855x |
+| 995 | 4.2/month | 100% | 0.995 | 2.70145x |
 
-- **Total** is capped at 2.0 to prevent excessive score amplification
-- Stable code with no bugs and no changes contributes 0.0 (no risk increase)
-
-**Example calculations:**
-
-| Scenario | Frequency | Bug Density | Contribution |
-|----------|-----------|-------------|--------------|
-| Stable code | 0.0/month | 0% | 0.0 |
-| Low activity, some bugs | 2.0/month | 25% | 0.475 |
-| High churn, no bugs | 10.0/month | 0% | 0.5 |
-| Bug-prone | 0.5/month | 100% | 1.525 |
-| Critical hotspot | 10.0/month | 50% | 1.25 |
+The 100% ratio in the one-modification example means one observed modification had a matching message. It is not evidence that every line is defective, or that the function has the same evidence strength as 995 labelled modifications.
 
 ### Bug Fix Detection
 
@@ -331,63 +311,23 @@ To further reduce false positives, commits are filtered out if they match non-bu
 | `chore: fix linting issues` | ❌ No | Excluded: conventional commit type "chore:" |
 | `update: add fixture for testing` | ❌ No | "fixture" contains "fix" but not as word boundary |
 
-**Bug Density Calculation:**
+**Fix-labelled Commit Ratio:**
 
 ```
 bug_density = bug_fix_count / total_commits
 ```
 
-For example, if a file has 10 total commits and 3 are genuine bug fixes (after exclusion filtering):
-- Bug density = 3/10 = 0.30 (30%)
+For example, if a file has 10 observed commits and 3 messages match the heuristic after exclusion filtering, its ratio is 3/10 = 0.30 (30%).
 
-A file with 100% bug density means every commit to that file was a bug fix, which is a strong signal that the code is problematic.
+A 100% ratio means every sampled commit matched the message heuristic. Validate the changes themselves before treating those labels as defect evidence.
 
-### Research Background: The Bug Magnet Hypothesis
+### Interpreting History Signals
 
-The use of git history for risk assessment is backed by extensive empirical research in software engineering. The core theory, often called the **"Bug Magnet Hypothesis"**, states that **code with a history of bugs is significantly more likely to contain future bugs**.
-
-#### Empirical Evidence
-
-Multiple large-scale studies have validated this approach:
-
-- **Microsoft Study (Nagappan & Ball, 2005)**: Analyzed Windows Server 2003 and found that modules with prior bugs were **4-16 times more likely** to have future bugs than modules without bug history.
-
-- **Mozilla Study (Hassan, 2009)**: Found that bug prediction models based on change history achieved **73% accuracy** in identifying future buggy files.
-
-- **Linux Kernel Study (Kim et al., 2007)**: Showed that files with bug fixes in their recent history had a significantly higher probability of containing latent defects.
-
-#### Why Past Bugs Predict Future Bugs
-
-There are four key mechanisms that explain this phenomenon:
-
-1. **Inherent Complexity**: Code that attracted bugs in the past is often more complex, making it harder to fix correctly and more prone to regression.
-
-2. **Incomplete Understanding**: If developers repeatedly introduce bugs in the same area, it suggests the code is difficult to understand or has subtle edge cases.
-
-3. **Technical Debt Accumulation**: Bug fixes under time pressure often introduce workarounds rather than proper solutions, creating technical debt that leads to more bugs.
-
-4. **Broken Window Effect**: Once code develops a reputation for being buggy, it may receive less careful maintenance, perpetuating the cycle.
-
-#### Interpreting Bug Density Scores
-
-| Bug Density | Interpretation | Action |
-|-------------|----------------|--------|
-| 0% - 10% | Healthy | Typical for stable, well-tested code |
-| 10% - 30% | Moderate concern | Consider adding tests or documentation |
-| 30% - 50% | High risk | Strong candidate for refactoring |
-| 50% - 100% | Critical | Almost certainly needs redesign or major refactoring |
-
-**Example from real output:**
-```
-├─ GIT HISTORY: 2.0 changes/month, 100.0% bugs, 30 days old, 1 authors
-│  └─ Risk Impact: base_risk=39.7 → contextual_risk=88.9 (2.2x multiplier)
-```
-
-This shows a file where **every single commit** was a bug fix (100% bug density), resulting in a 2.2x risk multiplier. This is a critical red flag indicating code that needs immediate attention.
+Use the ratio together with sample size, change frequency, coverage, and the actual commit diffs. A high ratio can justify inspection; it does not establish that redesign is necessary. A zero ratio can reflect message conventions or missing history and does not establish correctness. The scoring coefficients and confidence policy have not been calibrated as defect probabilities.
 
 #### Limitations and False Positives
 
-The improved detection methodology with word boundary matching and exclusion filters significantly reduces false positives, but some limitations remain:
+Word boundary matching and exclusion filters reject several known message patterns, but they do not validate the underlying changes:
 
 **Reduced Issues** (handled by word boundaries and exclusion filters):
 - ✅ **Substring matches**: Word boundary matching (`\bfix\b`) now correctly excludes "prefix", "fixture", "suffix", and "debugging"
@@ -400,40 +340,20 @@ The improved detection methodology with word boundary matching and exclusion fil
   - Underreporting: Some bug fixes may not be mentioned in commit messages
   - Example: A commit "Update authentication logic" that actually fixes a bug won't be detected
 - **New code**: Cannot assess code without commit history
-  - Files with <5 commits may not have enough data for reliable bug density calculation
+  - Small samples receive less scoring weight even when the raw labelled ratio is high
 - **Language barriers**: Non-English commit messages may use different bug-fix keywords
 - **Informal commits**: Internal repos may use different conventions (e.g., ticket IDs only)
 
-**Accuracy Improvements:**
+No repository-scale false-positive rate or defect-prediction accuracy is claimed for this heuristic.
 
-Before word boundary matching and exclusion filters:
-- False positive rate: ~15-25% (substring matches, style commits, etc.)
-
-After improvements:
-- False positive rate: ~5-10% (primarily commit message quality issues)
-- Precision: Significantly improved, particularly for conventional commit style repositories
-
-**Recommended practice**: Use git history as one signal among many. Combine it with complexity metrics, test coverage, and dependency analysis for a complete risk picture. The bug density metric is most reliable when:
+**Recommended practice**: Use git history as one signal among many. Interpret labelled ratios in the context of:
 - Repository uses consistent commit message conventions
-- Files have at least 10+ commits in their history
+- The number of observed modifications
 - Development team follows English-based conventional commit style
-
-### Stability Score
-
-Stability is calculated using weighted factors:
-
-```rust
-stability = (churn_factor × 0.4) + (bug_factor × 0.4) + (age_factor × 0.2)
-
-where:
-  churn_factor = 1.0 / (1.0 + monthly_churn)
-  bug_factor = 1.0 - (bug_fixes / total_commits)
-  age_factor = min(1.0, age_days / 365.0)
-```
 
 ### Stability Status Classifications
 
-The provider internally classifies files into stability statuses based on the calculated metrics:
+Legacy internal and JSON stability labels use the following thresholds. These labels are history summaries, not validated defect classifications; the contribution uses the separate sample-aware formula above.
 
 | Status | Criteria | Explanation |
 |--------|----------|-------------|

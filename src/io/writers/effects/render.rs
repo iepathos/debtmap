@@ -103,6 +103,7 @@ mod tests {
         }];
 
         let metrics = vec![FunctionMetrics {
+            column: None,
             name: "test_func".to_string(),
             file: PathBuf::from("test.rs"),
             line: 10,

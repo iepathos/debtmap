@@ -534,6 +534,7 @@ contract C {
 "#;
         let ast = parse_source(source, Path::new("Internal.sol")).expect("parse");
         let function = FunctionMetrics {
+            column: None,
             name: "C.hidden".to_string(),
             file: ast.path.clone(),
             line: 3,

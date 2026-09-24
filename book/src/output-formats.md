@@ -753,9 +753,12 @@ Indicates whether a function is pure and reasons for any impurity:
 ```
 
 **Purity Assessment:**
-- **Is Pure:** Boolean indicating if the function is pure (deterministic, no side effects)
-- **Confidence Level:** Percentage confidence in the assessment (0-100%)
-- **Impurity Reasons:** Specific reasons why the function is not pure
+- **Is Pure:** Compatibility boolean; only complete `StrictlyPure` evidence maps to true
+- **Confidence Level:** Supporting confidence, never a replacement for complete evidence
+- **Observed Effects:** Effects established by supported analysis or a reviewed model
+- **Unresolved Behavior:** Calls, receivers, callbacks, syntax, or bodies the analysis could not establish
+
+Human output reports unknown purity when evidence is incomplete. Existing JSON schemas do not add an `Unknown` enum value: optional purity fields are omitted instead. Older reports remain readable, but their legacy labels do not create effect provenance.
 
 **Common Impurity Reasons:**
 - Mutates shared or global state

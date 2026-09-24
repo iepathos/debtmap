@@ -58,6 +58,7 @@ fn create_test_git_repo() -> TempDir {
 fn create_test_metrics(count: usize) -> Vec<FunctionMetrics> {
     (0..count)
         .map(|i| FunctionMetrics {
+            column: None,
             name: format!("function_{}", i),
             file: PathBuf::from("test.rs"),
             line: i * 10,

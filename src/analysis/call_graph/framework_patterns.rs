@@ -138,6 +138,24 @@ impl FrameworkPatternDetector {
         Ok(())
     }
 
+    pub(crate) fn canonicalize_definitions(
+        &mut self,
+        graph: &crate::priority::call_graph::CallGraph,
+    ) {
+        use super::trait_registry::identity::{canonical_id, definition_locations};
+        let locations = definition_locations(graph);
+        self.function_to_patterns.clear();
+        for pattern in &mut self.detected_patterns {
+            if let Some(id) = &mut pattern.function_id {
+                *id = canonical_id(id, &locations);
+                self.function_to_patterns
+                    .entry(id.clone())
+                    .or_default()
+                    .push(pattern.pattern_type.clone());
+            }
+        }
+    }
+
     /// Get all detected patterns
     pub fn get_detected_patterns(&self) -> Vector<FrameworkPattern> {
         self.detected_patterns.clone()
@@ -226,6 +244,13 @@ impl FrameworkPatternDetector {
 
     /// Mark a function as a Visit trait implementation
     pub fn add_visit_trait_function(&mut self, func_id: FunctionId) {
+        if self
+            .function_to_patterns
+            .get(&func_id)
+            .is_some_and(|patterns| patterns.contains(&PatternType::VisitTrait))
+        {
+            return;
+        }
         let pattern = FrameworkPattern {
             pattern_type: PatternType::VisitTrait,
             function_id: Some(func_id.clone()),
@@ -286,7 +311,8 @@ impl PatternVisitor {
         let func_name = func.sig.ident.to_string();
         let line = self.get_line_number(func.sig.ident.span());
 
-        let func_id = FunctionId::new(self.file_path.clone(), func_name.clone(), line);
+        let func_id = FunctionId::new(self.file_path.clone(), func_name.clone(), line)
+            .with_column(Some(func.sig.ident.span().start().column));
 
         // Check for visitor pattern methods by name
         if FrameworkPatternDetector::is_visitor_pattern_method(&func_name) {

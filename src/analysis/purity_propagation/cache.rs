@@ -1,7 +1,7 @@
 //! Persistent Caching for Purity Propagation Results
 //!
 //! This module provides persistent caching of purity propagation results to avoid
-//! re-analysis on subsequent runs. The cache uses xxHash64 for fast content hashing
+//! re-analysis on subsequent runs. It uses deterministic dependency fingerprints
 //! and postcard for efficient serialization.
 
 use crate::priority::call_graph::FunctionId;
@@ -12,14 +12,26 @@ use std::path::Path;
 
 use super::PurityResult;
 
-const CACHE_VERSION: u32 = 1;
+const CACHE_MAGIC: &[u8; 8] = b"DMPURTY\0";
+const CACHE_VERSION: u32 = 2;
 const CACHE_FILE: &str = ".debtmap/purity_cache.postcard";
+
+/// Version of the semantic model represented by dependency assessment hashes.
+///
+/// This is intentionally independent from the binary cache format version. A
+/// model change must invalidate callers even when their dependency identities
+/// and the cache encoding itself are unchanged.
+pub const PURITY_MODEL_VERSION: u32 = 1;
+const PURITY_MODEL_NAMESPACE: &str = "rust-effect-evidence";
 
 /// Persistent cache for purity propagation results
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PurityCache {
     /// Schema version for migration compatibility
     version: u32,
+
+    /// Semantic analysis version for invalidating otherwise compatible entries.
+    model_version: u32,
 
     /// Cached purity results indexed by function ID
     entries: HashMap<FunctionId, CachedPurity>,
@@ -34,7 +46,7 @@ struct CachedPurity {
     /// xxHash64 of function source code
     source_hash: u64,
 
-    /// xxHash64 of sorted dependency IDs
+    /// Deterministic hash of dependency identities and assessment summaries
     deps_hash: u64,
 
     /// File modification time (seconds since epoch)
@@ -46,6 +58,7 @@ impl PurityCache {
     pub fn new() -> Self {
         Self {
             version: CACHE_VERSION,
+            model_version: PURITY_MODEL_VERSION,
             entries: HashMap::new(),
         }
     }
@@ -59,15 +72,10 @@ impl PurityCache {
         }
 
         let bytes = std::fs::read(&cache_path)?;
-        let cache: PurityCache = postcard::from_bytes(&bytes)?;
-
-        // Validate version
-        if cache.version != CACHE_VERSION {
-            eprintln!("Cache version mismatch, rebuilding cache");
-            return Ok(Self::new());
-        }
-
-        Ok(cache)
+        Ok(Self::decode_current(&bytes).unwrap_or_else(|| {
+            eprintln!("Purity cache is obsolete or corrupt; rebuilding cache");
+            Self::new()
+        }))
     }
 
     /// Save cache to disk
@@ -75,7 +83,7 @@ impl PurityCache {
         let cache_path = project_root.join(CACHE_FILE);
         std::fs::create_dir_all(cache_path.parent().unwrap())?;
 
-        let bytes = postcard::to_allocvec(self)?;
+        let bytes = self.encode_current()?;
         std::fs::write(&cache_path, bytes)?;
 
         Ok(())
@@ -149,6 +157,30 @@ impl PurityCache {
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
+
+    fn encode_current(&self) -> std::result::Result<Vec<u8>, postcard::Error> {
+        let payload = postcard::to_allocvec(self)?;
+        let mut bytes = Vec::with_capacity(CACHE_MAGIC.len() + 4 + payload.len());
+        bytes.extend_from_slice(CACHE_MAGIC);
+        bytes.extend_from_slice(&CACHE_VERSION.to_le_bytes());
+        bytes.extend(payload);
+        Ok(bytes)
+    }
+
+    fn decode_current(bytes: &[u8]) -> Option<Self> {
+        let payload = current_payload(bytes)?;
+        let cache: Self = postcard::from_bytes(payload).ok()?;
+        (cache.version == CACHE_VERSION && cache.model_version == PURITY_MODEL_VERSION)
+            .then_some(cache)
+    }
+}
+
+fn current_payload(bytes: &[u8]) -> Option<&[u8]> {
+    let version_start = CACHE_MAGIC.len();
+    let payload_start = version_start + std::mem::size_of::<u32>();
+    (bytes.get(..version_start)? == CACHE_MAGIC).then_some(())?;
+    let version = u32::from_le_bytes(bytes.get(version_start..payload_start)?.try_into().ok()?);
+    (version == CACHE_VERSION).then(|| &bytes[payload_start..])
 }
 
 impl Default for PurityCache {
@@ -157,7 +189,7 @@ impl Default for PurityCache {
     }
 }
 
-/// Hash a string using xxHash64
+/// Hash a string for cache invalidation.
 #[allow(dead_code)]
 pub fn hash_string(s: &str) -> u64 {
     // For now, use a simple hash
@@ -173,21 +205,27 @@ pub fn hash_string(s: &str) -> u64 {
 /// Hash a list of function IDs for dependency tracking
 #[allow(dead_code)]
 pub fn hash_deps(deps: &[FunctionId]) -> u64 {
-    let mut sorted_deps = deps.to_vec();
-    sorted_deps.sort_by(|a, b| {
-        a.file
-            .cmp(&b.file)
-            .then(a.name.cmp(&b.name))
-            .then(a.line.cmp(&b.line))
-    });
+    let dependencies = deps.iter().cloned().map(|id| (id, 0)).collect::<Vec<_>>();
+    hash_deps_with_assessments(&dependencies, PURITY_MODEL_VERSION)
+}
 
-    let deps_string = sorted_deps
-        .iter()
-        .map(|id| format!("{}:{}:{}", id.file.display(), id.name, id.line))
-        .collect::<Vec<_>>()
-        .join("|");
+/// Hash exact dependency identities and their normalized assessment summaries.
+///
+/// The assessment hash is supplied by the evidence model so a change in a
+/// callee's effects or uncertainty invalidates its callers. Ordering does not
+/// affect the result, while columns, module paths, assessment changes, and model
+/// version changes do.
+pub fn hash_deps_with_assessments(dependencies: &[(FunctionId, u64)], model_version: u32) -> u64 {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
 
-    hash_string(&deps_string)
+    let mut sorted = dependencies.to_vec();
+    sorted.sort_by(|left, right| left.0.cmp(&right.0).then(left.1.cmp(&right.1)));
+    let mut hasher = DefaultHasher::new();
+    PURITY_MODEL_NAMESPACE.hash(&mut hasher);
+    model_version.hash(&mut hasher);
+    sorted.hash(&mut hasher);
+    hasher.finish()
 }
 
 /// Get file modification time in seconds since epoch
@@ -202,13 +240,43 @@ pub fn get_mtime(file_path: &Path) -> Result<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::analysis::purity_analysis::PurityLevel;
     use std::path::PathBuf;
+
+    fn id(name: &str, column: usize, module: &str) -> FunctionId {
+        FunctionId::with_module_path(
+            PathBuf::from("src/lib.rs"),
+            name.to_string(),
+            10,
+            module.to_string(),
+        )
+        .with_column(Some(column))
+    }
+
+    fn result() -> PurityResult {
+        PurityResult {
+            level: PurityLevel::ReadOnly,
+            confidence: 0.8,
+            reason: super::super::PurityReason::Intrinsic,
+            assessment: crate::analysis::effect_evidence::EffectAssessment::unknown(
+                crate::analysis::effect_evidence::UnresolvedReason::LegacyEvidence,
+                "cache test",
+            ),
+        }
+    }
+
+    fn write_cache_bytes(root: &Path, bytes: &[u8]) {
+        let path = root.join(CACHE_FILE);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, bytes).unwrap();
+    }
 
     #[test]
     fn test_cache_new() {
         let cache = PurityCache::new();
         assert!(cache.is_empty());
         assert_eq!(cache.version, CACHE_VERSION);
+        assert_eq!(cache.model_version, PURITY_MODEL_VERSION);
     }
 
     #[test]
@@ -221,5 +289,88 @@ mod tests {
 
         // Hash should be same regardless of order
         assert_eq!(hash_deps(&deps1), hash_deps(&deps2));
+    }
+
+    #[test]
+    fn dependency_assessment_hash_is_order_independent() {
+        let left = id("left", 3, "one");
+        let right = id("right", 8, "two");
+        let first = vec![(left.clone(), 11), (right.clone(), 22)];
+        let second = vec![(right, 22), (left, 11)];
+        assert_eq!(
+            hash_deps_with_assessments(&first, PURITY_MODEL_VERSION),
+            hash_deps_with_assessments(&second, PURITY_MODEL_VERSION)
+        );
+    }
+
+    #[test]
+    fn dependency_hash_includes_exact_identity_assessment_and_model() {
+        let base = vec![(id("work", 3, "one"), 11)];
+        for changed in [
+            vec![(id("work", 4, "one"), 11)],
+            vec![(id("work", 3, "two"), 11)],
+            vec![(id("work", 3, "one"), 12)],
+        ] {
+            assert_ne!(
+                hash_deps_with_assessments(&base, PURITY_MODEL_VERSION),
+                hash_deps_with_assessments(&changed, PURITY_MODEL_VERSION)
+            );
+        }
+        assert_ne!(
+            hash_deps_with_assessments(&base, PURITY_MODEL_VERSION),
+            hash_deps_with_assessments(&base, PURITY_MODEL_VERSION + 1)
+        );
+    }
+
+    #[test]
+    fn current_cache_round_trips_through_postcard_envelope() {
+        let root = tempfile::tempdir().unwrap();
+        let function = id("work", 3, "module");
+        let mut cache = PurityCache::new();
+        cache.insert(function.clone(), result(), 1, 2, 3);
+        cache.save(root.path()).unwrap();
+
+        let restored = PurityCache::load(root.path()).unwrap();
+        let restored_result = restored.get(&function).unwrap();
+        assert_eq!(restored.len(), 1);
+        assert_eq!(restored_result.level, PurityLevel::ReadOnly);
+        assert_eq!(restored_result.confidence, 0.8);
+    }
+
+    #[test]
+    fn obsolete_header_rebuilds_without_decoding_payload() {
+        let root = tempfile::tempdir().unwrap();
+        let mut bytes = CACHE_MAGIC.to_vec();
+        bytes.extend_from_slice(&(CACHE_VERSION - 1).to_le_bytes());
+        bytes.extend_from_slice(b"not postcard");
+        write_cache_bytes(root.path(), &bytes);
+        assert!(PurityCache::load(root.path()).unwrap().is_empty());
+    }
+
+    #[test]
+    fn obsolete_model_rebuilds_even_with_current_binary_format() {
+        let root = tempfile::tempdir().unwrap();
+        let mut cache = PurityCache::new();
+        cache.model_version += 1;
+        write_cache_bytes(root.path(), &cache.encode_current().unwrap());
+        assert!(PurityCache::load(root.path()).unwrap().is_empty());
+    }
+
+    #[test]
+    fn legacy_unframed_payload_rebuilds_without_new_format_decode() {
+        let root = tempfile::tempdir().unwrap();
+        let bytes = postcard::to_allocvec(&PurityCache::new()).unwrap();
+        write_cache_bytes(root.path(), &bytes);
+        assert!(PurityCache::load(root.path()).unwrap().is_empty());
+    }
+
+    #[test]
+    fn corrupt_current_payload_rebuilds_safely() {
+        let root = tempfile::tempdir().unwrap();
+        let mut bytes = CACHE_MAGIC.to_vec();
+        bytes.extend_from_slice(&CACHE_VERSION.to_le_bytes());
+        bytes.extend_from_slice(b"not postcard");
+        write_cache_bytes(root.path(), &bytes);
+        assert!(PurityCache::load(root.path()).unwrap().is_empty());
     }
 }

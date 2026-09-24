@@ -188,6 +188,7 @@ fn test_pattern_matching_for_different_languages() {
 
     // Create test function metrics for different languages
     let rust_func = FunctionMetrics {
+        column: None,
         name: "test_rust".to_string(),
         file: PathBuf::from("test.rs"),
         line: 10,
@@ -218,6 +219,7 @@ fn test_pattern_matching_for_different_languages() {
     };
 
     let python_func = FunctionMetrics {
+        column: None,
         name: "test_python".to_string(),
         file: PathBuf::from("test.py"),
         line: 10,
@@ -248,6 +250,7 @@ fn test_pattern_matching_for_different_languages() {
     };
 
     let js_func = FunctionMetrics {
+        column: None,
         name: "testJavaScript".to_string(),
         file: PathBuf::from("test.js"),
         line: 10,

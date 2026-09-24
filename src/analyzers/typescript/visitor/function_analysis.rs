@@ -147,7 +147,7 @@ fn analyze_function_declaration(
     metrics.cognitive = calculate_cognitive_complexity(&body, &ast.source);
     metrics.nesting = calculate_nesting_depth(&body);
     metrics.nested_functions = summarize_nested_functions(&body, &ast.source);
-    metrics.length = count_function_lines(&body, &ast.source);
+    metrics.length = count_function_lines(node, &ast.source);
     metrics.is_async = is_async;
     metrics.is_test = is_test_function(&name);
     metrics.parameter_count = count_parameters(node);
@@ -185,7 +185,7 @@ fn analyze_generator_function(node: &Node, ast: &TypeScriptAst) -> Option<JsFunc
     metrics.cognitive = calculate_cognitive_complexity(&body, &ast.source);
     metrics.nesting = calculate_nesting_depth(&body);
     metrics.nested_functions = summarize_nested_functions(&body, &ast.source);
-    metrics.length = count_function_lines(&body, &ast.source);
+    metrics.length = count_function_lines(node, &ast.source);
     metrics.is_async = is_async;
     metrics.is_test = is_test_function(&name);
     metrics.parameter_count = count_parameters(node);
@@ -228,7 +228,7 @@ fn analyze_arrow_function(
     metrics.cognitive = calculate_cognitive_complexity(&body_node, &ast.source);
     metrics.nesting = calculate_nesting_depth(&body_node);
     metrics.nested_functions = summarize_nested_functions(&body_node, &ast.source);
-    metrics.length = count_function_lines(&body_node, &ast.source);
+    metrics.length = count_function_lines(node, &ast.source);
     metrics.is_async = has_async_modifier(node);
     metrics.is_test = is_test_function(&func_name);
     metrics.is_exported = is_exported;
@@ -276,7 +276,7 @@ fn analyze_method_definition(
         metrics.cognitive = calculate_cognitive_complexity(&body, &ast.source);
         metrics.nesting = calculate_nesting_depth(&body);
         metrics.nested_functions = summarize_nested_functions(&body, &ast.source);
-        metrics.length = count_function_lines(&body, &ast.source);
+        metrics.length = count_function_lines(node, &ast.source);
         metrics.entropy_score = Some(calculate_entropy(
             &body,
             &ast.source,
@@ -361,7 +361,7 @@ fn analyze_function_expression(
     metrics.cognitive = calculate_cognitive_complexity(&body, &ast.source);
     metrics.nesting = calculate_nesting_depth(&body);
     metrics.nested_functions = summarize_nested_functions(&body, &ast.source);
-    metrics.length = count_function_lines(&body, &ast.source);
+    metrics.length = count_function_lines(node, &ast.source);
     metrics.is_async = is_async;
     metrics.is_test = is_test_function(&func_name);
     metrics.parameter_count = count_parameters(node);

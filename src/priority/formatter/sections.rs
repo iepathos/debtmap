@@ -122,17 +122,17 @@ fn format_complexity_section(context: &FormatContext) -> Option<String> {
     }
 
     if let Some(ref entropy) = context.complexity_info.entropy_analysis {
-        // Show raw → adjusted for clarity (spec 183)
+        // Entropy adjusts cognitive complexity, not the structural path count.
         Some(format!(
-            "{} cyclomatic={} → {} (entropy-adjusted, factor: {:.2}), est_branches={}, cognitive={}, nesting={}, entropy={:.2}",
+            "{} cyclomatic={}, est_branches={}, cognitive={} → {} (entropy-adjusted, factor: {:.2}), nesting={}, entropy={:.2}",
             "├─ COMPLEXITY:".bright_blue(),
             format!("{}", context.complexity_info.cyclomatic).yellow(),
+            format!("{}", context.complexity_info.branch_count).yellow(),
+            format!("{}", context.complexity_info.cognitive).yellow(),
             format!("{}", entropy.adjusted_complexity)
                 .bright_green()
                 .bold(),
             entropy.dampening_factor,
-            format!("{}", context.complexity_info.branch_count).yellow(),
-            format!("{}", context.complexity_info.cognitive).yellow(),
             format!("{}", context.complexity_info.nesting).yellow(),
             entropy.entropy_score
         ))

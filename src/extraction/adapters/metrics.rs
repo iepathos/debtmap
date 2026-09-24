@@ -33,6 +33,7 @@ pub fn to_function_metrics(file_path: &Path, extracted: &ExtractedFunctionData) 
         name: metric_function_name(file_path, extracted),
         file: file_path.to_path_buf(),
         line: extracted.line,
+        column: extracted.column,
         cyclomatic: extracted.cyclomatic,
         cognitive: extracted.cognitive,
         nesting: extracted.nesting,
@@ -69,7 +70,7 @@ pub fn to_function_metrics(file_path: &Path, extracted: &ExtractedFunctionData) 
 
 fn metric_function_name(file_path: &Path, extracted: &ExtractedFunctionData) -> String {
     match Language::from_path(file_path) {
-        Language::Python => extracted.qualified_name.clone(),
+        Language::Python | Language::Rust => extracted.qualified_name.clone(),
         _ => extracted.name.clone(),
     }
 }
@@ -367,6 +368,7 @@ mod tests {
 
     fn create_test_function(name: &str, line: usize, cyclomatic: u32) -> ExtractedFunctionData {
         ExtractedFunctionData {
+            column: None,
             name: name.to_string(),
             qualified_name: name.to_string(),
             line,
@@ -394,6 +396,7 @@ mod tests {
     fn create_test_file_data() -> ExtractedFileData {
         ExtractedFileData {
             path: PathBuf::from("src/test.rs"),
+            rust_source: None,
             functions: vec![
                 create_test_function("foo", 1, 5),
                 create_test_function("bar", 20, 3),
@@ -410,6 +413,7 @@ mod tests {
     fn create_python_test_file_data() -> ExtractedFileData {
         ExtractedFileData {
             path: PathBuf::from("src/test.py"),
+            rust_source: None,
             functions: vec![
                 create_test_function("foo", 1, 5),
                 create_test_function("bar", 20, 3),

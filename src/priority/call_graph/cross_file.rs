@@ -205,12 +205,19 @@ impl CallGraph {
             .or_default()
             .insert(original_call.caller.clone());
 
-        // Update the edge
-        for edge in self.edges.iter_mut() {
-            if edge.caller == original_call.caller && edge.callee == original_call.callee {
-                edge.callee = resolved_callee.clone();
-                break;
-            }
+        self.edge_set.remove(original_call);
+        for edge in self.edges.iter_mut().filter(|edge| *edge == original_call) {
+            edge.callee = resolved_callee.clone();
+            self.edge_set.insert(edge.clone());
+        }
+        for evidence in self
+            .edge_evidence
+            .iter_mut()
+            .filter(|e| &e.call == original_call)
+        {
+            self.evidence_set.remove(evidence);
+            evidence.call.callee = resolved_callee.clone();
+            self.evidence_set.insert(evidence.clone());
         }
     }
 
@@ -310,6 +317,7 @@ impl CallGraph {
             self.apply_call_resolution(&original_call, &resolved_callee);
         }
 
+        self.deduplicate_resolved_records();
         progress.finish_with_message(format!(
             "Resolved cross-file calls: {}/{}",
             processed_counter.load(Ordering::Relaxed),
@@ -340,6 +348,14 @@ impl CallGraph {
                 self.apply_call_resolution(&call, &resolved_callee);
             }
         }
+        self.deduplicate_resolved_records();
+    }
+
+    fn deduplicate_resolved_records(&mut self) {
+        self.edges.sort();
+        self.edges.dedup();
+        self.edge_evidence.sort();
+        self.edge_evidence.dedup();
     }
 }
 
@@ -373,6 +389,7 @@ mod tests {
                 i * 10,
             );
             let callee = FunctionId {
+                column: None,
                 file: PathBuf::from("unknown.rs"),
                 name: format!("function_{}", i + 1),
                 line: 0, // Unresolved
@@ -641,6 +658,7 @@ mod tests {
                 (i % 10) * 10,
             );
             let callee = FunctionId {
+                column: None,
                 file: PathBuf::from("unknown.rs"),
                 name: format!("function_{}_{}", (i + 1) % 100, (i + 1) % 10),
                 line: 0,

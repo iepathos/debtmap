@@ -30,3 +30,5 @@ pub use effect_pipeline::{
     analyze_file_effect, analyze_file_with_coverage_effect, analyze_files, analyze_files_effect,
     analyze_files_parallel_effect,
 };
+
+pub(crate) mod rust_workspace;

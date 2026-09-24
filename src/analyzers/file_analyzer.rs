@@ -469,7 +469,12 @@ impl UnifiedFileAnalyzer {
                     .iter()
                     .filter(|f| {
                         coverage
-                            .get_function_coverage(&f.file, &f.name)
+                            .get_function_coverage_with_bounds(
+                                &f.file,
+                                &f.name,
+                                f.line,
+                                f.line.saturating_add(f.length.saturating_sub(1)),
+                            )
                             .map(|c| c > 0.0)
                             .unwrap_or(false)
                     })
@@ -608,6 +613,7 @@ mod tests {
 
     fn create_test_function_metrics(name: &str, cyclomatic: u32, length: usize) -> FunctionMetrics {
         FunctionMetrics {
+            column: None,
             name: name.to_string(),
             file: PathBuf::from("test.rs"),
             line: 1,
@@ -732,6 +738,25 @@ mod tests {
 
         let metrics = analyzer.calculate_coverage_metrics(&functions, 2);
         assert_eq!(metrics.coverage_percent, 0.0);
+    }
+
+    #[test]
+    fn file_coverage_uses_exact_bounds_with_line_only_records() {
+        use std::io::Write;
+        let mut file = tempfile::NamedTempFile::new().unwrap();
+        write!(
+            file,
+            "SF:test.rs\nDA:10,0\nDA:11,0\nDA:20,1\nDA:21,1\nend_of_record\n"
+        )
+        .unwrap();
+        let coverage = crate::risk::lcov::parse_lcov_file(file.path()).unwrap();
+        let analyzer = UnifiedFileAnalyzer::new(Some(coverage));
+        let mut uncovered = create_test_function_metrics("same_name", 1, 2);
+        uncovered.line = 10;
+        let mut covered = uncovered.clone();
+        covered.line = 20;
+        let metrics = analyzer.calculate_coverage_metrics(&[uncovered, covered], 2);
+        assert_eq!(metrics.coverage_percent, 0.5);
     }
 
     #[test]

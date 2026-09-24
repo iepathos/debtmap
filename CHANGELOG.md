@@ -7,6 +7,93 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.1] - 2026-09-24
+
+### Fixed
+
+- **Rust Re-export Resolution** - Stops recursive path expansion when a function is re-exported through a module with the same name, preventing excessive memory use during analysis ([#134](https://github.com/iepathos/debtmap/pull/134), thanks to [HardMax71](https://github.com/HardMax71))
+  - Preserves conditional value imports through same-named modules, retaining alternative call targets as uncertain instead of reporting an incorrect confirmed target
+
+## [0.24.0] - 2026-09-20
+
+### Added
+
+- **Bounded Workspace-Aware Rust Resolution** - Resolve project calls using declaration identities, lexical scopes, and receiver facts
+  - Handles imports and aliases, constructors, condition bindings, value/type namespaces, and supported receiver constraints without overriding shadowed project definitions
+  - Retains unresolved and possible targets as evidence for conservative reachability rather than counting them as confirmed calls
+  - Preserves exact definition identities, including source columns, across direct and cached extraction, graph enhancement, data-flow records, and sequential/parallel analysis
+  - Resolves against complete workspace snapshots while keeping parsing batches bounded
+
+- **Evidence-Based Rust Effect Analysis** - Track observed effects, unresolved behavior, and source provenance separately
+  - Distinguishes callable references and closure construction from supported invocation, including directly bound callbacks and bounded project-wrapper analysis
+  - Adds reviewed standard-library models for selected primitive, string, collection, Option/Result, memory-backed, filesystem, console, environment, time, and socket operations
+  - Propagates full assessments through exact invocation relationships and recursive components without losing local effects or converting possible targets into observed execution
+  - Adds regression matrices, property tests, debug benchmarks, and documentation of supported models and analysis limits
+
+### Changed
+
+- **Conservative Purity Scoring** - Incomplete evidence without confirmed impure effects now yields internal `Unknown` rather than an unsupported purity or impurity claim
+  - Confirmed impure effects remain `Impure` even when additional behavior is unresolved
+  - Unknown assessments receive neutral purity factors; confidence cannot establish completeness or grant a purity discount
+  - Removes operation-count-based `IOIsolated` and `IOMixed` discounts and requires complete evidence for purity-derived `PureLogic` roles
+  - Reports observed effects separately from unresolved behavior instead of fabricating explanations from a classification
+  - Unsupported third-party APIs, macros, implicit dispatch, and callback relationships remain uncertain; no general macro expansion or third-party API modeling is claimed
+
+- **Safe Report Comparisons** - CLI and automated comparisons retain analyzer versions and analysis receipts before judging trends
+  - Rejects incompatible versions, policies, evidence, selections, targets, or analysis modes, and withholds claims when provenance or scope is insufficient
+  - CLI rejection provides reasons without writing or overwriting a comparison report; automated validation returns `non_comparable`
+  - Compatible reports may still differ in source revision, timestamps, and worker execution settings
+
+- **Representative Coverage Collection** - Coverage recipes discover ordinary library, binary, and integration test targets through Cargo with all features
+  - Retains existing ignored tests, isolates coverage collection, and prevents report-only commands from using incomplete collections
+  - Expands targeted Windows/macOS/Linux integration gates for cached resolution, definition identity, namespace handling, and comparison safety
+
+### Fixed
+
+- **Accurate Coverage Attribution** - Uses AST callable bounds and merged executable-line observations, including nested closures and uncovered lines
+  - Aligns Rust and JavaScript/TypeScript callable lengths with their reported source locations, including multiline signatures
+  - Keeps direct execution coverage in reports separate from transitive callee estimates used elsewhere in analysis
+  - Uses the same bounds during scoring, uncovered-line lookup, and coverage propagation; ambiguous identities do not gain speculative attribution
+
+- **Faithful Scoring Explanations** - Captures actual arithmetic, operands, complexity preprocessing, weights, context, and scaling for human reports
+  - Corrects the existing JSON `base_score` value to the actual pre-scaling score rather than a sum of display indicators
+  - Applies complete propagated purity assessments in both orchestration and workflow paths
+  - Counts distinct immediate external graph neighbors, excludes self-recursion from coupling, and removes degree-derived critical-path claims
+  - Tempers sparse Git-history risk with evidence weight while preserving the raw message-labelled fix ratio
+
+- **Resolver And Cache Consistency** - Preserves source queries for uncertain shadowed calls, absolute standard-library aliases, constructor uncertainty, and exact data-flow identity
+  - Migrates legacy identities only when an exact definition can be established
+  - Keeps extraction snapshots owned and serializable; versioned purity caches rebuild obsolete payloads instead of treating legacy labels as new evidence
+
+- **Progress And Terminal Recovery** - Reports function-scoring progress and restores terminal state after editor-launch failures
+- **Documentation Accuracy** - Corrects Rust macro-expansion and Rust-only language-support claims
+- **Commit Validation CI** - Pins `crate-ci/committed` to `v1.1.11` instead of the unavailable `master` reference
+- **Coverage Test Stability** - Fixes an intermittent entropy-formatting assertion failure during parallel `just coverage-lcov` runs
+  - Removes the test's global color override and checks content independently of ANSI styling, with deterministic plain and colored regression cases
+  - Leaves production formatting and scoring unchanged
+
+### Performance
+
+- Indexes repeated workspace lookups and caches completed Git-history misses
+- Documents accepted effect-analysis costs: five warmed debug runs measured +17.9% median runtime and +7.0% peak RSS, with +110.4% macOS peak memory footprint
+  - These measurements compare against the immediate pre-effect commit `8b650ea9`, not the 0.23.0 release; they are not release-build performance claims
+  - Remaining overhead and reproduction details are recorded in [Rust effect analysis](book/src/rust-effect-analysis.md)
+
+### Compatibility And Upgrade Notes
+
+- Public JSON v3/v4 keys and enum values remain unchanged; unknown purity uses existing optional-field omission, and only `StrictlyPure` maps to the historical `is_pure: true`
+- Corrected measurements and more conservative evidence can change scores and rankings; regenerate both comparison baselines with the same analyzer version and settings before interpreting trends
+- Older reports remain readable, but missing receipts or analyzer identity prevent safe comparisons; absent provenance is not reconstructed
+- Public Rust library models gain fields, including source identity and effect assessments, and `PurityReason` gains an `Evidence` variant; downstream struct literals and exhaustive matches may require updates
+- Rebuild obsolete analysis caches from source; compatibility with arbitrary older unversioned binary snapshots is not guaranteed
+
+### Dependencies
+
+- Bumped `crossbeam` from 0.8.4 to 0.8.5
+- Bumped `trybuild` from 1.0.120 to 1.0.121, replacing transitive `target-triple` with `target-tuple` 1.0.2
+- Bumped `taiki-e/install-action` from 2.87.0 to 2.87.14
+- Regenerated the Cargo lockfile for 0.24.0 while retaining the CI-validated dependency versions
+
 ## [0.23.0] - 2026-09-02
 
 ### Added

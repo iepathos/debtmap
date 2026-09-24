@@ -42,7 +42,7 @@ jobs:
         cache-bin: "false"
 
     - name: Install cargo-nextest
-      uses: taiki-e/install-action@v2.87.0
+      uses: taiki-e/install-action@v2.87.14
       with:
         tool: cargo-nextest
 
@@ -53,6 +53,10 @@ jobs:
         cargo nextest run --lib \
           --test analyzer_tests --test complexity_tests --test core_metrics_tests \
           --test debt_tests --test entropy_tests \
+          --test rust_method_resolution_cached \
+          --test data_flow_identity_matrix \
+          --test rust_resolution_namespace_matrix \
+          --test compare_safety_test \
           --status-level fail --final-status-level slow
 
     - name: Configure vendored OpenSSL prerequisites (Windows)
@@ -76,6 +80,10 @@ jobs:
           --test analyzer_tests `
           --test complexity_tests --test core_metrics_tests `
           --test debt_tests --test entropy_tests `
+          --test rust_method_resolution_cached `
+          --test data_flow_identity_matrix `
+          --test rust_resolution_namespace_matrix `
+          --test compare_safety_test `
           --status-level fail --final-status-level slow
 
   integration:
@@ -95,7 +103,7 @@ jobs:
         cache-bin: "false"
 
     - name: Install cargo-nextest
-      uses: taiki-e/install-action@v2.87.0
+      uses: taiki-e/install-action@v2.87.14
       with:
         tool: cargo-nextest
 
@@ -111,7 +119,16 @@ jobs:
           --test cli_output_format_integration_test \
           --test config_contract_integration_test \
           --test json_output_contract_test \
+          --test compare_integration_test \
+          --test compare_safety_test \
           --test parallel_sequential_equivalence_test \
+          --test data_flow_identity_matrix \
+          --test rust_resolution_constraint_matrix \
+          --test rust_resolution_namespace_matrix \
+          --test rust_resolution_matrix_oracles \
+          --test rust_resolution_matrix_invariants \
+          --test rust_resolution_matrix_assertions \
+          --test recursive_dependency_metrics \
           --status-level fail --final-status-level slow
 
     - name: Verify installer contract

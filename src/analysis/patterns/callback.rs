@@ -179,6 +179,7 @@ mod tests {
 
     fn create_test_function(name: &str, line: usize) -> FunctionMetrics {
         FunctionMetrics {
+            column: None,
             name: name.to_string(),
             file: PathBuf::from("test.py"),
             line,

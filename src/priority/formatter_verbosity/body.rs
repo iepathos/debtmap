@@ -43,23 +43,22 @@ fn collect_scoring_factors(
 ) -> Vec<String> {
     let mut factors = vec![];
 
-    // Coverage factor (50% weight in weighted sum model) - only if coverage data available
+    // Coverage description is meaningful only when coverage data is available.
     if let Some(desc) =
         coverage::format_coverage_factor_description(item, weights, has_coverage_data)
     {
         factors.push(desc);
     }
 
-    // Complexity factor (35% weight in weighted sum model)
+    // Summarize observed factors without reconstructing scoring weights.
     if item.unified_score.complexity_factor > 5.0 {
-        factors.push("Complexity (weight: 35%)".to_string());
+        factors.push("Complexity".to_string());
     } else if item.unified_score.complexity_factor > 3.0 {
         factors.push("Moderate complexity".to_string());
     }
 
-    // Dependency factor (15% weight in weighted sum model)
     if item.unified_score.dependency_factor > 5.0 {
-        factors.push("Critical path (weight: 15%)".to_string());
+        factors.push("Caller coupling".to_string());
     }
 
     // Performance specific factors
@@ -365,7 +364,11 @@ mod tests {
         item.unified_score.dependency_factor = 1.0;
 
         let factors = collect_scoring_factors(&item, &weights, true); // has_coverage_data = true
-        assert!(factors.iter().any(|f| f.contains("UNTESTED")));
+        assert!(
+            factors
+                .iter()
+                .any(|f| f.contains("Coverage data unavailable"))
+        );
         assert!(factors.iter().any(|f| f.contains("Moderate complexity")));
 
         // Test with nested loops debt type
@@ -454,6 +457,7 @@ mod tests {
                 contextual_risk_multiplier: None,
                 pre_contextual_score: None,
                 debt_type_multiplier: None,
+                score_trace: Vec::new(),
             },
             function_role: crate::priority::FunctionRole::Unknown,
             recommendation: crate::priority::ActionableRecommendation {
@@ -479,6 +483,7 @@ mod tests {
             upstream_production_callers: vec![],
             upstream_test_callers: vec![],
             production_blast_radius: 0,
+            immediate_neighbor_count: None,
             nesting_depth: 2,
             function_length: 50,
             cyclomatic_complexity: 10,

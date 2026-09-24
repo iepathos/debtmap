@@ -48,6 +48,7 @@ pub fn to_function_metrics(function: &SolidityFunction) -> FunctionMetrics {
     let entropy_analysis = function.entropy_analysis.clone();
 
     FunctionMetrics {
+        column: None,
         name: function.name.clone(),
         file: function.file.clone(),
         line: function.line,

@@ -211,6 +211,7 @@ mod tests {
             complexity: ComplexityMetrics {
                 functions: vec![
                     FunctionMetrics {
+                        column: None,
                         name: "low_complexity".to_string(),
                         file: PathBuf::from("test.rs"),
                         line: 10,
@@ -240,6 +241,7 @@ mod tests {
                         entropy_analysis: None,
                     },
                     FunctionMetrics {
+                        column: None,
                         name: "high_complexity".to_string(),
                         file: PathBuf::from("test.rs"),
                         line: 30,
@@ -433,6 +435,7 @@ mod tests {
     fn test_calculate_total_complexity() {
         let functions = vec![
             FunctionMetrics {
+                column: None,
                 name: "func1".to_string(),
                 file: PathBuf::from("test.rs"),
                 line: 10,
@@ -462,6 +465,7 @@ mod tests {
                 entropy_analysis: None,
             },
             FunctionMetrics {
+                column: None,
                 name: "func2".to_string(),
                 file: PathBuf::from("test.rs"),
                 line: 40,

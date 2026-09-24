@@ -1,4 +1,8 @@
-use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
+use crate::analysis::role_policy::{CodeRoles, RoleEvidence, evidence_from_roles, merge_evidence};
+use crate::priority::call_graph::{
+    CallEdgeEvidence, CallEdgeProvenance, CallGraph, CallType, FunctionCall, FunctionId,
+    UncertainCall,
+};
 use dashmap::{DashMap, DashSet};
 use rayon::prelude::*;
 use std::sync::Arc;
@@ -46,6 +50,8 @@ impl ParallelStats {
 pub struct ParallelCallGraph {
     nodes: Arc<DashMap<FunctionId, NodeInfo>>,
     edges: Arc<DashSet<FunctionCall>>,
+    evidence: Arc<DashSet<CallEdgeEvidence>>,
+    uncertain_calls: Arc<DashSet<UncertainCall>>,
     caller_index: Arc<DashMap<FunctionId, DashSet<FunctionId>>>,
     callee_index: Arc<DashMap<FunctionId, DashSet<FunctionId>>>,
     stats: Arc<ParallelStats>,
@@ -54,8 +60,7 @@ pub struct ParallelCallGraph {
 #[derive(Debug, Clone)]
 struct NodeInfo {
     id: FunctionId,
-    is_entry_point: bool,
-    is_test: bool,
+    role_evidence: RoleEvidence,
     complexity: u32,
     lines: usize,
 }
@@ -65,6 +70,8 @@ impl ParallelCallGraph {
         Self {
             nodes: Arc::new(DashMap::new()),
             edges: Arc::new(DashSet::new()),
+            evidence: Arc::new(DashSet::new()),
+            uncertain_calls: Arc::new(DashSet::new()),
             caller_index: Arc::new(DashMap::new()),
             callee_index: Arc::new(DashMap::new()),
             stats: Arc::new(ParallelStats::new(total_files)),
@@ -80,25 +87,60 @@ impl ParallelCallGraph {
         complexity: u32,
         lines: usize,
     ) {
-        let node_info = NodeInfo {
-            id: id.clone(),
-            is_entry_point,
-            is_test,
+        self.add_function_with_evidence(
+            id,
+            evidence_from_roles(CodeRoles {
+                is_entry_point,
+                is_test,
+                ..CodeRoles::default()
+            }),
             complexity,
             lines,
-        };
-        self.nodes.insert(id, node_info);
+        );
+    }
+
+    fn add_function_with_evidence(
+        &self,
+        id: FunctionId,
+        role_evidence: RoleEvidence,
+        complexity: u32,
+        lines: usize,
+    ) {
+        self.nodes
+            .entry(id.clone())
+            .and_modify(|node| {
+                node.role_evidence = merge_evidence(&node.role_evidence, &role_evidence);
+                node.complexity = complexity;
+                node.lines = lines;
+            })
+            .or_insert(NodeInfo {
+                id,
+                role_evidence,
+                complexity,
+                lines,
+            });
         self.stats.add_nodes(1);
     }
 
     /// Add a function call concurrently
     pub fn add_call(&self, caller: FunctionId, callee: FunctionId, call_type: CallType) {
-        let call = FunctionCall {
-            caller: caller.clone(),
-            callee: callee.clone(),
-            call_type,
-        };
+        self.add_call_with_evidence(CallEdgeEvidence {
+            call: FunctionCall {
+                caller,
+                callee,
+                call_type,
+            },
+            provenance: CallEdgeProvenance::Legacy,
+            confidence: 0,
+            call_site: None,
+        });
+    }
 
+    fn add_call_with_evidence(&self, evidence: CallEdgeEvidence) {
+        let call = evidence.call.clone();
+        let caller = call.caller.clone();
+        let callee = call.callee.clone();
+        self.evidence.insert(evidence);
         if self.edges.insert(call) {
             // Update indices
             self.caller_index
@@ -114,23 +156,25 @@ impl ParallelCallGraph {
 
     /// Merge another call graph concurrently
     pub fn merge_concurrent(&self, other: CallGraph) {
-        // Parallelize node merging
-        let nodes_vec: Vec<_> = other.get_all_functions().collect();
-        nodes_vec.par_iter().for_each(|func_id| {
-            if let Some((is_entry, is_test, complexity, lines)) = other.get_function_info(func_id) {
-                self.add_function((*func_id).clone(), is_entry, is_test, complexity, lines);
-            }
-        });
-
-        // Parallelize edge merging
-        let calls_vec: Vec<_> = other.get_all_calls();
-        calls_vec.par_iter().for_each(|call| {
-            self.add_call(
-                call.caller.clone(),
-                call.callee.clone(),
-                call.call_type.clone(),
+        other.nodes.par_iter().for_each(|(id, node)| {
+            self.add_function_with_evidence(
+                id.clone(),
+                node.effective_role_evidence(),
+                node.complexity,
+                node._lines,
             );
         });
+        other.edge_evidence.par_iter().for_each(|evidence| {
+            self.add_call_with_evidence(evidence.clone());
+        });
+        other.uncertain_calls.par_iter().for_each(|call| {
+            self.uncertain_calls.insert(call.clone());
+        });
+        for call in other.edges {
+            if !self.edges.contains(&call) {
+                self.add_call(call.caller, call.callee, call.call_type);
+            }
+        }
     }
 
     /// Convert to regular CallGraph for compatibility
@@ -143,22 +187,21 @@ impl ParallelCallGraph {
 
         // Add all nodes
         for node in sorted_nodes {
-            call_graph.add_function(
+            call_graph.add_function_with_evidence(
                 node.id.clone(),
-                node.is_entry_point,
-                node.is_test,
+                node.role_evidence.clone(),
                 node.complexity,
                 node.lines,
             );
         }
 
-        // Sort edges for deterministic insertion order (Spec 214 fix)
-        let mut sorted_edges: Vec<_> = self.edges.iter().map(|e| e.clone()).collect();
-        sorted_edges.sort();
-
-        // Add all edges
-        for call in sorted_edges {
-            call_graph.add_call(call);
+        let mut sorted_evidence: Vec<_> = self.evidence.iter().map(|e| e.clone()).collect();
+        sorted_evidence.sort();
+        for evidence in sorted_evidence {
+            call_graph.add_call_with_evidence(evidence);
+        }
+        for call in self.uncertain_calls.iter() {
+            call_graph.record_uncertain_call(call.clone());
         }
 
         call_graph

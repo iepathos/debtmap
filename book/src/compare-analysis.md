@@ -2,6 +2,28 @@
 
 The `compare` command enables you to track technical debt changes over time by comparing two analysis results. This is essential for validating refactoring efforts, detecting regressions in pull requests, and monitoring project health trends.
 
+## Comparable inputs are required
+
+`compare` checks report provenance before calculating changes. Both inputs must
+identify the same Debtmap version, contain analysis receipts with complete scope,
+and agree on analysis policy, evidence settings, selection, analysis target and
+multi-pass configuration. Source revisions and measured values may differ;
+parallel execution and worker counts need not match.
+
+Incompatible inputs, missing analyzer identity or receipts, and partial, limited
+or unknown scopes produce a nonzero exit status with an explanation on stderr.
+No trend report is emitted and an existing `--output` file is left unchanged.
+This applies to JSON, Markdown and terminal output. Older v3 reports remain
+readable, but reports without receipts cannot establish a safe comparison.
+
+After upgrading Debtmap, regenerate both the before and after reports with the
+same analyzer version and settings. Comparing an old baseline to a newly scored
+report can mistake analyzer changes for code improvements or regressions.
+Matching provenance is a prerequisite for comparison, not proof that a score
+change was caused by a particular refactoring.
+Analyzer identity uses the recorded package version; it cannot distinguish
+locally modified development builds that reuse the same version string.
+
 ## Implementation Status
 
 **All Features Available Now**:

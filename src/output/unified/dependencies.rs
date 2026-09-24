@@ -14,10 +14,11 @@ pub struct Dependencies {
     pub upstream_callers: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub downstream_callees: Vec<String>,
-    /// Blast radius: upstream + downstream (impact of changes)
+    /// Distinct immediate neighboring definitions; legacy records may lack exact identities.
+    /// Retained JSON field name; this is not transitive change impact.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub blast_radius: usize,
-    /// Whether this function is on a critical path (high upstream or downstream)
+    /// Critical execution path evidence, never inferred from dependency counts alone.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub critical_path: bool,
     /// Coupling classification: "Stable Core", "Leaf Module", "Hub", "Connector"
@@ -39,8 +40,7 @@ pub struct Dependencies {
     /// Count of test upstream callers (Spec 267)
     #[serde(default, skip_serializing_if = "is_zero")]
     pub test_upstream_count: usize,
-    /// Production-only blast radius: production_upstream_count + downstream_count (Spec 267)
-    /// This is the true change risk metric - test callers don't increase change risk.
+    /// Distinct immediate production callers and callees; not transitive change impact.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub production_blast_radius: usize,
 }

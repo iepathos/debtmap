@@ -327,6 +327,7 @@ mod tests {
         ]);
 
         let function = FunctionMetrics {
+            column: None,
             name: "ConcreteObserver::on_event".to_string(),
             file: PathBuf::from("test.py"),
             line: 20,

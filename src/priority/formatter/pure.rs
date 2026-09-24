@@ -328,6 +328,50 @@ mod tests {
         ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location, UnifiedScore,
     };
 
+    #[test]
+    fn complexity_section_assigns_entropy_adjustment_to_cognitive() {
+        let mut item = create_test_item(20.0);
+        item.cyclomatic_complexity = 23;
+        item.cognitive_complexity = 41;
+        item.entropy_analysis = Some(crate::complexity::EntropyAnalysis {
+            entropy_score: 0.24,
+            pattern_repetition: 0.89,
+            branch_similarity: 0.14,
+            dampening_factor: 0.555,
+            dampening_was_applied: true,
+            original_complexity: 41,
+            adjusted_complexity: 22,
+            reasoning: Vec::new(),
+        });
+        let context = create_format_context(1, &item, false);
+        let text = generate_formatted_sections(&context).complexity.unwrap();
+        assert_entropy_complexity_text(&text);
+    }
+
+    #[test]
+    fn entropy_complexity_assertions_accept_ansi_styling() {
+        for (start, end) in [("", ""), ("\x1b[33m", "\x1b[0m"), ("\x1b[1;92m", "\x1b[0m")] {
+            let text = format!(
+                "cyclomatic={start}23{end}, est_branches={start}23{end}, \
+                 cognitive={start}41{end} → {start}22{end} (entropy-adjusted, factor: 0.56)"
+            );
+            assert_entropy_complexity_text(&text);
+        }
+    }
+
+    fn assert_entropy_complexity_text(text: &str) {
+        // Other libtest threads can change colored's process-global override.
+        // Check content independently of presentation without changing that state.
+        let sgr = regex::Regex::new(r"\x1b\[[0-9;]*m").unwrap();
+        let text = sgr.replace_all(text, "");
+        assert!(text.contains("cyclomatic=23, est_branches=23"), "{text}");
+        assert!(
+            text.contains("cognitive=41 → 22 (entropy-adjusted, factor: 0.56)"),
+            "{text}"
+        );
+        assert!(!text.contains("cyclomatic=23 →"), "{text}");
+    }
+
     fn create_test_item(score: f64) -> UnifiedDebtItem {
         UnifiedDebtItem {
             location: Location {
@@ -361,6 +405,7 @@ mod tests {
                 contextual_risk_multiplier: None,
                 pre_contextual_score: None,
                 debt_type_multiplier: None,
+                score_trace: Vec::new(),
             },
             function_role: FunctionRole::PureLogic,
             recommendation: ActionableRecommendation {
@@ -385,6 +430,7 @@ mod tests {
             upstream_production_callers: vec![],
             upstream_test_callers: vec![],
             production_blast_radius: 0,
+            immediate_neighbor_count: None,
             nesting_depth: 3,
             function_length: 50,
             cyclomatic_complexity: 10,

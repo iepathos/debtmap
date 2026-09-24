@@ -38,6 +38,7 @@
 - [Boilerplate Detection](boilerplate-detection.md)
 - [Boilerplate vs Complexity](boilerplate-vs-complexity.md)
 - [Call Graph Analysis](call-graph-analysis.md)
+- [Rust Effect Analysis](rust-effect-analysis.md)
 - [Context Providers](context-providers.md)
 - [Coverage Analysis](coverage-analysis.md)
 - [Coverage Integration](coverage-integration.md)

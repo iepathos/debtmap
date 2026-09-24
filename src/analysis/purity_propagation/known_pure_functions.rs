@@ -4,7 +4,7 @@
 //! that are known to be pure (no side effects), enabling more accurate
 //! purity propagation through the call graph.
 
-use crate::analyzers::purity_detector::{is_known_pure_call, is_known_pure_method};
+use crate::analyzers::purity_detector::is_known_pure_call;
 
 /// Classification of callee purity for propagation
 #[derive(Debug, Clone, PartialEq)]
@@ -35,23 +35,23 @@ pub fn resolve_callee_purity(
     receiver_type: Option<&str>,
     cached_purity: Option<(bool, f64)>, // (is_pure, confidence)
 ) -> CalleePurity {
-    // 1. Check if it's a known pure std function (by full name)
-    if is_known_pure_call(callee_name, receiver_type) {
-        return CalleePurity::KnownPure;
-    }
-
-    // 2. Check if it's a known pure method (by method name alone)
-    if is_known_pure_method(callee_name) {
-        return CalleePurity::KnownPure;
-    }
-
-    // 3. Check cache for already-analyzed functions
+    // Project definitions always take precedence over compatibility models.
     if let Some((is_pure, confidence)) = cached_purity {
         return if is_pure {
             CalleePurity::AnalyzedPure(confidence)
         } else {
             CalleePurity::AnalyzedImpure
         };
+    }
+
+    // This legacy compatibility helper only accepts a qualified standard path
+    // or an explicit reviewed receiver. Bare method-name suffixes are unknown.
+    let qualified_std = callee_name.starts_with("std::")
+        || callee_name.starts_with("core::")
+        || callee_name.starts_with("alloc::");
+    if (qualified_std || receiver_type.is_some()) && is_known_pure_call(callee_name, receiver_type)
+    {
+        return CalleePurity::KnownPure;
     }
 
     // 4. Unknown external function
@@ -117,18 +117,26 @@ mod tests {
     }
 
     #[test]
-    fn test_known_pure_method_name_only() {
+    fn bare_method_names_are_not_models() {
         assert_eq!(
             resolve_callee_purity("map", None, None),
-            CalleePurity::KnownPure
+            CalleePurity::Unknown
         );
         assert_eq!(
             resolve_callee_purity("collect", None, None),
-            CalleePurity::KnownPure
+            CalleePurity::Unknown
         );
         assert_eq!(
             resolve_callee_purity("len", None, None),
-            CalleePurity::KnownPure
+            CalleePurity::Unknown
+        );
+    }
+
+    #[test]
+    fn project_definition_precedes_legacy_model_name() {
+        assert_eq!(
+            resolve_callee_purity("map", Some("Option"), Some((false, 0.9))),
+            CalleePurity::AnalyzedImpure
         );
     }
 

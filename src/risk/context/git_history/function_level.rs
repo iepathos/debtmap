@@ -63,12 +63,12 @@ pub struct FunctionHistory {
 }
 
 impl FunctionHistory {
-    /// Calculate bug density for this function
+    /// Calculate this function's fix-labelled modification commit ratio.
     ///
     /// Pure function: returns 0.0 if function was never modified after introduction
     pub fn bug_density(&self) -> f64 {
         if self.total_commits == 0 {
-            return 0.0; // Never modified = no bugs
+            return 0.0; // No observed modifications; this does not establish absence of defects.
         }
         self.bug_fix_count as f64 / self.total_commits as f64
     }
@@ -178,11 +178,18 @@ pub fn filter_bug_fix_commits(commits: &[CommitInfo]) -> Vec<&CommitInfo> {
 
 /// Pickaxe search pattern for function introduction (`git log -S`).
 pub fn introduction_search_pattern(function_name: &str) -> String {
+    let function_name = source_function_name(function_name);
     format!("fn {function_name}")
+}
+
+/// Graph qualification is not part of a Rust function's declaration text.
+fn source_function_name(function_name: &str) -> &str {
+    function_name.rsplit("::").next().unwrap_or(function_name)
 }
 
 /// Regex for modification search (`git log -G`), matching CLI behavior.
 pub fn modification_search_regex(function_name: &str) -> Result<Regex> {
+    let function_name = source_function_name(function_name);
     Regex::new(function_name)
         .or_else(|_| Regex::new(&regex::escape(function_name)))
         .map_err(|e| anyhow::anyhow!("invalid modification regex for '{function_name}': {e}"))
@@ -314,7 +321,7 @@ fn run_git_log_introduction(
     function_name: &str,
 ) -> Result<String> {
     // Search for function definition (fn function_name)
-    let search_pattern = format!("fn {function_name}");
+    let search_pattern = introduction_search_pattern(function_name);
     let output = Command::new("git")
         .args([
             "log",
@@ -345,6 +352,7 @@ fn run_git_log_modifications(
     intro_commit: &str,
 ) -> Result<String> {
     let range = format!("{intro_commit}..HEAD");
+    let pattern = modification_search_regex(function_name)?;
     // Use -G to find commits where the diff matches the function name pattern
     // This catches any modification to lines containing the function
     let output = Command::new("git")
@@ -352,7 +360,7 @@ fn run_git_log_modifications(
             "log",
             &range,
             "-G",
-            function_name,
+            pattern.as_str(),
             "--format=:::%H:::%cI:::%s:::%ae",
             "--",
             &file_path.to_string_lossy(),
@@ -397,6 +405,18 @@ mod tests {
     // =========================================================================
     // Pure Function Tests (No Git Required)
     // =========================================================================
+
+    #[test]
+    fn qualified_function_patterns_use_source_declaration_names() {
+        for name in ["run", "Worker::run", "inner::Worker<T>::run", "tests::run"] {
+            assert_eq!(introduction_search_pattern(name), "fn run");
+            assert!(
+                modification_search_regex(name)
+                    .unwrap()
+                    .is_match("fn run() {}")
+            );
+        }
+    }
 
     #[test]
     fn test_parse_introduction_commit_found() {

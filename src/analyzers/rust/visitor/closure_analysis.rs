@@ -12,6 +12,7 @@ use crate::complexity::pure_mapping_patterns::{
 use crate::config::get_entropy_config;
 use crate::core::FunctionMetrics;
 use std::path::PathBuf;
+use syn::spanned::Spanned;
 
 /// Convert closure body to a block for analysis
 pub fn convert_closure_to_block(closure: &syn::ExprClosure) -> syn::Block {
@@ -41,7 +42,7 @@ pub fn is_substantial_closure(metrics: &ClosureComplexityMetrics) -> bool {
 
 /// Build function metrics for closure
 pub fn build_closure_metrics(
-    _closure: &syn::ExprClosure,
+    closure: &syn::ExprClosure,
     block: &syn::Block,
     complexity: &ClosureComplexityMetrics,
     name: String,
@@ -67,13 +68,15 @@ pub fn build_closure_metrics(
     };
 
     FunctionMetrics {
+        column: None,
         name,
         file,
         line,
         cyclomatic: complexity.cyclomatic,
         cognitive: complexity.cognitive,
         nesting: complexity.nesting,
-        length: complexity.length,
+        // The analysis block may have synthetic braces; retain original body bounds.
+        length: closure.body.span().end().line.saturating_sub(line) + 1,
         is_test: in_test_module,
         visibility: None,
         is_trait_method: false,

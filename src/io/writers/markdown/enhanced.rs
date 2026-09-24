@@ -335,6 +335,7 @@ mod tests {
                 contextual_risk_multiplier: None,
                 pre_contextual_score: None,
                 debt_type_multiplier: None,
+                score_trace: Vec::new(),
             },
             debt_type: DebtType::ComplexityHotspot {
                 cyclomatic: 15,
@@ -364,6 +365,7 @@ mod tests {
             upstream_production_callers: vec![],
             upstream_test_callers: vec![],
             production_blast_radius: 0,
+            immediate_neighbor_count: None,
             nesting_depth: 0,
             function_length: 50,
             cyclomatic_complexity: 15,
@@ -492,6 +494,7 @@ mod tests {
             contextual_risk_multiplier: None,
             pre_contextual_score: None,
             debt_type_multiplier: None,
+            score_trace: Vec::new(),
         };
 
         let result = format_score_factors(&score);
@@ -601,6 +604,7 @@ mod tests {
             contextual_risk_multiplier: None,
             pre_contextual_score: None,
             debt_type_multiplier: None,
+            score_trace: Vec::new(),
         };
 
         let result = format_score_factors(&score);

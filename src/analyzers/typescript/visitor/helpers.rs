@@ -264,7 +264,7 @@ fn add_nested_function_summary(node: &Node, source: &str, summary: &mut NestedFu
     }
 }
 
-/// Count lines in a function body
+/// Count the inclusive source span from the function's recorded start to its end.
 pub fn count_function_lines(node: &Node, _source: &str) -> usize {
     let start_line = node.start_position().row;
     let end_line = node.end_position().row;
@@ -317,6 +317,7 @@ pub fn convert_to_function_metrics(
     };
 
     let mut metrics = FunctionMetrics {
+        column: None,
         name: js_metrics.name.clone(),
         file: js_metrics.file.clone(),
         line: js_metrics.line,

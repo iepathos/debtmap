@@ -123,6 +123,7 @@ fn determine_role(name: &str) -> FunctionRole {
 
 fn create_getter() -> FunctionMetrics {
     FunctionMetrics {
+        column: None,
         name: "get_value".to_string(),
         file: PathBuf::from("lib.rs"),
         line: 10,
@@ -155,6 +156,7 @@ fn create_getter() -> FunctionMetrics {
 
 fn create_setter() -> FunctionMetrics {
     FunctionMetrics {
+        column: None,
         name: "set_value".to_string(),
         file: PathBuf::from("lib.rs"),
         line: 20,
@@ -187,6 +189,7 @@ fn create_setter() -> FunctionMetrics {
 
 fn create_simple_validator() -> FunctionMetrics {
     FunctionMetrics {
+        column: None,
         name: "is_valid".to_string(),
         file: PathBuf::from("validators.rs"),
         line: 5,
@@ -219,6 +222,7 @@ fn create_simple_validator() -> FunctionMetrics {
 
 fn create_small_util() -> FunctionMetrics {
     FunctionMetrics {
+        column: None,
         name: "format_string".to_string(),
         file: PathBuf::from("utils.rs"),
         line: 15,
@@ -251,6 +255,7 @@ fn create_small_util() -> FunctionMetrics {
 
 fn create_test_helper() -> FunctionMetrics {
     FunctionMetrics {
+        column: None,
         name: "test_setup".to_string(),
         file: PathBuf::from("tests/helpers.rs"),
         line: 30,
@@ -283,6 +288,7 @@ fn create_test_helper() -> FunctionMetrics {
 
 fn create_complex_handler() -> FunctionMetrics {
     FunctionMetrics {
+        column: None,
         name: "handle_request".to_string(),
         file: PathBuf::from("handlers.rs"),
         line: 100,
@@ -315,6 +321,7 @@ fn create_complex_handler() -> FunctionMetrics {
 
 fn create_nested_logic() -> FunctionMetrics {
     FunctionMetrics {
+        column: None,
         name: "process_data".to_string(),
         file: PathBuf::from("processor.rs"),
         line: 50,
@@ -347,6 +354,7 @@ fn create_nested_logic() -> FunctionMetrics {
 
 fn create_long_switch() -> FunctionMetrics {
     FunctionMetrics {
+        column: None,
         name: "categorize_items".to_string(),
         file: PathBuf::from("categorizer.rs"),
         line: 200,
@@ -379,6 +387,7 @@ fn create_long_switch() -> FunctionMetrics {
 
 fn create_moderate_complexity() -> FunctionMetrics {
     FunctionMetrics {
+        column: None,
         name: "calculate_score".to_string(),
         file: PathBuf::from("scoring.rs"),
         line: 75,

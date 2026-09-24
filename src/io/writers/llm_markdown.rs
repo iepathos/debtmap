@@ -156,11 +156,10 @@ pub mod format {
             writeln!(out, "- Branch Similarity: {:.2}", similarity).unwrap();
         }
         if let Some(adjusted) = adj {
-            writeln!(out, "- Dampening Factor: {:.2}", adjusted.dampening_factor).unwrap();
             writeln!(
                 out,
-                "- Dampened Cyclomatic: {:.1}",
-                adjusted.dampened_cyclomatic
+                "- Cognitive Entropy Dampening Factor (analysis): {:.2}",
+                adjusted.dampening_factor
             )
             .unwrap();
         }
@@ -174,11 +173,16 @@ pub mod format {
         }
         let mut out = String::new();
         write_section_heading(&mut out, "Coverage");
-        if let Some(cov) = m.coverage {
-            writeln!(out, "- Direct Coverage: {:.0}%", cov * 100.0).unwrap();
+        if let Some(direct_coverage) = m.coverage {
+            writeln!(out, "- Direct Coverage: {:.0}%", direct_coverage * 100.0).unwrap();
         }
-        if let Some(trans) = m.transitive_coverage {
-            writeln!(out, "- Transitive Coverage: {:.0}%", trans * 100.0).unwrap();
+        if let Some(transitive_coverage) = m.transitive_coverage {
+            writeln!(
+                out,
+                "- Transitive Coverage: {:.0}%",
+                transitive_coverage * 100.0
+            )
+            .unwrap();
         }
         Some(out)
     }
@@ -205,17 +209,15 @@ pub mod format {
 
         // Spec 267: Show production-only blast radius
         if deps.production_blast_radius > 0 {
-            let impact = classify_blast_radius(deps.production_blast_radius);
             writeln!(
                 out,
-                "- Production Blast Radius: {} ({})",
-                deps.production_blast_radius, impact
+                "- Immediate Production Neighbors: {}",
+                deps.production_blast_radius
             )
             .unwrap();
         } else if deps.blast_radius > 0 {
             // Fallback to legacy blast radius
-            let impact = classify_blast_radius(deps.blast_radius);
-            writeln!(out, "- Blast Radius: {} ({})", deps.blast_radius, impact).unwrap();
+            writeln!(out, "- Immediate Neighbors: {}", deps.blast_radius).unwrap();
         }
         if deps.critical_path {
             writeln!(out, "- Critical Path: Yes").unwrap();
@@ -257,16 +259,6 @@ pub mod format {
         }
     }
 
-    /// Classify blast radius into impact severity level.
-    /// Pure function for consistent classification across production and legacy paths.
-    pub(crate) fn classify_blast_radius(radius: usize) -> &'static str {
-        match radius {
-            r if r >= 20 => "critical",
-            r if r >= 10 => "high",
-            _ => "moderate",
-        }
-    }
-
     /// Map coupling classification to architectural insight.
     /// Returns None if the classification has no specific insight.
     pub(crate) fn architectural_insight(classification: &str) -> Option<&'static str> {
@@ -290,11 +282,15 @@ pub mod format {
         }
     }
 
-    /// Format purity analysis section (returns None if no purity data)
+    /// Format purity analysis without treating missing evidence as impurity.
     pub fn purity(purity: Option<&PurityAnalysis>) -> Option<String> {
-        let p = purity?;
         let mut out = String::new();
         write_section_heading(&mut out, "Purity Analysis");
+        let Some(p) = purity else {
+            writeln!(out, "- Purity Level: Unknown").unwrap();
+            writeln!(out, "- Evidence: incomplete or unavailable").unwrap();
+            return Some(out);
+        };
         writeln!(out, "- Is Pure: {}", p.is_pure).unwrap();
         if let Some(ref level) = p.purity_level {
             writeln!(out, "- Purity Level: {}", level).unwrap();
@@ -338,25 +334,26 @@ pub mod format {
         let s = scoring?;
         let mut out = String::new();
         write_section_heading(&mut out, "Scoring Breakdown");
-        writeln!(out, "- Base Score: {:.2}", s.base_score).unwrap();
+        if !s.score_trace.is_empty() {
+            for line in s
+                .score_trace
+                .iter()
+                .flat_map(|step| step.explanation_lines())
+            {
+                writeln!(out, "- {line}").unwrap();
+            }
+            writeln!(out, "- Final Score: {:.2}", s.final_score).unwrap();
+            return Some(out);
+        }
         writeln!(
             out,
-            "- Complexity Factor: {:.2} (weight: 0.4)",
-            s.complexity_score
+            "- Arithmetic trace unavailable; recorded factors do not reconstruct the final score."
         )
         .unwrap();
-        writeln!(
-            out,
-            "- Coverage Factor: {:.2} (weight: 0.3)",
-            s.coverage_score
-        )
-        .unwrap();
-        writeln!(
-            out,
-            "- Dependency Factor: {:.2} (weight: 0.2)",
-            s.dependency_score
-        )
-        .unwrap();
+        writeln!(out, "- Recorded Base Score: {:.2}", s.base_score).unwrap();
+        writeln!(out, "- Complexity Factor: {:.2}", s.complexity_score).unwrap();
+        writeln!(out, "- Coverage Gap Indicator: {:.2}", s.coverage_score).unwrap();
+        writeln!(out, "- Dependency Factor: {:.2}", s.dependency_score).unwrap();
         writeln!(
             out,
             "- Role Multiplier: {:.2} ({:?})",
@@ -374,7 +371,7 @@ pub mod format {
         );
 
         if let Some(pf) = s.purity_factor {
-            writeln!(out, "- Purity Factor: {:.2}", pf).unwrap();
+            writeln!(out, "- Purity Blend Input: {:.2}", pf).unwrap();
         }
         format_optional_multiplier(&mut out, "Refactorability Factor", s.refactorability_factor);
         format_optional_multiplier(&mut out, "Pattern Factor", s.pattern_factor);
@@ -383,12 +380,7 @@ pub mod format {
         if let Some(pre) = s.pre_normalization_score
             && (pre - s.final_score).abs() > 0.1
         {
-            writeln!(
-                out,
-                "- Pre-normalization Score: {:.2} (clamped to {:.2})",
-                pre, s.final_score
-            )
-            .unwrap();
+            writeln!(out, "- Recorded Pre-normalization Score: {:.2}", pre).unwrap();
         }
         writeln!(out, "- Final Score: {:.2}", s.final_score).unwrap();
         Some(out)
@@ -459,25 +451,29 @@ pub mod format {
             g.total_commits, commit_label, g.change_frequency
         )
         .unwrap();
-        // Show fix rate as "N fixes / M changes" for clarity
-        let changes = g.total_commits.saturating_sub(1);
-        if changes == 0 {
-            writeln!(out, "- Bug Density: 0%").unwrap();
-        } else {
-            writeln!(
-                out,
-                "- Bug Density: {:.0}% ({} fix{} / {} change{})",
-                g.bug_density * 100.0,
-                g.bug_fix_count,
-                if g.bug_fix_count == 1 { "" } else { "es" },
-                changes,
-                if changes == 1 { "" } else { "s" }
-            )
-            .unwrap();
-        }
+        // Function and file histories have different introduction conventions;
+        // the public record does not identify which denominator was used.
+        writeln!(
+            out,
+            "- Fix-labelled commit ratio: {:.0}% ({} labelled commit{})",
+            g.bug_density * 100.0,
+            g.bug_fix_count,
+            if g.bug_fix_count == 1 { "" } else { "s" },
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "- History signal: commit-message labels, not confirmed defects"
+        )
+        .unwrap();
         writeln!(out, "- Age: {} days", g.age_days).unwrap();
         writeln!(out, "- Authors: {}", g.author_count).unwrap();
-        writeln!(out, "- Stability: {}", g.stability).unwrap();
+        let stability = match g.stability.as_str() {
+            "Bug Prone" => "Frequent fix labels",
+            "Highly Unstable" => "High history activity",
+            value => value,
+        };
+        writeln!(out, "- Stability: {} (history heuristic)", stability).unwrap();
         Some(out)
     }
 
@@ -891,6 +887,26 @@ mod tests {
     use super::*;
 
     #[test]
+    fn metrics_do_not_present_entropy_dampened_cyclomatic_as_a_scoring_input() {
+        let metrics = FunctionMetricsOutput {
+            cyclomatic_complexity: 23,
+            cognitive_complexity: 41,
+            entropy_adjusted_cognitive: Some(22),
+            ..Default::default()
+        };
+        let adjusted = crate::output::unified::AdjustedComplexity {
+            dampened_cyclomatic: 12.7,
+            dampening_factor: 0.55,
+        };
+        let text = format::metrics(&metrics, Some(&adjusted));
+        assert!(text.contains("Cyclomatic Complexity: 23"));
+        assert!(text.contains("Cognitive Complexity: 41 → 22 (entropy-adjusted)"));
+        assert!(text.contains("Cognitive Entropy Dampening Factor (analysis): 0.55"));
+        assert!(!text.contains("Dampened Cyclomatic"));
+        assert!(!text.contains("12.7"));
+    }
+
+    #[test]
     fn test_generate_item_id() {
         assert_eq!(generate_item_id("src/main.rs", Some(42)), "src_main_rs_42");
         assert_eq!(generate_item_id("src/lib.rs", None), "src_lib_rs");
@@ -1071,8 +1087,8 @@ mod tests {
 
         // Check new dependency fields (Spec 267: Production Blast Radius)
         assert!(
-            markdown.contains("Production Blast Radius: 13 (high)"),
-            "Should show production blast radius: {}",
+            markdown.contains("Immediate Production Neighbors: 13"),
+            "Should show the immediate production neighborhood: {}",
             markdown
         );
         assert!(
@@ -1142,6 +1158,7 @@ mod tests {
                 risk_reduction: 0.15,
             },
             scoring_details: Some(FunctionScoringDetails {
+                score_trace: Vec::new(),
                 coverage_score: 5.0,
                 complexity_score: 8.0,
                 dependency_score: 3.0,
@@ -1191,13 +1208,80 @@ mod tests {
             "Should show refactorability factor"
         );
         assert!(
-            markdown.contains("Pre-normalization Score: 150.00 (clamped to 100.00)"),
-            "Should show pre-normalization score when clamped"
+            markdown.contains("Recorded Pre-normalization Score: 150.00"),
+            "Should show the recorded value without inventing a clamp"
         );
         assert!(
             markdown.contains("Final Score: 100.00"),
             "Should show final score"
         );
+        assert!(!markdown.contains("weight: 0."));
+        assert!(!markdown.contains("clamped to"));
+        assert!(markdown.contains("Arithmetic trace unavailable"));
+
+        let mut details = item.scoring_details.unwrap();
+        details.score_trace = vec![crate::priority::scoring::trace::ScoreStep::new(
+            "Configured blend",
+            20.0,
+            crate::priority::scoring::trace::ScoreOperation::WeightedBlend {
+                factors: [0.3, 1.0, 0.85],
+                weights: [0.2, 0.5, 0.3],
+            },
+            16.3,
+        )];
+        let traced = format::scoring(Some(&details), &FunctionRole::Unknown).unwrap();
+        assert!(traced.contains("Configured blend: 20.0000"));
+        assert!(traced.contains("purity 0.3000 × 0.2000"));
+        assert!(!traced.contains("Recorded Base Score"));
+        assert!(!traced.contains("Arithmetic trace unavailable"));
+        let json = serde_json::to_value(&details).unwrap();
+        assert!(json.get("score_trace").is_none());
+        let restored: FunctionScoringDetails = serde_json::from_value(json).unwrap();
+        assert!(restored.score_trace.is_empty());
+
+        let inputs = crate::priority::scoring::complexity_inputs::ComplexityInputs::new(
+            [23, 41],
+            0.7,
+            None,
+            [0.4, 0.6],
+        );
+        details.score_trace = vec![crate::priority::scoring::trace::ScoreStep::new(
+            "Complexity factor",
+            0.0,
+            crate::priority::scoring::trace::ScoreOperation::Complexity(inputs),
+            inputs.factor(),
+        )];
+        let rendered = format::scoring(Some(&details), &FunctionRole::Unknown).unwrap();
+        assert!(rendered.contains("- Cyclomatic input (purity): trunc(23 × 0.7000) = 16"));
+        assert!(rendered.contains("- Cognitive input (purity): trunc(41 × 0.7000) = 28"));
+        assert!(rendered.contains("clamp((16 × 0.4000 + 28 × 0.6000) / 2, 0, 10) = 10.0000"));
+    }
+
+    #[test]
+    fn test_git_history_uses_recorded_ratio_without_assuming_introduction() {
+        use crate::output::unified::GitHistoryOutput;
+        for (total_commits, bug_density, bug_fix_count, expected) in [
+            (0, 0.0, 0, "0% (0 labelled commits)"),
+            (2, 1.0, 1, "100% (1 labelled commit)"),
+            (2, 0.5, 1, "50% (1 labelled commit)"),
+        ] {
+            let history = GitHistoryOutput {
+                total_commits,
+                bug_density,
+                bug_fix_count,
+                change_frequency: 0.0,
+                age_days: 0,
+                author_count: 0,
+                stability: "Bug Prone".to_string(),
+            };
+            let text = format::git_history(Some(&history)).unwrap();
+            assert!(text.contains(expected));
+            assert!(text.contains("commit-message labels, not confirmed defects"));
+            assert!(!text.contains("Bug Density"));
+            assert!(!text.contains("Bug Prone"));
+            assert!(text.contains("Frequent fix labels (history heuristic)"));
+            assert!(!text.contains(" / "));
+        }
     }
 
     #[test]
@@ -1278,8 +1362,8 @@ mod tests {
             markdown
         );
         assert!(
-            markdown.contains("Bug Density: 25% (5 fixes / 20 changes)"),
-            "Should show bug density with fix counts: {}",
+            markdown.contains("Fix-labelled commit ratio: 25% (5 labelled commits)"),
+            "Should show the observed fix-labelled ratio and count: {}",
             markdown
         );
         assert!(
@@ -1332,21 +1416,16 @@ mod tests {
     }
 
     #[test]
-    fn test_classify_blast_radius() {
-        // Critical threshold (>= 20)
-        assert_eq!(format::classify_blast_radius(20_usize), "critical");
-        assert_eq!(format::classify_blast_radius(25_usize), "critical");
-        assert_eq!(format::classify_blast_radius(100_usize), "critical");
-
-        // High threshold (>= 10, < 20)
-        assert_eq!(format::classify_blast_radius(10_usize), "high");
-        assert_eq!(format::classify_blast_radius(15_usize), "high");
-        assert_eq!(format::classify_blast_radius(19_usize), "high");
-
-        // Moderate (< 10)
-        assert_eq!(format::classify_blast_radius(0_usize), "moderate");
-        assert_eq!(format::classify_blast_radius(5_usize), "moderate");
-        assert_eq!(format::classify_blast_radius(9_usize), "moderate");
+    fn immediate_neighborhood_does_not_claim_severity() {
+        let deps = Dependencies {
+            blast_radius: 100,
+            ..Dependencies::default()
+        };
+        let markdown = format::dependencies(&deps);
+        assert!(markdown.contains("Immediate Neighbors: 100"));
+        assert!(!markdown.contains("critical"));
+        assert!(!markdown.contains("high"));
+        assert!(!markdown.contains("Critical Path"));
     }
 
     #[test]

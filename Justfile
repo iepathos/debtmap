@@ -82,6 +82,7 @@ test-integration:
         --test call_graph_extraction_test --test call_graph_improved_test \
         --test call_graph_resolution_test --test call_graph_cross_file_resolution_test \
         --test cognitive_complexity_tests --test complexity_comparison_test \
+        --test compare_integration_test --test compare_safety_test \
         --test complexity_module_tests --test complexity_tests \
         --test context_aware_integration_test --test context_aware_test --test core_ast_tests \
         --test core_display_tests --test core_metrics_tests --test core_monadic_tests \
@@ -94,6 +95,10 @@ test-integration:
         --test false_positive_reproduction_tests --test fast_unit_tests \
         --test field_access_chain_test --test io_walker_tests --test json_serialization_test \
         --test language_tests --test python_complexity_tests --test python_extraction_test \
+        --test data_flow_identity_matrix --test rust_resolution_constraint_matrix \
+        --test rust_resolution_namespace_matrix --test rust_resolution_matrix_oracles \
+        --test rust_resolution_matrix_invariants --test rust_resolution_matrix_assertions \
+        --test recursive_dependency_metrics \
         --test solidity_analyzer_tests --test suppression_tests --test token_classification_tests \
         --test validate_improvement_integration_test
 
@@ -109,164 +114,66 @@ test-pattern PATTERN:
 test-watch:
     cargo watch -x 'nextest run'
 
-# Run fast coverage using the default local test scope
-coverage: coverage-fast
+# Representative coverage: all ordinary library, binary and integration tests.
+# Libtest creates one profile per binary; Cargo discovers new test targets.
+coverage: coverage-collect
+    just coverage-report-html
 
-# Run fast coverage using cargo-llvm-cov's low-profile-count libtest harness
-coverage-fast:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    # Ensure rustup's cargo is in PATH (needed for llvm-tools-preview)
-    export PATH="$HOME/.cargo/bin:$PATH"
+coverage-lcov: coverage-collect
+    just coverage-report-lcov
+
+coverage-check: coverage-collect
+    just coverage-report-check
+
+# Collect once; additional report formats can reuse this successful run.
+coverage-collect:
     mkdir -p target/coverage
+    rm -f target/coverage/.complete target/coverage/lcov.info target/coverage/coverage-summary.json
+    rm -rf target/coverage/html
     cargo llvm-cov clean --profraw-only
-    echo "Generating fast HTML coverage report with cargo-llvm-cov..."
-    cargo llvm-cov --no-clean --html --output-dir target/coverage \
-        --lib --test analyzer_tests --test complexity_tests --test core_metrics_tests \
-        --test debt_tests --test entropy_tests --test parallel_unified_analysis_test \
-        --test cli_output_format_integration_test --test batch_integration \
-        --test call_graph_cross_file_resolution_test --test call_graph_comprehensive_test \
-        --test risk_analysis_tests --test integrated_analysis \
-        --test validate_improvement_integration_test --test output_validation_test \
-        --test solidity_analyzer_tests --test python_extraction_test \
-        --test risk_context_tests -- --quiet
-    echo "Coverage report generated at target/coverage/html/index.html"
+    cargo llvm-cov --no-report --all-features --tests --no-fail-fast -- --quiet
+    touch target/coverage/.complete
 
-# Run tests with coverage (lcov format)
-coverage-lcov: coverage-fast-lcov
+# Export only after successful representative collection.
+coverage-report-html:
+    test -f target/coverage/.complete
+    cargo llvm-cov report --html --output-dir target/coverage
 
-# Run fast tests with coverage (lcov format)
-coverage-fast-lcov:
-    #!/usr/bin/env bash
-    set -euo pipefail  # Exit on error, undefined variables, and pipe failures
-    # Ensure rustup's cargo is in PATH (needed for llvm-tools-preview)
-    export PATH="$HOME/.cargo/bin:$PATH"
-    # Ensure target/coverage directory exists
-    mkdir -p target/coverage
-    cargo llvm-cov clean --profraw-only
-    # Use the default libtest harness for LCOV: nextest is fast at running tests,
-    # but source coverage creates one raw profile per test process, which makes
-    # LLVM's final merge/export step dominate this suite.
-    echo "Generating LCOV report with cargo-llvm-cov..."
-    cargo llvm-cov --no-clean --lcov --output-path target/coverage/lcov.info \
-        --lib --test analyzer_tests --test complexity_tests --test core_metrics_tests \
-        --test debt_tests --test entropy_tests --test parallel_unified_analysis_test \
-        --test cli_output_format_integration_test --test batch_integration \
-        --test call_graph_cross_file_resolution_test --test call_graph_comprehensive_test \
-        --test risk_analysis_tests --test integrated_analysis \
-        --test validate_improvement_integration_test --test output_validation_test \
-        --test solidity_analyzer_tests --test python_extraction_test \
-        --test risk_context_tests -- --quiet
-    echo "Coverage report generated at target/coverage/lcov.info"
-    # Verify the file was actually created
-    if [ ! -f target/coverage/lcov.info ]; then
-        echo "ERROR: Coverage file was not generated at target/coverage/lcov.info"
-        exit 1
-    fi
+coverage-report-lcov:
+    test -f target/coverage/.complete
+    cargo llvm-cov report --lcov --output-path target/coverage/lcov.info
 
-# Run tests with coverage and check threshold
-coverage-check:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    # Ensure rustup's cargo is in PATH (needed for llvm-tools-preview)
-    export PATH="$HOME/.cargo/bin:$PATH"
-    mkdir -p target/coverage
-    cargo llvm-cov clean --profraw-only
-    echo "Checking fast line coverage threshold..."
-    cargo llvm-cov --no-clean --json --summary-only --output-path target/coverage/coverage.json \
-        --lib --test analyzer_tests --test complexity_tests --test core_metrics_tests \
-        --test debt_tests --test entropy_tests --test parallel_unified_analysis_test \
-        --test cli_output_format_integration_test --test batch_integration \
-        --test call_graph_cross_file_resolution_test --test call_graph_comprehensive_test \
-        --test risk_analysis_tests --test integrated_analysis \
-        --test validate_improvement_integration_test --test output_validation_test \
-        --test solidity_analyzer_tests --test python_extraction_test \
-        --test risk_context_tests -- --quiet
-    COVERAGE=$(jq -r '.data[0].totals.lines.percent' target/coverage/coverage.json)
-    echo "Current coverage: ${COVERAGE}%"
-    if (( $(echo "$COVERAGE < 80" | bc -l) )); then
-        echo "⚠️  Coverage is below 80%: $COVERAGE%"
-        exit 1
-    else
-        echo "✅ Coverage meets 80% threshold: $COVERAGE%"
-    fi
+coverage-report-check:
+    test -f target/coverage/.complete
+    cargo llvm-cov report --json --summary-only --output-path target/coverage/coverage-summary.json --fail-under-lines 80
 
-# Run exhaustive coverage using all feature combinations in the default cargo test harness
-coverage-full:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    # Ensure rustup's cargo is in PATH (needed for llvm-tools-preview)
-    export PATH="$HOME/.cargo/bin:$PATH"
-    echo "Building debtmap binary for integration tests..."
-    cargo build --bin debtmap
-    echo "Cleaning previous coverage data..."
-    cargo llvm-cov clean
-    echo "Generating full HTML coverage report with cargo-llvm-cov..."
-    cargo llvm-cov --all-features --html --output-dir target/coverage
-    echo "Coverage report generated at target/coverage/html/index.html"
+# Compatibility names: representative coverage is now the default.
+coverage-full: coverage
+coverage-full-lcov: coverage-lcov
+coverage-full-check: coverage-check
 
-# Run exhaustive tests with coverage (lcov format)
-coverage-full-lcov:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    # Ensure rustup's cargo is in PATH (needed for llvm-tools-preview)
-    export PATH="$HOME/.cargo/bin:$PATH"
-    echo "Building debtmap binary for integration tests..."
-    cargo build --bin debtmap
-    echo "Cleaning previous coverage data..."
-    cargo llvm-cov clean
-    mkdir -p target/coverage
-    echo "Generating full LCOV report with cargo-llvm-cov..."
-    cargo llvm-cov --all-features --lcov --output-path target/coverage/lcov.info
-    echo "Coverage report generated at target/coverage/lcov.info"
-    if [ ! -f target/coverage/lcov.info ]; then
-        echo "ERROR: Coverage file was not generated at target/coverage/lcov.info"
-        exit 1
-    fi
+# Partial, library-only feedback. Profiles and artifacts are isolated from full coverage.
+coverage-fast: _coverage-fast-collect
+    CARGO_LLVM_COV_TARGET_DIR=target/llvm-cov-fast-target cargo llvm-cov report --html --output-dir target/coverage-fast
 
-# Run exhaustive tests with coverage and check threshold
-coverage-full-check:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    echo "Building debtmap binary for integration tests..."
-    cargo build --bin debtmap
-    echo "Setting up LLVM tools..."
-    RUSTUP_TOOLCHAIN=$(rustup show active-toolchain | cut -d' ' -f1)
-    LLVM_DIR=$(rustup which rustc | xargs dirname | xargs dirname)/lib/rustlib/$(rustc -vV | grep host | cut -d' ' -f2)/bin
-    export LLVM_PROFDATA="$LLVM_DIR/llvm-profdata"
-    export LLVM_COV="$LLVM_DIR/llvm-cov"
-    echo "Checking code coverage threshold..."
-    cargo llvm-cov clean
-    cargo llvm-cov --all-features --json --output-path target/coverage/coverage.json
-    COVERAGE=$(cat target/coverage/coverage.json | jq -r '.data[0].totals.lines.percent')
-    echo "Current coverage: ${COVERAGE}%"
-    if (( $(echo "$COVERAGE < 80" | bc -l) )); then
-        echo "⚠️  Coverage is below 80%: $COVERAGE%"
-        exit 1
-    else
-        echo "✅ Coverage meets 80% threshold: $COVERAGE%"
-    fi
+coverage-fast-lcov: _coverage-fast-collect
+    CARGO_LLVM_COV_TARGET_DIR=target/llvm-cov-fast-target cargo llvm-cov report --lcov --output-path target/coverage-fast/lcov.info
 
-# Open coverage report in browser
+_coverage-fast-collect:
+    mkdir -p target/coverage-fast
+    rm -f target/coverage-fast/lcov.info
+    rm -rf target/coverage-fast/html
+    CARGO_LLVM_COV_TARGET_DIR=target/llvm-cov-fast-target cargo llvm-cov clean --profraw-only
+    CARGO_LLVM_COV_TARGET_DIR=target/llvm-cov-fast-target cargo llvm-cov --no-report --lib -- --quiet
+
+# Open representative coverage in the browser.
 coverage-open: coverage
     open target/coverage/html/index.html
 
-# Analyze the current repository with debtmap using coverage data
-analyze-self:
-    #!/usr/bin/env bash
-    echo "Building debtmap..."
+# Analyze this repository using freshly collected representative coverage.
+analyze-self: coverage-lcov
     cargo build --bin debtmap
-    echo "Setting up LLVM tools..."
-    RUSTUP_TOOLCHAIN=$(rustup show active-toolchain | cut -d' ' -f1)
-    LLVM_DIR=$(rustup which rustc | xargs dirname | xargs dirname)/lib/rustlib/$(rustc -vV | grep host | cut -d' ' -f2)/bin
-    export LLVM_PROFDATA="$LLVM_DIR/llvm-profdata"
-    export LLVM_COV="$LLVM_DIR/llvm-cov"
-    echo "Generating code coverage (lcov format)..."
-    cargo llvm-cov clean
-    cargo llvm-cov --all-features --lcov --output-path target/coverage/lcov.info
-    echo "Analyzing current repository with debtmap..."
     ./target/debug/debtmap analyze . --lcov target/coverage/lcov.info -vv
-    echo "Analysis complete!"
 
 # Run property-based tests only (if using proptest)
 test-prop:
@@ -303,7 +210,7 @@ test-stress:
         --test call_graph_debug_output_test --test call_graph_stress_test \
         --test demo_library_api_test --test functional_composition_validation_test \
         --test parallel_unified_analysis_test --test stress_test_large_projects
-    cargo nextest run --profile stress \
+    cargo nextest run --profile stress --run-ignored all \
         --test boilerplate_performance_test --test coverage_performance_regression_test
 
 # Run opt-in tests that depend on terminal state, binaries, or local artifacts

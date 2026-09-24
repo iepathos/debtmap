@@ -38,6 +38,7 @@ end_of_record
         timestamp: Utc::now(),
         complexity: ComplexityReport {
             metrics: vec![FunctionMetrics {
+                column: None,
                 name: "test_func".to_string(),
                 file: PathBuf::from("src/test.rs"),
                 line: 10,
@@ -113,6 +114,7 @@ fn test_analyze_risk_with_coverage_invalid_lcov_path() {
         timestamp: Utc::now(),
         complexity: ComplexityReport {
             metrics: vec![FunctionMetrics {
+                column: None,
                 name: "test_func".to_string(),
                 file: PathBuf::from("src/test.rs"),
                 line: 10,
@@ -191,6 +193,7 @@ fn test_analyze_risk_without_coverage() {
         timestamp: Utc::now(),
         complexity: ComplexityReport {
             metrics: vec![FunctionMetrics {
+                column: None,
                 name: "main".to_string(),
                 file: PathBuf::from("src/test.rs"),
                 line: 10,

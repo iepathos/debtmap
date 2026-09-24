@@ -66,6 +66,27 @@ fn benchmark_lookup_comparison(c: &mut Criterion) {
     let temp_file = create_lcov_file(100, 20);
     let data = parse_lcov_file(temp_file.path()).unwrap();
 
+    group.bench_function("indexed_lookup_with_ast_bounds", |b| {
+        b.iter(|| {
+            for file_idx in 0..100 {
+                for func_idx in 0..20 {
+                    let file = PathBuf::from(format!(
+                        "/workspace/src/module_{}/file_{}.rs",
+                        file_idx / 10,
+                        file_idx
+                    ));
+                    let line = func_idx * 15 + 10;
+                    black_box(data.get_function_coverage_with_bounds(
+                        black_box(&file),
+                        "unused_ast_name",
+                        line,
+                        line + 9,
+                    ));
+                }
+            }
+        })
+    });
+
     // Test indexed lookup (O(1))
     group.bench_function("indexed_lookup_by_name", |b| {
         b.iter(|| {

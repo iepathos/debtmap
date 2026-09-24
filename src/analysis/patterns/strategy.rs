@@ -299,6 +299,7 @@ mod tests {
         };
 
         let function = FunctionMetrics {
+            column: None,
             name: "CreditCardStrategy.process_payment".to_string(),
             file: PathBuf::from("payment.py"),
             line: 20,
@@ -336,6 +337,7 @@ mod tests {
 
     fn create_function_metrics(name: &str) -> FunctionMetrics {
         FunctionMetrics {
+            column: None,
             name: name.to_string(),
             file: PathBuf::from("payment.py"),
             line: 20,

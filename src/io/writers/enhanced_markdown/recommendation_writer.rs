@@ -149,6 +149,7 @@ mod tests {
                 contextual_risk_multiplier: None,
                 pre_contextual_score: None,
                 debt_type_multiplier: None,
+                score_trace: Vec::new(),
             },
             upstream_dependencies: 2,
             downstream_dependencies: 5,
@@ -164,6 +165,7 @@ mod tests {
             upstream_production_callers: vec![],
             upstream_test_callers: vec![],
             production_blast_radius: 0,
+            immediate_neighbor_count: None,
             is_pure: Some(false),
             purity_confidence: Some(0.8),
             purity_level: None,
@@ -214,6 +216,7 @@ mod tests {
 
         let metrics: Vec<FunctionMetrics> = (0..10)
             .map(|i| FunctionMetrics {
+                column: None,
                 file: PathBuf::from(format!("test_{}.rs", i)),
                 name: format!("test_function_{}", i),
                 line: i * 10,

@@ -47,6 +47,7 @@ pub fn to_function_metrics(function: &GoFunction) -> FunctionMetrics {
     let detected_patterns = detected_patterns(function);
 
     FunctionMetrics {
+        column: None,
         name: function.name.clone(),
         file: function.file.clone(),
         line: function.line,

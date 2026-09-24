@@ -334,6 +334,7 @@ fn estimate_side_effects_from_complexity(func: &FunctionMetrics) -> bool {
 // Pure function for creating FunctionId
 fn create_function_id(func: &FunctionMetrics) -> crate::priority::call_graph::FunctionId {
     crate::priority::call_graph::FunctionId::new(func.file.clone(), func.name.clone(), func.line)
+        .with_column(func.column)
 }
 
 // Pure function for dependency extraction

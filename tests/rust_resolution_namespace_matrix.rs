@@ -1,0 +1,192 @@
+//! Desired namespace behavior, including deliberately ambiguous source inputs.
+#[path = "rust_resolution_namespace_matrix/cases.rs"]
+mod cases;
+#[path = "rust_resolution_matrix_support/mod.rs"]
+mod support;
+
+use cases::{Case, SourceKind};
+use support::verify;
+
+#[test]
+fn valid_namespace_matrix() {
+    check_cases(SourceKind::Valid);
+}
+
+#[test]
+fn deliberately_ambiguous_namespace_matrix() {
+    check_cases(SourceKind::Ambiguous);
+}
+
+fn check_cases(kind: SourceKind) {
+    let rows: Vec<_> = cases::all()
+        .into_iter()
+        .filter(|row| row.kind == kind)
+        .collect();
+    let failures: Vec<_> = rows.iter().filter_map(check_case).collect();
+    eprintln!(
+        "namespace {kind:?}: {} passed, {} failed, {} rows",
+        rows.len() - failures.len(),
+        failures.len(),
+        rows.len()
+    );
+    assert!(failures.is_empty(), "{}", failures.join("\n\n"));
+}
+
+fn check_case(case: &Case) -> Option<String> {
+    match verify(&case.name, &case.source, &case.expected) {
+        Ok(()) => {
+            eprintln!("namespace {:?}/{}: PASS", case.kind, case.name);
+            None
+        }
+        Err(error) => {
+            eprintln!("namespace {:?}/{}: FAIL", case.kind, case.name);
+            Some(error)
+        }
+    }
+}
+
+#[test]
+fn ambiguous_constructor_arguments_record_each_nested_call_once() {
+    use support::Expectation as E;
+    let source = "mod left { pub struct Item(pub u32); impl Item { /*@left_hit*/ pub fn hit(&self) {} } }
+        mod right { pub struct Item(pub u32); impl Item { /*@right_hit*/ pub fn hit(&self) {} } }
+        struct Other; impl Other { /*@other_hit*/ fn hit(&self) {} }
+        use left::*; use right::*;
+        /*@argument*/ fn argument() -> u32 { 1 }
+        /*@caller*/ fn caller() { let x = /*#constructor*/ Item(/*#argument_call*/ argument()); /*#method*/ x.hit(); }";
+    verify(
+        "ambiguous_constructor_argument",
+        source,
+        &[
+            E::absent("constructor", "Item("),
+            E::resolved("argument_call", "argument(", &["argument"]),
+            E::uncertain("method", "hit(", &["left_hit", "right_hit"]),
+        ],
+    )
+    .expect("constructor arguments visit once without a constructor body diagnostic");
+}
+
+#[test]
+fn mixed_function_constructor_results_retain_every_admissible_owner() {
+    use support::Expectation as E;
+    let source = "mod left { pub struct Item(pub u32); impl Item { /*@left_hit*/ pub fn hit(&self) {} } }
+        struct Other; impl Other { /*@other_hit*/ fn hit(&self) {} }
+        struct Noise; impl Noise { /*@noise_hit*/ fn hit(&self) {} }
+        mod right { /*@function*/ pub fn Item(_: u32) -> crate::Other { crate::Other } }
+        use left::*; use right::*;
+        /*@argument*/ fn argument() -> u32 { 1 }
+        /*@caller*/ fn caller() { let x = /*#constructor*/ Item(/*#argument_call*/ argument()); /*#method*/ x.hit(); }";
+    verify(
+        "mixed_invocation_results",
+        source,
+        &[
+            E::uncertain("constructor", "Item(", &["function"]),
+            E::resolved("argument_call", "argument(", &["argument"]),
+            E::uncertain("method", "hit(", &["left_hit", "other_hit"]),
+        ],
+    )
+    .expect("all invocation alternatives constrain the propagated result");
+}
+
+#[test]
+fn unresolved_explicit_import_keeps_constructor_call_uncertain() {
+    use debtmap::priority::call_graph::UncertaintyReason;
+    use support::Expectation as E;
+    // Deliberately incomplete source: the competing binding cannot be classified.
+    let source = "mod left { pub struct Item(pub u32); }
+        use left::Item; use missing::Item;
+        /*@argument*/ fn argument() -> u32 { 1 }
+        /*@caller*/ fn caller() { let _ = /*#constructor*/ Item(/*#argument_call*/ argument()); }";
+    verify(
+        "unresolved_explicit_constructor_competitor",
+        source,
+        &[
+            E::uncertain("constructor", "Item(", &[])
+                .reason(UncertaintyReason::AmbiguousDeclaration),
+            E::resolved("argument_call", "argument(", &["argument"]),
+        ],
+    )
+    .expect("an unavailable competing binding must retain one uncertain call site");
+}
+
+#[test]
+fn known_explicit_constructor_conflicts_do_not_invent_call_diagnostics() {
+    use support::Expectation as E;
+    // Both conflicting bindings are known constructors without callable bodies.
+    let source = "mod left { pub struct Item(pub u32); }
+        mod right { pub struct Item(pub u32); }
+        use left::Item; use right::Item;
+        /*@argument*/ fn argument() -> u32 { 1 }
+        /*@caller*/ fn caller() { let _ = /*#constructor*/ Item(/*#argument_call*/ argument()); }";
+    verify(
+        "known_explicit_constructor_competitors",
+        source,
+        &[
+            E::absent("constructor", "Item("),
+            E::resolved("argument_call", "argument(", &["argument"]),
+        ],
+    )
+    .expect("fully known constructor conflicts omit diagnostics and visit arguments once");
+}
+
+#[test]
+fn glob_fed_constructor_alias_does_not_turn_search_misses_into_bindings() {
+    use support::Expectation as E;
+    let source = "mod left { pub struct Item(pub u32); }
+        use left::*; use Item as Alias;
+        /*@caller*/ fn caller() { let _ = /*#constructor*/ Alias(1); }";
+    verify(
+        "glob_fed_constructor_alias",
+        source,
+        &[E::absent("constructor", "Alias(")],
+    )
+    .expect("an unbound local search path does not compete with the known constructor");
+}
+
+#[test]
+fn unresolved_constructor_competitor_survives_an_explicit_reexport() {
+    use debtmap::priority::call_graph::UncertaintyReason;
+    use support::Expectation as E;
+    let source = "mod left { pub struct Item(pub u32); }
+        mod export { pub use crate::left::Item; pub use missing::Item; }
+        use export::Item;
+        /*@caller*/ fn caller() { let _ = /*#constructor*/ Item(1); }";
+    verify(
+        "reexported_unresolved_constructor_competitor",
+        source,
+        &[E::uncertain("constructor", "Item(", &[])
+            .reason(UncertaintyReason::AmbiguousDeclaration)],
+    )
+    .expect("reexport expansion cannot hide an unavailable competing binding");
+}
+
+#[test]
+fn cyclic_explicit_import_does_not_erase_constructor_call_uncertainty() {
+    use debtmap::priority::call_graph::UncertaintyReason;
+    use support::Expectation as E;
+    let source = "mod left { pub struct Item(pub u32); }
+        use left::Item; use A as Item; use B as A; use A as B;
+        /*@caller*/ fn caller() { let _ = /*#constructor*/ Item(1); }";
+    verify(
+        "cyclic_explicit_constructor_competitor",
+        source,
+        &[E::uncertain("constructor", "Item(", &[])
+            .reason(UncertaintyReason::AmbiguousDeclaration)],
+    )
+    .expect("an exhausted import search does not establish constructor-only bindings");
+}
+
+#[test]
+fn cfg_value_keeps_local_and_import_candidates() {
+    use support::Expectation as E;
+    let source = "mod imp { /*@fallback*/ pub fn fallback() {} }
+        #[cfg(feature=\"native\")] /*@local*/ fn imp() {}
+        #[cfg(not(feature=\"native\"))] use crate::imp::fallback as imp;
+        /*@caller*/ fn call() { /*#call*/ imp(); }";
+    verify(
+        "cfg_value_keeps_local_and_import_candidates",
+        source,
+        &[E::uncertain("call", "imp(", &["local", "fallback"])],
+    )
+    .expect("configuration alternatives must both remain admissible");
+}

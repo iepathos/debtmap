@@ -5,6 +5,7 @@ use std::path::PathBuf;
 fn test_complexity_metrics() {
     let functions = vec![
         FunctionMetrics {
+            column: None,
             name: "simple".to_string(),
             file: PathBuf::from("test.rs"),
             line: 1,
@@ -34,6 +35,7 @@ fn test_complexity_metrics() {
             entropy_analysis: None,
         },
         FunctionMetrics {
+            column: None,
             name: "complex".to_string(),
             file: PathBuf::from("test.rs"),
             line: 20,
@@ -63,6 +65,7 @@ fn test_complexity_metrics() {
             entropy_analysis: None,
         },
         FunctionMetrics {
+            column: None,
             name: "medium".to_string(),
             file: PathBuf::from("test.rs"),
             line: 80,
@@ -112,6 +115,7 @@ fn test_complexity_metrics() {
 #[test]
 fn test_function_is_complex() {
     let func = FunctionMetrics {
+        column: None,
         name: "test".to_string(),
         file: PathBuf::from("test.rs"),
         line: 1,

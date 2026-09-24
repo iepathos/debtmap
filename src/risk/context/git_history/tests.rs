@@ -42,6 +42,7 @@ fn function_history_git2(
 #[cfg(test)]
 fn test_function_metric(file: PathBuf, name: &str) -> crate::core::FunctionMetrics {
     crate::core::FunctionMetrics {
+        column: None,
         name: name.to_string(),
         file,
         line: 1,
@@ -244,6 +245,53 @@ fn test_determine_stability_status_edge_cases() {
 }
 
 #[test]
+fn test_history_confidence_zero_tiny_and_large_samples() {
+    let contribution = |samples| stability::sample_adjusted_contribution(4.2, 1.0, samples);
+    assert_eq!(contribution(0), 0.0);
+    assert!((contribution(1) - 1.71 / 6.0).abs() < 1e-12);
+    assert!((contribution(5) - 1.71 / 2.0).abs() < 1e-12);
+    assert!((contribution(995) - 1.71 * 0.995).abs() < 1e-12);
+    assert!((0..100).all(|samples| contribution(samples) <= contribution(samples + 1)));
+    assert!(contribution(usize::MAX) <= 2.0);
+}
+
+#[test]
+fn test_history_confidence_preserves_neutral_and_capped_contributions() {
+    for samples in [0, 1, 4, 5, 6, 100, usize::MAX] {
+        assert_eq!(
+            stability::sample_adjusted_contribution(0.0, 0.0, samples),
+            0.0
+        );
+        let capped = stability::sample_adjusted_contribution(100.0, 1.5, samples);
+        assert!((0.0..=2.0).contains(&capped));
+    }
+}
+
+#[test]
+fn test_function_context_confidence_excludes_introduction_and_keeps_raw_ratio() {
+    let now = chrono::Utc::now();
+    let history = function_level::FunctionHistory {
+        introduction_commit: Some("created".to_string()),
+        total_commits: 1,
+        bug_fix_count: 1,
+        introduced: Some(now - chrono::Duration::days(30)),
+        ..Default::default()
+    };
+    let context =
+        GitHistoryProvider::context_from_function_history("git_history", 1.0, &history, now);
+    assert!((context.contribution - 1.55 / 6.0).abs() < 1e-12);
+    assert!(matches!(
+        context.details,
+        ContextDetails::Historical {
+            total_commits: 2,
+            bug_fix_count: 1,
+            bug_density: 1.0,
+            ..
+        }
+    ));
+}
+
+#[test]
 fn test_classify_risk_contribution_continuous_scaling() {
     // Test that contribution scales continuously with bug density
     // Formula: bug_density * 1.5 + min(freq/20, 0.5)
@@ -347,13 +395,16 @@ fn test_classify_risk_contribution_capped_at_max() {
 fn test_format_stability_message_highly_unstable() {
     let message =
         stability::format_stability_message(StabilityStatus::HighlyUnstable, 8.5, 0.45, 180, 5);
-    assert_eq!(message, "Highly unstable: 8.5 changes/month, 45% bug fixes");
+    assert_eq!(
+        message,
+        "High history activity: 8.5 changes/month, 45% fix-labelled commit ratio"
+    );
 
     let message =
         stability::format_stability_message(StabilityStatus::HighlyUnstable, 12.3, 0.67, 90, 10);
     assert_eq!(
         message,
-        "Highly unstable: 12.3 changes/month, 67% bug fixes"
+        "High history activity: 12.3 changes/month, 67% fix-labelled commit ratio"
     );
 }
 
@@ -377,10 +428,16 @@ fn test_format_stability_message_frequently_changed() {
 #[test]
 fn test_format_stability_message_bug_prone() {
     let message = stability::format_stability_message(StabilityStatus::BugProne, 1.2, 0.35, 150, 3);
-    assert_eq!(message, "Bug-prone: 35% of commits are bug fixes");
+    assert_eq!(
+        message,
+        "Frequent fix labels: 35% fix-labelled commit ratio"
+    );
 
     let message = stability::format_stability_message(StabilityStatus::BugProne, 0.8, 0.72, 300, 2);
-    assert_eq!(message, "Bug-prone: 72% of commits are bug fixes");
+    assert_eq!(
+        message,
+        "Frequent fix labels: 72% fix-labelled commit ratio"
+    );
 }
 
 #[test]
@@ -438,11 +495,15 @@ fn test_gather_integration() -> Result<()> {
     assert_eq!(context.weight, 1.0);
 
     // Check that the contribution is calculated correctly
-    if let ContextDetails::Historical { bug_density, .. } = context.details {
-        // We have 3 bug fixes out of 4 commits = 0.75 bug density
-        assert!(bug_density > 0.7);
-        // With high bug density (>0.3), we expect high contribution
-        assert!(context.contribution >= 1.0);
+    if let ContextDetails::Historical {
+        bug_density,
+        change_frequency,
+        ..
+    } = context.details
+    {
+        assert_eq!(bug_density, 1.0);
+        let expected = stability::sample_adjusted_contribution(change_frequency, bug_density, 3);
+        assert!((context.contribution - expected).abs() < 1e-12);
     } else {
         panic!("Expected Historical context details");
     }
@@ -749,6 +810,7 @@ fn test_batched_function_preload_matches_direct_lookup() -> Result<()> {
     let mut provider = GitHistoryProvider::new(repo_path.clone())?;
     let metrics = vec![
         crate::core::FunctionMetrics {
+            column: None,
             name: "alpha".to_string(),
             file: PathBuf::from("test.rs"),
             line: 1,
@@ -778,6 +840,7 @@ fn test_batched_function_preload_matches_direct_lookup() -> Result<()> {
             entropy_analysis: None,
         },
         crate::core::FunctionMetrics {
+            column: None,
             name: "beta".to_string(),
             file: PathBuf::from("test.rs"),
             line: 2,
@@ -840,6 +903,47 @@ fn test_batched_function_preload_matches_direct_lookup() -> Result<()> {
         panic!("expected historical context");
     }
 
+    Ok(())
+}
+
+#[test]
+fn test_preloaded_missing_function_does_not_reopen_git_repository() -> Result<()> {
+    let (_temp, repo_path) = setup_test_repo()?;
+    create_test_file(&repo_path, "test.rs", "fn existing() {}")?;
+    commit_with_message(&repo_path, "Initial commit")?;
+
+    let mut provider = GitHistoryProvider::new(repo_path.clone())?;
+    provider
+        .preload_function_histories(&[test_function_metric(PathBuf::from("test.rs"), "missing")])?;
+    let mut target = AnalysisTarget {
+        root_path: repo_path.clone(),
+        file_path: PathBuf::from("test.rs"),
+        function_name: "missing".to_string(),
+        line_range: (1, 1),
+        reference_time: chrono::Utc::now(),
+    };
+
+    // Make a repeated repository scan fail, while retaining the completed snapshot.
+    std::fs::rename(repo_path.join(".git"), repo_path.join("saved-git"))?;
+    for _ in 0..2 {
+        assert!(
+            provider
+                .lookup_function_history(Path::new("test.rs"), &target)?
+                .is_none()
+        );
+        assert!(
+            provider.gather(&target).is_ok(),
+            "File history remains available"
+        );
+    }
+
+    target.function_name = "existing".to_string();
+    assert!(
+        provider
+            .lookup_function_history(Path::new("test.rs"), &target)
+            .is_err(),
+        "Targets absent from preload must retain on-demand lookup"
+    );
     Ok(())
 }
 
@@ -979,6 +1083,7 @@ fn test_gather_falls_back_to_file_level() -> Result<()> {
     if let ContextDetails::Historical {
         change_frequency,
         bug_density,
+        total_commits,
         ..
     } = context.details
     {
@@ -992,6 +1097,9 @@ fn test_gather_falls_back_to_file_level() -> Result<()> {
             change_frequency >= 0.0,
             "Change frequency should be non-negative"
         );
+        assert_eq!(total_commits, 2);
+        let expected = stability::sample_adjusted_contribution(change_frequency, bug_density, 2);
+        assert!((context.contribution - expected).abs() < 1e-12);
     } else {
         panic!("Expected Historical context details");
     }

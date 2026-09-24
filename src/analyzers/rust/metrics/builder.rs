@@ -56,6 +56,7 @@ mod tests {
     fn test_calculate_total_complexity() {
         let functions = vec![
             FunctionMetrics {
+                column: None,
                 name: "func1".to_string(),
                 file: PathBuf::from("test.rs"),
                 line: 1,
@@ -85,6 +86,7 @@ mod tests {
                 entropy_analysis: None,
             },
             FunctionMetrics {
+                column: None,
                 name: "func2".to_string(),
                 file: PathBuf::from("test.rs"),
                 line: 15,
@@ -132,6 +134,7 @@ mod tests {
     fn test_build_file_metrics() {
         let path = PathBuf::from("test.rs");
         let functions = vec![FunctionMetrics {
+            column: None,
             name: "test_fn".to_string(),
             file: path.clone(),
             line: 1,

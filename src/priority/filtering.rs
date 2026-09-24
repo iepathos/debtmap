@@ -367,6 +367,7 @@ mod tests {
                 contextual_risk_multiplier: None,
                 pre_contextual_score: None,
                 debt_type_multiplier: None,
+                score_trace: Vec::new(),
             },
             function_role: FunctionRole::PureLogic,
             recommendation: ActionableRecommendation {
@@ -391,6 +392,7 @@ mod tests {
             upstream_production_callers: vec![],
             upstream_test_callers: vec![],
             production_blast_radius: 0,
+            immediate_neighbor_count: None,
             nesting_depth: 0,
             function_length: 10,
             cyclomatic_complexity: 1,

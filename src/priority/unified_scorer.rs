@@ -1,6 +1,8 @@
 use crate::core::{FunctionMetrics, PurityLevel};
 use crate::data_flow::DataFlowGraph;
 use crate::organization::GodObjectAnalysis;
+use crate::priority::scoring::complexity_inputs::ComplexityInputs;
+use crate::priority::scoring::trace::{ScoreOperation, ScoreStep};
 use crate::priority::{
     ActionableRecommendation, DebtType, FunctionAnalysis, ImpactMetrics,
     call_graph::{CallGraph, FunctionId},
@@ -8,8 +10,7 @@ use crate::priority::{
     debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId},
     scoring::calculation::{
         calculate_base_score_no_coverage, calculate_base_score_with_coverage_multiplier,
-        calculate_complexity_factor, calculate_coverage_factor, calculate_coverage_multiplier,
-        calculate_dependency_factor,
+        calculate_coverage_factor, calculate_coverage_multiplier, calculate_dependency_factor,
     },
     scoring::debt_item::{determine_visibility, is_dead_code},
     semantic_classifier::{FunctionRole, classify_function_role},
@@ -95,9 +96,12 @@ impl PuritySpectrum {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UnifiedScore {
-    pub complexity_factor: f64, // 0-10, configurable weight (default 35%)
-    pub coverage_factor: f64,   // 0-10, configurable weight (default 40%)
-    pub dependency_factor: f64, // 0-10, configurable weight (default 20%)
+    /// Arithmetic evidence for human explanations, excluded from record formats.
+    #[serde(skip)]
+    pub score_trace: Vec<crate::priority::scoring::trace::ScoreStep>,
+    pub complexity_factor: f64, // Complexity indicator used in the weighted base
+    pub coverage_factor: f64,   // Displayed uncovered fraction × 10, not an additive score
+    pub dependency_factor: f64, // External production caller contribution
     pub role_multiplier: f64,   // 0.1-1.5x based on function role
     pub final_score: f64,       // Computed composite score (with scaling applied)
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -171,6 +175,10 @@ pub struct UnifiedDebtItem {
     /// Production-only blast radius for scoring (Spec 267)
     #[serde(default)]
     pub production_blast_radius: usize,
+    /// Distinct immediate neighboring definitions, counted before display formatting.
+    /// Legacy serialized records lack exact identity counts.
+    #[serde(skip)]
+    pub immediate_neighbor_count: Option<usize>,
     pub nesting_depth: u32,
     pub function_length: usize,
     pub cyclomatic_complexity: u32,
@@ -226,6 +234,25 @@ pub struct UnifiedDebtItem {
 }
 
 impl UnifiedDebtItem {
+    /// Count immediate neighbors; legacy records can only deduplicate display labels.
+    pub fn immediate_neighbors(&self) -> usize {
+        self.immediate_neighbor_count.unwrap_or_else(|| {
+            let known = self
+                .upstream_callers
+                .iter()
+                .chain(&self.downstream_callees)
+                .collect::<std::collections::HashSet<_>>()
+                .len();
+            known
+                + self
+                    .upstream_dependencies
+                    .saturating_sub(self.upstream_callers.len())
+                + self
+                    .downstream_dependencies
+                    .saturating_sub(self.downstream_callees.len())
+        })
+    }
+
     /// Builder method to attach pattern analysis to this debt item (spec 151)
     pub fn with_pattern_analysis(
         mut self,
@@ -288,6 +315,13 @@ pub fn calculate_unified_score_with_patterns(
         1.0
     };
 
+    let mut score_trace = base_score.score_trace.clone();
+    score_trace.push(ScoreStep::new(
+        "God-object context",
+        base_score.final_score,
+        ScoreOperation::Multiply(god_object_multiplier),
+        base_score.final_score.max(0.0) * god_object_multiplier,
+    ));
     UnifiedScore {
         complexity_factor: base_score.complexity_factor * god_object_multiplier,
         coverage_factor: base_score.coverage_factor,
@@ -310,6 +344,7 @@ pub fn calculate_unified_score_with_patterns(
         contextual_risk_multiplier: base_score.contextual_risk_multiplier,
         pre_contextual_score: base_score.pre_contextual_score,
         debt_type_multiplier: base_score.debt_type_multiplier,
+        score_trace,
     }
 }
 
@@ -321,7 +356,8 @@ pub fn calculate_unified_priority_with_debt(
     debt_aggregator: Option<&DebtAggregator>,
     has_coverage_data: bool,
 ) -> UnifiedScore {
-    let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
+    let func_id =
+        FunctionId::new(func.file.clone(), func.name.clone(), func.line).with_column(func.column);
 
     // Check if this function is actually technical debt
     // Simple I/O wrappers, entry points, and trivial pure functions with low complexity
@@ -391,6 +427,7 @@ pub fn calculate_unified_priority_with_role(
             contextual_risk_multiplier: None,
             pre_contextual_score: None,
             debt_type_multiplier: None,
+            score_trace: Vec::new(),
         };
     }
 
@@ -398,27 +435,20 @@ pub fn calculate_unified_priority_with_role(
     // Orchestrators typically have low cognitive complexity relative to cyclomatic
     let is_orchestrator_candidate = role == FunctionRole::Orchestrator;
 
-    // Calculate entropy analysis if available (Spec 218)
-    let entropy_analysis = crate::priority::scoring::computation::calculate_entropy_analysis(func);
-
-    // Calculate purity adjustment and apply to complexity metrics
-    let purity_bonus = calculate_purity_adjustment(func);
-    let (purity_adjusted_cyclomatic, purity_adjusted_cognitive) =
-        apply_purity_adjustment(func.cyclomatic, func.cognitive, purity_bonus);
-
-    let raw_complexity = normalize_complexity(
-        purity_adjusted_cyclomatic,
-        purity_adjusted_cognitive,
-        entropy_analysis.as_ref(),
+    let complexity_inputs = ComplexityInputs::for_function(
+        func,
+        graph_purity_adjustment(func, func_id, call_graph),
         is_orchestrator_candidate,
+        crate::config::get_config(),
     );
+    let raw_complexity = complexity_inputs.weighted_complexity();
 
     // Calculate complexity and dependency factors
-    let complexity_factor = calculate_complexity_factor(raw_complexity);
+    let complexity_factor = complexity_inputs.factor();
 
     // Spec 267: Use production callers only for scoring
     // Test callers don't increase change risk, so they shouldn't inflate the dependency factor
-    let upstream_callers = call_graph.get_callers(func_id);
+    let upstream_callers = call_graph.external_callers(func_id);
     let production_upstream_count = count_production_callers(&upstream_callers, call_graph);
     let dependency_factor = calculate_dependency_factor(production_upstream_count);
 
@@ -427,13 +457,22 @@ pub fn calculate_unified_priority_with_role(
     let coverage_weight = get_role_coverage_weight(role);
 
     // Calculate base score
-    let base_score = calculate_base_score(
+    let (base_score, mut score_trace) = calculate_base_score(
         has_coverage_data,
         func.is_test,
         coverage_pct,
         coverage_weight,
         complexity_factor,
         dependency_factor,
+    );
+    score_trace.insert(
+        0,
+        ScoreStep::new(
+            "Complexity factor",
+            0.0,
+            ScoreOperation::Complexity(complexity_inputs),
+            complexity_factor,
+        ),
     );
 
     // Store coverage_factor for display purposes (kept for backward compatibility)
@@ -455,6 +494,12 @@ pub fn calculate_unified_priority_with_role(
         role_multiplier
     };
     let role_adjusted_score = base_score * clamped_role_multiplier;
+    score_trace.push(ScoreStep::new(
+        "Role (after configured clamp)",
+        base_score,
+        ScoreOperation::Multiply(clamped_role_multiplier),
+        role_adjusted_score,
+    ));
 
     // Apply structural quality adjustment based on nesting/cyclomatic ratio
     // High ratio = deeply nested relative to branches = bad structure = boost score
@@ -462,14 +507,36 @@ pub fn calculate_unified_priority_with_role(
     let structural_multiplier =
         calculate_structural_quality_multiplier(func.nesting, func.cyclomatic);
     let structure_adjusted_score = role_adjusted_score * structural_multiplier;
+    score_trace.push(ScoreStep::new(
+        "Structure",
+        role_adjusted_score,
+        ScoreOperation::Multiply(structural_multiplier),
+        structure_adjusted_score,
+    ));
 
     // Add debt-based adjustments with detailed breakdown (spec 260)
     let (debt_adjustment, debt_details) =
         calculate_debt_adjustment_with_details(func, debt_aggregator);
     let debt_adjusted_score = structure_adjusted_score + debt_adjustment;
+    if debt_adjustment != 0.0 {
+        score_trace.push(ScoreStep::new(
+            "Debt adjustment",
+            structure_adjusted_score,
+            ScoreOperation::Add(debt_adjustment),
+            debt_adjusted_score,
+        ));
+    }
 
     // Floor negative scores to 0 (no upper bound - spec 261)
     let floored_score = debt_adjusted_score.max(0.0);
+    if debt_adjusted_score < 0.0 {
+        score_trace.push(ScoreStep::new(
+            "Nonnegative floor",
+            debt_adjusted_score,
+            ScoreOperation::Floor(0.0),
+            floored_score,
+        ));
+    }
 
     // Track if negative clamping occurred for transparency (spec 260)
     let pre_normalization_score = if debt_adjusted_score < 0.0 {
@@ -487,6 +554,14 @@ pub fn calculate_unified_priority_with_role(
         call_graph,
         &role,
     );
+    if adjustment.is_some() {
+        score_trace.push(ScoreStep::new(
+            "Orchestration adjustment",
+            floored_score,
+            ScoreOperation::Adjustment,
+            final_normalized_score,
+        ));
+    }
 
     // Always store debt adjustment details for transparency (spec 260)
     // Even small adjustments help explain score differences in the TUI
@@ -518,10 +593,36 @@ pub fn calculate_unified_priority_with_role(
         contextual_risk_multiplier: None, // Set by apply_contextual_risk_to_score
         pre_contextual_score: None,       // Set by apply_contextual_risk_to_score
         debt_type_multiplier: None,       // Set by apply_score_scaling
+        score_trace,
     }
 }
 
 // Helper functions for calculate_unified_priority_with_debt
+
+fn graph_purity_adjustment(func: &FunctionMetrics, id: &FunctionId, graph: &CallGraph) -> f64 {
+    use crate::analysis::effect_evidence::EffectClassification as Class;
+    if crate::core::Language::from_path(&func.file) != crate::core::Language::Rust {
+        return calculate_purity_adjustment(func);
+    }
+    let Some(assessment) = graph.effect_assessment(id) else {
+        return 1.0;
+    };
+    // Unpropagated invocation facts alone cannot establish a discount.
+    if !graph.effect_assessments_are_propagated() && assessment.dependencies().next().is_some() {
+        return 1.0;
+    }
+    match (
+        assessment.classification(),
+        func.purity_confidence.unwrap_or(0.0) > 0.8,
+    ) {
+        (Class::StrictlyPure, true) => 0.70,
+        (Class::StrictlyPure, false) => 0.80,
+        (Class::LocallyPure, true) => 0.75,
+        (Class::LocallyPure, false) => 0.85,
+        (Class::ReadOnly, _) => 0.90,
+        (Class::Impure | Class::Unknown, _) => 1.0,
+    }
+}
 
 /// Determine if a function is trivial based on complexity and role.
 ///
@@ -542,8 +643,13 @@ fn get_function_coverage(func: &FunctionMetrics, coverage: Option<&LcovData>) ->
     if func.is_test {
         1.0 // Test functions have 100% coverage by definition
     } else if let Some(cov) = coverage {
-        cov.get_function_coverage(&func.file, &func.name)
-            .unwrap_or(0.0)
+        cov.get_function_coverage_with_bounds(
+            &func.file,
+            &func.name,
+            func.line,
+            func.line.saturating_add(func.length.saturating_sub(1)),
+        )
+        .unwrap_or(0.0)
     } else {
         0.0 // No coverage data - assume worst case
     }
@@ -565,6 +671,14 @@ fn should_skip_as_non_debt(is_trivial: bool, has_coverage: bool) -> bool {
 /// - ReadOnly: 0.90 (good - reads but doesn't modify)
 /// - Impure: 1.0 (no bonus)
 fn calculate_purity_adjustment(func: &FunctionMetrics) -> f64 {
+    let rust_evidence = crate::core::Language::from_path(&func.file) != crate::core::Language::Rust
+        || func
+            .purity_reason
+            .as_deref()
+            .is_some_and(|reason| reason.starts_with("EffectEvidence:"));
+    if !rust_evidence {
+        return 1.0;
+    }
     // Try new purity_level field first
     if let Some(level) = func.purity_level {
         let confidence = func.purity_confidence.unwrap_or(0.0);
@@ -590,8 +704,10 @@ fn calculate_purity_adjustment(func: &FunctionMetrics) -> f64 {
         };
     }
 
-    // Fallback to legacy is_pure field for backward compatibility
-    if func.is_pure == Some(true) {
+    // Other-language compatibility only. Rust legacy booleans are not evidence.
+    if crate::core::Language::from_path(&func.file) != crate::core::Language::Rust
+        && func.is_pure == Some(true)
+    {
         // Old code path - treat as StrictlyPure
         if func.purity_confidence.unwrap_or(0.0) > 0.8 {
             0.70
@@ -601,16 +717,6 @@ fn calculate_purity_adjustment(func: &FunctionMetrics) -> f64 {
     } else {
         1.0 // Impure or unknown
     }
-}
-
-/// Apply purity adjustment to complexity metrics.
-///
-/// Returns adjusted cyclomatic and cognitive complexity values.
-fn apply_purity_adjustment(cyclomatic: u32, cognitive: u32, adjustment: f64) -> (u32, u32) {
-    (
-        (cyclomatic as f64 * adjustment) as u32,
-        (cognitive as f64 * adjustment) as u32,
-    )
 }
 
 /// Calculate structural quality multiplier based on nesting/cyclomatic ratio.
@@ -684,8 +790,18 @@ fn calculate_base_score(
     coverage_weight: f64,
     complexity_factor: f64,
     dependency_factor: f64,
-) -> f64 {
-    if has_coverage_data {
+) -> (f64, Vec<ScoreStep>) {
+    let raw_base = calculate_base_score_no_coverage(complexity_factor, dependency_factor);
+    let mut trace = vec![ScoreStep::new(
+        "Weighted complexity and dependencies",
+        complexity_factor,
+        ScoreOperation::WeightedBase {
+            complexity: complexity_factor,
+            dependency: dependency_factor,
+        },
+        raw_base,
+    )];
+    let score = if has_coverage_data {
         // With coverage: use multiplier approach (coverage dampens complexity+deps score)
         let coverage_multiplier = if is_test {
             0.0 // Test functions get maximum dampening (near-zero score)
@@ -694,15 +810,23 @@ fn calculate_base_score(
             let adjusted_coverage_pct = 1.0 - ((1.0 - coverage_pct) * coverage_weight);
             calculate_coverage_multiplier(adjusted_coverage_pct)
         };
-        calculate_base_score_with_coverage_multiplier(
+        let score = calculate_base_score_with_coverage_multiplier(
             coverage_multiplier,
             complexity_factor,
             dependency_factor,
-        )
+        );
+        trace.push(ScoreStep::new(
+            "Coverage (role-adjusted uncovered fraction)",
+            raw_base,
+            ScoreOperation::Multiply(coverage_multiplier),
+            score,
+        ));
+        score
     } else {
         // Without coverage: adjusted weights (50% complexity, 25% deps, 25% debt)
-        calculate_base_score_no_coverage(complexity_factor, dependency_factor)
-    }
+        raw_base
+    };
+    (score, trace)
 }
 
 /// Calculate debt-based adjustment to the score with detailed breakdown (spec 260).
@@ -715,7 +839,8 @@ fn calculate_debt_adjustment_with_details(
 ) -> (f64, DebtAdjustmentDetails) {
     if let Some(aggregator) = debt_aggregator {
         let agg_func_id =
-            AggregatorFunctionId::new(func.file.clone(), func.name.clone(), func.line);
+            AggregatorFunctionId::new(func.file.clone(), func.name.clone(), func.line)
+                .with_column(func.column);
         let debt_scores = aggregator.calculate_debt_scores(&agg_func_id);
 
         // Calculate individual components
@@ -786,76 +911,14 @@ fn apply_orchestration_adjustment(
     )
 }
 
-/// Normalize complexity to 0-10 scale using weighted complexity (spec 121).
-///
-/// Uses configurable weights for cyclomatic and cognitive complexity.
-/// Default: 30% cyclomatic, 70% cognitive (research shows cognitive correlates better with bugs).
-/// For orchestrators, cognitive weight may be increased further.
-/// Calculate raw complexity from cyclomatic and cognitive metrics.
-///
-/// Uses raw cyclomatic (no dampening) and entropy-adjusted cognitive.
-/// Returns a weighted sum that feeds into calculate_complexity_factor.
-///
-/// Formula: cyclomatic * weight_cyc + cognitive_adjusted * weight_cog
-/// - Default weights: 40% cyclomatic, 60% cognitive
-/// - Orchestrators: 25% cyclomatic, 75% cognitive (cognitive matters more)
-fn normalize_complexity(
-    cyclomatic: u32,
-    cognitive: u32,
-    entropy_analysis: Option<&crate::complexity::EntropyAnalysis>,
-    is_orchestrator: bool,
-) -> f64 {
-    let entropy_config = crate::config::get_entropy_config();
-
-    // Use raw cyclomatic (no entropy dampening on cyclomatic)
-    let raw_cyclomatic = cyclomatic as f64;
-
-    // Use entropy-adjusted cognitive if available and enabled
-    let adjusted_cognitive = if let Some(entropy) = entropy_analysis {
-        if entropy_config.enabled {
-            entropy.adjusted_complexity as f64
-        } else {
-            cognitive as f64
-        }
-    } else {
-        cognitive as f64
-    };
-
-    // Get weights from configuration or use defaults
-    let config = crate::config::get_config();
-    let (cyc_weight, cog_weight) = if let Some(weights_config) = config.complexity_weights.as_ref()
-    {
-        (weights_config.cyclomatic, weights_config.cognitive)
-    } else if is_orchestrator {
-        // Orchestrators: cognitive complexity matters more
-        (0.25, 0.75)
-    } else {
-        // Default: 40% cyclomatic, 60% cognitive
-        (0.4, 0.6)
-    };
-
-    // Simple weighted sum - no complex normalization
-    // Result feeds into calculate_complexity_factor which divides by 2 and clamps to 0-10
-    raw_cyclomatic * cyc_weight + adjusted_cognitive * cog_weight
-}
-
 /// Count production callers from a list of function IDs (Spec 267).
 ///
 /// Uses the call graph to check if each caller is a test function,
 /// then falls back to heuristics if call graph data is unavailable.
 fn count_production_callers(callers: &[FunctionId], call_graph: &CallGraph) -> usize {
-    use crate::priority::caller_classification::{CallerType, classify_caller};
-
     callers
         .iter()
-        .filter(|caller| {
-            // Check if caller is a test function via call graph
-            if call_graph.is_test_function(caller) {
-                return false;
-            }
-            // Fallback to heuristics for name-based detection
-            classify_caller(&caller.name, Some(call_graph)) == CallerType::Production
-        })
+        .filter(|caller| !call_graph.is_test_dependency(caller))
         .count()
 }
 
@@ -922,59 +985,21 @@ pub fn is_dead_code_with_exclusions(
 /// Returns a factor in range 0.0-1.0 where lower values reduce priority.
 /// Based on PuritySpectrum classification derived from data flow graph.
 fn calculate_purity_factor(func_id: &FunctionId, data_flow: &DataFlowGraph) -> f64 {
-    // Get purity info from data flow analysis
-    let purity_info = data_flow.get_purity_info(func_id);
+    use crate::analysis::effect_evidence::EffectClassification;
 
-    // Get mutation analysis
-    let mutation_info = data_flow.get_mutation_info(func_id);
-
-    // Get I/O operations
-    let io_ops = data_flow.get_io_operations(func_id);
-
-    // Classify on purity spectrum (spec 257: use binary signals)
-    let spectrum = if let Some(purity) = purity_info {
-        if purity.is_pure && purity.confidence > 0.8 {
-            // Check if truly pure or just locally pure using binary signals
-            if let Some(mutations) = mutation_info {
-                if mutations.has_mutations {
-                    // Has local mutations but doesn't escape
-                    PuritySpectrum::LocallyPure
-                } else {
-                    // No mutations at all
-                    PuritySpectrum::StrictlyPure
-                }
-            } else {
-                PuritySpectrum::StrictlyPure
-            }
-        } else if purity.is_pure {
-            // Lower confidence purity
-            PuritySpectrum::LocallyPure
-        } else {
-            // Not pure - check I/O isolation
-            classify_io_isolation(io_ops)
-        }
-    } else {
-        // No purity info - assume impure
-        PuritySpectrum::Impure
-    };
-
-    spectrum.score_multiplier()
-}
-
-/// Classify I/O isolation level based on I/O operations
-fn classify_io_isolation(io_ops: Option<&Vec<crate::data_flow::IoOperation>>) -> PuritySpectrum {
-    match io_ops {
-        None => PuritySpectrum::Impure,
-        Some(ops) if ops.is_empty() => PuritySpectrum::Impure,
-        Some(ops) => {
-            // If I/O operations are concentrated (few unique types), likely isolated
-            let unique_types: HashSet<&String> = ops.iter().map(|op| &op.operation_type).collect();
-            if unique_types.len() <= 2 && ops.len() <= 3 {
-                PuritySpectrum::IOIsolated
-            } else {
-                PuritySpectrum::IOMixed
-            }
-        }
+    match data_flow
+        .get_purity_info(func_id)
+        .and_then(|purity| purity.assessment.as_ref())
+        .map(|assessment| assessment.classification())
+    {
+        Some(EffectClassification::StrictlyPure) => 0.0,
+        Some(EffectClassification::LocallyPure) => 0.3,
+        Some(
+            EffectClassification::ReadOnly
+            | EffectClassification::Impure
+            | EffectClassification::Unknown,
+        )
+        | None => 1.0,
     }
 }
 
@@ -1047,7 +1072,8 @@ pub fn calculate_unified_priority_with_data_flow(
     debt_aggregator: Option<&DebtAggregator>,
     config: &crate::config::DataFlowScoringConfig,
 ) -> UnifiedScore {
-    let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
+    let func_id =
+        FunctionId::new(func.file.clone(), func.name.clone(), func.line).with_column(func.column);
     let role = classify_function_role(func, &func_id, call_graph);
 
     // Delegate to the role-aware version (spec 205)
@@ -1114,6 +1140,22 @@ pub fn calculate_unified_priority_with_data_flow_and_role(
 
     // Apply adjustment to final score
     let adjusted_score = base_score.final_score * combined_adjustment;
+    base_score.score_trace.push(
+        ScoreStep::new(
+            "Data-flow weighted blend",
+            base_score.final_score,
+            ScoreOperation::WeightedBlend {
+                factors: [purity_factor, refactorability_factor, pattern_factor],
+                weights: [
+                    config.purity_weight,
+                    config.refactorability_weight,
+                    config.pattern_weight,
+                ],
+            },
+            adjusted_score,
+        )
+        .with_details(purity_trace_details(func_id, data_flow)),
+    );
 
     // Update score with data flow factors
     base_score.final_score = adjusted_score;
@@ -1122,6 +1164,50 @@ pub fn calculate_unified_priority_with_data_flow_and_role(
     base_score.pattern_factor = Some(pattern_factor);
 
     base_score
+}
+
+fn purity_trace_details(func_id: &FunctionId, data_flow: &DataFlowGraph) -> Vec<String> {
+    use crate::analysis::effect_evidence::EffectClassification;
+
+    let Some(assessment) = data_flow
+        .get_purity_info(func_id)
+        .and_then(|purity| purity.assessment.as_ref())
+    else {
+        return vec![
+            "Purity assessment: Unknown (effect evidence unavailable); no discount granted.".into(),
+        ];
+    };
+    let classification = assessment.classification();
+    let observed = assessment
+        .observed()
+        .map(|effect| format!("{:?}: {}", effect.kind, effect.detail))
+        .collect::<Vec<_>>();
+    let unresolved = assessment
+        .unresolved()
+        .map(|behavior| format!("{:?}: {}", behavior.reason, behavior.detail))
+        .collect::<Vec<_>>();
+    let decision = match classification {
+        EffectClassification::StrictlyPure | EffectClassification::LocallyPure => {
+            "complete evidence qualifies for a purity discount"
+        }
+        EffectClassification::ReadOnly | EffectClassification::Impure => {
+            "the classification receives no data-flow purity discount"
+        }
+        EffectClassification::Unknown => "incomplete evidence cannot qualify for a purity discount",
+    };
+    vec![
+        format!("Purity assessment: {classification:?}; {decision}."),
+        format!("Observed effects: {}", evidence_list(&observed)),
+        format!("Unresolved behavior: {}", evidence_list(&unresolved)),
+    ]
+}
+
+fn evidence_list(values: &[String]) -> String {
+    if values.is_empty() {
+        "none".into()
+    } else {
+        values.join("; ")
+    }
 }
 
 #[cfg(test)]

@@ -11,6 +11,52 @@ use debtmap::priority::{
 };
 use std::path::PathBuf;
 
+#[test]
+fn complexity_formatters_attach_entropy_adjustment_to_cognitive() {
+    use debtmap::formatting::{ColoredFormatter, FormattingConfig};
+    use debtmap::priority::formatter_verbosity::complexity::{
+        format_complexity_details_section, format_complexity_summary,
+    };
+
+    let mut item = create_test_item_with_state_machine();
+    item.cyclomatic_complexity = 23;
+    item.cognitive_complexity = 41;
+    item.entropy_analysis = Some(debtmap::complexity::EntropyAnalysis {
+        entropy_score: 0.24,
+        pattern_repetition: 0.89,
+        branch_similarity: 0.14,
+        dampening_factor: 0.555,
+        dampening_was_applied: true,
+        original_complexity: 41,
+        adjusted_complexity: 22,
+        reasoning: Vec::new(),
+    });
+    let formatter = ColoredFormatter::new(FormattingConfig::plain());
+    let mut summary = String::new();
+    format_complexity_summary(&mut summary, &item, &formatter);
+    let details = format_complexity_details_section(&item, &formatter).join("\n");
+
+    for output in [summary, details] {
+        assert!(output.contains("cyclomatic=23"), "{output}");
+        assert!(
+            output.contains("cognitive=41 (entropy-adjusted: 22, factor: 0.56)"),
+            "{output}"
+        );
+        assert!(!output.contains("cyclomatic=23 ("), "{output}");
+        assert!(!output.contains("dampened:"), "{output}");
+    }
+
+    item.entropy_analysis = None;
+    let mut summary = String::new();
+    format_complexity_summary(&mut summary, &item, &formatter);
+    let details = format_complexity_details_section(&item, &formatter).join("\n");
+    for output in [summary, details] {
+        assert!(output.contains("cyclomatic=23"), "{output}");
+        assert!(output.contains("cognitive=41"), "{output}");
+        assert!(!output.contains("entropy-adjusted"), "{output}");
+    }
+}
+
 /// Create a test UnifiedDebtItem with a state machine pattern
 fn create_test_item_with_state_machine() -> UnifiedDebtItem {
     UnifiedDebtItem {
@@ -32,6 +78,7 @@ fn create_test_item_with_state_machine() -> UnifiedDebtItem {
         upstream_production_callers: vec![],
         upstream_test_callers: vec![],
         production_blast_radius: 0,
+        immediate_neighbor_count: None,
         upstream_dependencies: 0,
         downstream_dependencies: 0,
         unified_score: UnifiedScore {
@@ -56,6 +103,7 @@ fn create_test_item_with_state_machine() -> UnifiedDebtItem {
             contextual_risk_multiplier: None,
             pre_contextual_score: None,
             debt_type_multiplier: None,
+            score_trace: Vec::new(),
         },
         expected_impact: ImpactMetrics {
             coverage_improvement: 0.0,
@@ -127,6 +175,7 @@ fn create_test_item_with_coordinator() -> UnifiedDebtItem {
         upstream_production_callers: vec![],
         upstream_test_callers: vec![],
         production_blast_radius: 0,
+        immediate_neighbor_count: None,
         upstream_dependencies: 0,
         downstream_dependencies: 0,
         unified_score: UnifiedScore {
@@ -151,6 +200,7 @@ fn create_test_item_with_coordinator() -> UnifiedDebtItem {
             contextual_risk_multiplier: None,
             pre_contextual_score: None,
             debt_type_multiplier: None,
+            score_trace: Vec::new(),
         },
         expected_impact: ImpactMetrics {
             coverage_improvement: 0.0,

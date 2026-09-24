@@ -1,23 +1,8 @@
-//! Parallel coverage calculation.
-//!
-//! This module provides pure functions for computing function coverage
-//! percentages from line execution data. All calculations are done using
-//! parallel processing for performance on large codebases.
-//!
-//! # Stillwater Philosophy
-//!
-//! The coverage calculation functions are pure:
-//! - They take immutable data as input
-//! - They produce deterministic results
-//! - They can be safely run in parallel
-//!
-//! # Performance
-//!
-//! Uses rayon for parallel iteration, making efficient use of multiple
-//! CPU cores when processing large numbers of functions.
+//! Deterministic coverage calculation from executable-line observations.
+//! Both the parser and legacy function-map helper use the same nested-callable
+//! boundary rules when exact AST bounds are unavailable.
 
 use super::types::FunctionCoverage;
-use rayon::prelude::*;
 use std::collections::HashMap;
 
 /// Coverage data for a single function (intermediate result).
@@ -30,6 +15,36 @@ pub struct FunctionCoverageData {
     pub coverage_percentage: f64,
     /// List of line numbers that weren't executed
     pub uncovered_lines: Vec<usize>,
+}
+
+/// Recompute fallback coverage from merged observations. A nested callable does
+/// not end its parent's source range; exact AST queries use their own end line.
+pub(crate) fn update_function_coverage<'a>(
+    functions: impl Iterator<Item = &'a mut FunctionCoverage>,
+    lines: &[(usize, u64)],
+) {
+    let functions: Vec<_> = functions.collect();
+    let mut boundaries: Vec<_> = functions
+        .iter()
+        .map(|function| (function.start_line, function.name.clone()))
+        .collect();
+    boundaries.sort();
+    for function in functions {
+        let nested_prefix = format!("{}::", function.name);
+        let after = boundaries.partition_point(|(line, _)| *line <= function.start_line);
+        let end = boundaries[after..]
+            .iter()
+            .find(|(_, name)| !name.starts_with(&nested_prefix))
+            .map(|(line, _)| *line)
+            .unwrap_or(usize::MAX);
+        let coverage = calculate_function_coverage_data(
+            function.start_line,
+            &[function.start_line, end],
+            lines,
+        );
+        function.coverage_percentage = coverage.coverage_percentage;
+        function.uncovered_lines = coverage.uncovered_lines;
+    }
 }
 
 /// Calculate coverage data for a single function.
@@ -86,15 +101,12 @@ pub fn calculate_function_coverage_data(
     let func_lines = &sorted_lines[start_idx..end_idx];
 
     if !func_lines.is_empty() {
-        let covered = func_lines
-            .par_iter()
-            .filter(|(_, count)| *count > 0)
-            .count();
+        let covered = func_lines.iter().filter(|(_, count)| *count > 0).count();
         let coverage_percentage = (covered as f64 / func_lines.len() as f64) * 100.0;
 
-        // Collect uncovered lines in parallel
+        // Functions are small; avoid scheduling two parallel jobs per function.
         let uncovered_lines = func_lines
-            .par_iter()
+            .iter()
             .filter(|(_, count)| *count == 0)
             .map(|(line, _)| *line)
             .collect();
@@ -111,10 +123,10 @@ pub fn calculate_function_coverage_data(
     }
 }
 
-/// Process all functions in a file in parallel.
+/// Process all functions in a file (legacy API name retained).
 ///
-/// This function calculates coverage percentages and uncovered lines for
-/// all functions in a file using parallel processing.
+/// Calculate coverage percentages and uncovered lines with the shared
+/// nested-callable boundary rules.
 ///
 /// # Arguments
 ///
@@ -128,8 +140,8 @@ pub fn calculate_function_coverage_data(
 ///
 /// # Performance
 ///
-/// Uses rayon for parallel iteration. The function boundaries and line
-/// data are pre-sorted for efficient binary search queries.
+/// Boundaries and observations are sorted once for binary range queries.
+/// Small per-function scans run sequentially to avoid scheduling overhead.
 pub fn process_function_coverage_parallel(
     file_functions: &mut HashMap<String, FunctionCoverage>,
     file_lines: &HashMap<usize, u64>,
@@ -139,50 +151,12 @@ pub fn process_function_coverage_parallel(
         return;
     }
 
-    // Collect and sort function start lines for boundary detection (parallel-friendly)
-    let func_boundaries: Vec<usize> = file_functions
-        .par_iter()
-        .map(|(_, func)| func.start_line)
-        .collect::<Vec<_>>()
-        .into_iter()
-        .collect::<std::collections::BTreeSet<_>>()
-        .into_iter()
+    let mut sorted_lines: Vec<_> = file_lines
+        .iter()
+        .map(|(&line, &hits)| (line, hits))
         .collect();
-
-    // Convert file_lines HashMap to sorted Vec for efficient range queries
-    let sorted_lines: Vec<(usize, u64)> = file_lines
-        .par_iter()
-        .map(|(line, count)| (*line, *count))
-        .collect::<Vec<_>>()
-        .into_par_iter()
-        .collect::<std::collections::BTreeSet<_>>()
-        .into_iter()
-        .collect();
-
-    // Pre-calculate coverage for all unique start lines
-    let coverage_results: HashMap<usize, FunctionCoverageData> = func_boundaries
-        .par_iter()
-        .map(|&func_start| {
-            (
-                func_start,
-                calculate_function_coverage_data(func_start, &func_boundaries, &sorted_lines),
-            )
-        })
-        .collect();
-
-    // Update all functions deterministically (Spec 214 fix)
-    // We iterate over the file_functions map entries sorted by name
-    let mut sorted_names: Vec<String> = file_functions.keys().cloned().collect();
-    sorted_names.sort();
-
-    for name in sorted_names {
-        if let Some(func) = file_functions.get_mut(&name)
-            && let Some(data) = coverage_results.get(&func.start_line)
-        {
-            func.coverage_percentage = data.coverage_percentage;
-            func.uncovered_lines = data.uncovered_lines.clone();
-        }
-    }
+    sorted_lines.sort_unstable_by_key(|(line, _)| *line);
+    update_function_coverage(file_functions.values_mut(), &sorted_lines);
 }
 
 #[cfg(test)]

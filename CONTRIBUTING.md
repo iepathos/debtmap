@@ -53,7 +53,9 @@ just test              # Run the fast cross-platform smoke suite
 just test-integration  # Run bounded cross-module regressions
 just test-cli          # Run CLI and output-format regressions
 just test-verbose      # Run tests with output
-just coverage          # Generate coverage report
+just coverage          # Generate HTML coverage from all ordinary test targets
+just coverage-lcov     # Generate representative LCOV for debt ranking
+just coverage-fast     # Library-only feedback, with separate artifacts
 just analyze-self      # Analyze debtmap with coverage
 
 # Code Quality
@@ -65,6 +67,10 @@ just check          # Quick syntax check
 just ci             # Run all CI checks locally
 just pre-commit     # Run pre-commit checks
 ```
+
+Coverage defaults and CI share automatic Cargo test discovery. See the
+[coverage policy](docs/coverage-policy.md) for scope, report reuse, timing checks
+and the distinction between representative and fast coverage.
 
 ### Feature Branch Workflow
 
@@ -320,15 +326,16 @@ New to Debtmap? Look for issues labeled:
 - **Documentation improvements**: Fix typos, clarify confusing sections, add Rust examples
 - **Test coverage**: Add tests for untested Rust analysis code paths
 - **Bug fixes**: Start with issues tagged `bug` and `good-first-issue`
-- **Rust analysis depth**: Improve macro expansion, trait resolution, lifetime analysis
+- **Rust analysis depth**: Improve bounded call and trait resolution, receiver tracking, and effect models
 - **New Rust metrics**: Implement additional Rust-specific complexity or quality metrics
 - **Rust patterns**: Detect more Rust idioms and anti-patterns
 - **Performance**: Optimize Rust analysis algorithms
 
-**Note on multi-language support**: Debtmap is currently focusing exclusively on Rust analysis.
-Multi-language support (Python, JavaScript/TypeScript, Go, etc.) will be considered once
-Rust analysis reaches maturity. If you're interested in contributing to multi-language
-support in the future, please open an issue to discuss the roadmap and timeline.
+**Multi-language support**: Debtmap supports Rust, Python, JavaScript, TypeScript, Go,
+and Solidity. Analysis depth varies by language; see the
+[supported languages](README.md#supported-languages) for current capabilities.
+Contributions to any supported language are welcome. For additional languages,
+please open an issue to discuss scope and implementation.
 
 ## Communication
 

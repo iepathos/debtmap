@@ -24,6 +24,7 @@ fn test_orchestrator_receives_reduction() {
     // Add callees
     for i in 0..3 {
         let callee = FunctionId {
+            column: None,
             file: PathBuf::from("test.rs"),
             name: format!("task_{}", i),
             line: 10 + i * 10,
@@ -84,8 +85,8 @@ fn test_non_orchestrator_no_adjustment() {
     let role = classify_function_role(&func, &func_id, &call_graph);
     assert_eq!(
         role,
-        FunctionRole::PureLogic,
-        "Should be classified as pure logic"
+        FunctionRole::Unknown,
+        "Missing evidence cannot establish pure logic"
     );
 
     // Calculate unified score
@@ -94,7 +95,7 @@ fn test_non_orchestrator_no_adjustment() {
     // Verify no adjustment was applied
     assert!(
         score.adjustment_applied.is_none(),
-        "No adjustment should be applied to pure logic"
+        "No orchestration adjustment should be applied to an unknown role"
     );
     assert!(
         score.pre_adjustment_score.is_none(),
@@ -189,6 +190,7 @@ fn create_test_func(
     length: usize,
 ) -> debtmap::core::FunctionMetrics {
     debtmap::core::FunctionMetrics {
+        column: None,
         file: PathBuf::from("test.rs"),
         name: name.to_string(),
         line: 1,
@@ -229,6 +231,7 @@ fn create_test_call_graph(callee_count: usize, func_name: &str, func_line: usize
     // Add callees
     for i in 0..callee_count {
         let callee = FunctionId {
+            column: None,
             file: PathBuf::from("test.rs"),
             name: format!("callee_{}", i),
             line: 100 + i * 10,

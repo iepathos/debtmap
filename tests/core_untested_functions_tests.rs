@@ -14,6 +14,7 @@ fn create_test_metrics_simple() -> FileMetrics {
         language: Language::Rust,
         complexity: ComplexityMetrics {
             functions: vec![FunctionMetrics {
+                column: None,
                 name: "test_func".to_string(),
                 file: PathBuf::from("test.rs"),
                 line: 1,
@@ -62,6 +63,7 @@ fn create_test_metrics_complex() -> FileMetrics {
         complexity: ComplexityMetrics {
             functions: vec![
                 FunctionMetrics {
+                    column: None,
                     name: "complex_func1".to_string(),
                     file: PathBuf::from("complex.rs"),
                     line: 10,
@@ -91,6 +93,7 @@ fn create_test_metrics_complex() -> FileMetrics {
                     entropy_analysis: None,
                 },
                 FunctionMetrics {
+                    column: None,
                     name: "complex_func2".to_string(),
                     file: PathBuf::from("complex.rs"),
                     line: 50,
@@ -227,6 +230,7 @@ mod test_combine_metrics {
     #[test]
     fn test_combine_metrics_single_function_each() {
         let func1 = FunctionMetrics {
+            column: None,
             name: "func1".to_string(),
             file: PathBuf::from("file1.rs"),
             line: 10,
@@ -257,6 +261,7 @@ mod test_combine_metrics {
         };
 
         let func2 = FunctionMetrics {
+            column: None,
             name: "func2".to_string(),
             file: PathBuf::from("file2.rs"),
             line: 20,
@@ -320,6 +325,7 @@ mod test_combine_metrics {
     #[test]
     fn test_combine_metrics_preserves_function_details() {
         let func1 = FunctionMetrics {
+            column: None,
             name: "detailed_func".to_string(),
             file: PathBuf::from("detail.rs"),
             line: 42,

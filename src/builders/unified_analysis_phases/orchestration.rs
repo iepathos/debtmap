@@ -52,6 +52,18 @@ pub fn run_purity_propagation(
     metrics: &[FunctionMetrics],
     call_graph: &CallGraph,
 ) -> Vec<FunctionMetrics> {
+    run_purity_propagation_with_assessments(metrics, call_graph).0
+}
+
+pub(crate) fn run_purity_propagation_with_assessments(
+    metrics: &[FunctionMetrics],
+    call_graph: &CallGraph,
+) -> (
+    Vec<FunctionMetrics>,
+    Option<
+        std::collections::BTreeMap<FunctionId, crate::analysis::effect_evidence::EffectAssessment>,
+    >,
+) {
     // Create RustCallGraph wrapper
     let rust_graph = RustCallGraph {
         base_graph: call_graph.clone(),
@@ -71,28 +83,13 @@ pub fn run_purity_propagation(
     // Run propagation - failures are expected when external dependencies are called
     if let Err(e) = propagator.propagate(metrics) {
         log::debug!("Purity propagation skipped (external deps): {}", e);
-        return metrics.to_vec();
+        return (metrics.to_vec(), None);
     }
 
-    // Apply results to metrics
-    metrics
-        .iter()
-        .map(|metric| {
-            let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line);
-
-            if let Some(result) = propagator.get_result(&func_id) {
-                let mut updated = metric.clone();
-                updated.is_pure = Some(
-                    result.level == crate::analysis::purity_analysis::PurityLevel::StrictlyPure,
-                );
-                updated.purity_confidence = Some(result.confidence as f32);
-                updated.purity_reason = Some(format!("{:?}", result.reason));
-                updated
-            } else {
-                metric.clone()
-            }
-        })
-        .collect()
+    (
+        propagator.apply_results(metrics),
+        Some(propagator.assessments()),
+    )
 }
 
 /// Create unified analysis from analysis results (orchestrates pure functions).

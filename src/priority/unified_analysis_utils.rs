@@ -173,17 +173,29 @@ impl UnifiedAnalysisUtils for UnifiedAnalysis {
     }
 
     fn populate_purity_analysis(&mut self, metrics: &[crate::core::FunctionMetrics]) {
+        let assessments = crate::analysis::purity_propagation::propagate_graph_assessments(
+            self.data_flow_graph.call_graph(),
+        );
         for metric in metrics {
-            let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line);
+            let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line)
+                .with_column(metric.column);
+            let assessment = assessments.get(&func_id).cloned();
+            let is_pure = assessment
+                .as_ref()
+                .map(|evidence| {
+                    evidence.classification()
+                        == crate::analysis::effect_evidence::EffectClassification::StrictlyPure
+                })
+                .unwrap_or_else(|| metric.is_pure.unwrap_or(false));
 
             let purity_info = PurityInfo {
-                is_pure: metric.is_pure.unwrap_or(false),
+                impurity_reasons: assessment
+                    .as_ref()
+                    .map(assessment_reasons)
+                    .unwrap_or_default(),
+                assessment,
+                is_pure,
                 confidence: metric.purity_confidence.unwrap_or(0.0),
-                impurity_reasons: if !metric.is_pure.unwrap_or(false) {
-                    vec!["Function may have side effects".to_string()]
-                } else {
-                    vec![]
-                },
             };
 
             self.data_flow_graph.set_purity_info(func_id, purity_info);
@@ -222,6 +234,10 @@ impl UnifiedAnalysisUtils for UnifiedAnalysis {
 
                     // Create a new item with the adjusted score and file context
                     let mut adjusted_item = item.clone();
+                    adjusted_item.unified_score.score_trace.push(crate::priority::scoring::trace::ScoreStep::new(
+                        "File classification", item.unified_score.final_score,
+                        crate::priority::scoring::trace::ScoreOperation::Multiply(crate::priority::scoring::file_context_scoring::context_reduction_factor(context)), adjusted_score,
+                    ));
                     adjusted_item.unified_score.final_score = adjusted_score.max(0.0);
                     adjusted_item.file_context = Some(context.clone());
                     adjusted_item
@@ -232,6 +248,20 @@ impl UnifiedAnalysisUtils for UnifiedAnalysis {
             })
             .collect();
     }
+}
+
+fn assessment_reasons(
+    assessment: &crate::analysis::effect_evidence::EffectAssessment,
+) -> Vec<String> {
+    assessment
+        .observed()
+        .map(|effect| effect.detail.clone())
+        .chain(
+            assessment
+                .unresolved()
+                .map(|behavior| format!("Unresolved: {}", behavior.detail)),
+        )
+        .collect()
 }
 
 #[cfg(test)]
@@ -282,6 +312,7 @@ mod tests {
                 contextual_risk_multiplier: None,
                 pre_contextual_score: None,
                 debt_type_multiplier: None,
+                score_trace: Vec::new(),
             },
             cyclomatic_complexity: 65,
             cognitive_complexity: 6,
@@ -308,6 +339,7 @@ mod tests {
             upstream_production_callers: vec![],
             upstream_test_callers: vec![],
             production_blast_radius: 0,
+            immediate_neighbor_count: None,
             nesting_depth: 0,
             function_length: 500,
             is_pure: None,

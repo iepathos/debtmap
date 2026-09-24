@@ -62,6 +62,14 @@ pub fn create_god_object_debt_item(
     let mut unified_score = calculate_god_object_score(god_analysis, &aggregated_metrics);
     let score_multiplier = coupling_classification.score_multiplier();
     if score_multiplier < 1.0 {
+        unified_score
+            .score_trace
+            .push(crate::priority::scoring::trace::ScoreStep::new(
+                "Architectural coupling",
+                unified_score.final_score,
+                crate::priority::scoring::trace::ScoreOperation::Multiply(score_multiplier),
+                unified_score.final_score * score_multiplier,
+            ));
         // Apply dampening for stable/well-tested cores (spec 269)
         unified_score.final_score *= score_multiplier;
     }
@@ -91,8 +99,13 @@ pub fn create_god_object_debt_item(
     let function_role = classify_god_object_role(god_analysis);
 
     // Calculate production blast radius
-    let production_blast_radius =
-        classified_callers.production_count + aggregated_metrics.downstream_dependencies;
+    // Aggregated legacy metrics retain labels rather than definition identities.
+    let production_blast_radius = classified_callers
+        .production
+        .iter()
+        .chain(&aggregated_metrics.unique_downstream_callees)
+        .collect::<std::collections::HashSet<_>>()
+        .len();
 
     UnifiedDebtItem {
         location: crate::priority::unified_scorer::Location {
@@ -113,6 +126,7 @@ pub fn create_god_object_debt_item(
         upstream_production_callers: classified_callers.production,
         upstream_test_callers: classified_callers.test,
         production_blast_radius,
+        immediate_neighbor_count: None,
         nesting_depth: aggregated_metrics.max_nesting_depth,
         function_length: god_analysis.lines_of_code,
         cyclomatic_complexity: aggregated_metrics.total_cyclomatic,
@@ -180,6 +194,7 @@ fn calculate_god_object_score(
         contextual_risk_multiplier: None,
         pre_contextual_score: None,
         debt_type_multiplier: None,
+        score_trace: Vec::new(),
     };
 
     // Apply contextual risk to score if available

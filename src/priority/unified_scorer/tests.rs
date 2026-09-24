@@ -1,12 +1,67 @@
 use super::*;
+use crate::analysis::effect_evidence::EffectClassification as EffectClass;
 use crate::config::DataFlowScoringConfig;
 use crate::core::FunctionMetrics;
 use crate::priority::call_graph::CallGraph;
 use crate::risk::lcov::{FunctionCoverage, LcovData};
 use std::path::PathBuf;
 
+fn graph_with_assessment(metric: &FunctionMetrics, class: EffectClass) -> CallGraph {
+    let id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line)
+        .with_column(metric.column);
+    let mut graph = CallGraph::new();
+    graph.record_effect_assessment(id, effect_assessment(class));
+    graph
+}
+
+fn effect_assessment(
+    classification: crate::analysis::effect_evidence::EffectClassification,
+) -> crate::analysis::effect_evidence::EffectAssessment {
+    use crate::analysis::effect_evidence::{
+        EffectAssessment, EffectProvenance, ObservedEffect, ObservedEffectKind, UnresolvedBehavior,
+        UnresolvedReason,
+    };
+
+    let owner = FunctionId::new(PathBuf::from("test.rs"), "effect".into(), 1);
+    let provenance = EffectProvenance::source(owner, 1, Some(0));
+    match classification {
+        crate::analysis::effect_evidence::EffectClassification::StrictlyPure => {
+            EffectAssessment::complete()
+        }
+        crate::analysis::effect_evidence::EffectClassification::LocallyPure => {
+            EffectAssessment::complete().with_effect(ObservedEffect {
+                kind: ObservedEffectKind::LocalMutation,
+                detail: "local mutation".into(),
+                provenance,
+            })
+        }
+        crate::analysis::effect_evidence::EffectClassification::ReadOnly => {
+            EffectAssessment::complete().with_effect(ObservedEffect {
+                kind: ObservedEffectKind::ExternalRead,
+                detail: "external read".into(),
+                provenance,
+            })
+        }
+        crate::analysis::effect_evidence::EffectClassification::Impure => {
+            EffectAssessment::complete().with_effect(ObservedEffect {
+                kind: ObservedEffectKind::Io,
+                detail: "I/O".into(),
+                provenance,
+            })
+        }
+        crate::analysis::effect_evidence::EffectClassification::Unknown => {
+            EffectAssessment::complete().with_unresolved(UnresolvedBehavior {
+                reason: UnresolvedReason::UnresolvedCall,
+                detail: "unknown call".into(),
+                provenance,
+            })
+        }
+    }
+}
+
 fn create_test_metrics() -> FunctionMetrics {
     FunctionMetrics {
+        column: None,
         file: PathBuf::from("test.rs"),
         name: "test_function".to_string(),
         line: 10,
@@ -34,6 +89,211 @@ fn create_test_metrics() -> FunctionMetrics {
         error_swallowing_count: None,
         error_swallowing_patterns: None,
         entropy_analysis: None,
+    }
+}
+
+#[test]
+fn complexity_trace_explains_actual_purity_and_entropy_inputs() {
+    let mut func = create_test_metrics();
+    func.cyclomatic = 23;
+    func.cognitive = 41;
+    func.purity_level = Some(PurityLevel::StrictlyPure);
+    func.purity_confidence = Some(0.95);
+    func.purity_reason = Some("EffectEvidence: observed=[]; unresolved=[]".into());
+    func.entropy_score = Some(crate::complexity::entropy_core::EntropyScore {
+        token_entropy: 0.24,
+        pattern_repetition: 0.89,
+        branch_similarity: 0.14,
+        effective_complexity: 0.0,
+        unique_variables: 8,
+        max_nesting: 3,
+        dampening_applied: 1.0,
+    });
+    let graph = graph_with_assessment(&func, EffectClass::StrictlyPure);
+    let score = calculate_unified_priority(&func, &graph, None, None);
+    assert!((score.complexity_factor - 9.8).abs() < 1e-10);
+    let explanation = crate::priority::scoring::trace::explanation_lines(&score).join("\n");
+    assert!(
+        explanation.contains("Cyclomatic input (purity): trunc(23 × 0.7000) = 16"),
+        "{explanation}"
+    );
+    assert!(
+        explanation.contains("Cognitive input (entropy): trunc(41 × 0.5550) = 22"),
+        "{explanation}"
+    );
+    assert!(
+        explanation.contains("clamp((16 × 0.4000 + 22 × 0.6000) / 2, 0, 10) = 9.8000"),
+        "{explanation}"
+    );
+    for pair in score.score_trace.windows(2) {
+        assert!((pair[0].output - pair[1].input).abs() < 1e-10);
+    }
+    for step in &score.score_trace {
+        assert!(
+            (step.calculated_output() - step.output).abs() < 1e-10,
+            "{step}"
+        );
+    }
+}
+
+#[test]
+fn complexity_inputs_capture_entropy_selection_and_purity_fallback() {
+    let mut func = create_test_metrics();
+    func.cyclomatic = 23;
+    func.cognitive = 41;
+    func.entropy_score = Some(crate::complexity::entropy_core::EntropyScore {
+        token_entropy: 0.24,
+        pattern_repetition: 0.89,
+        branch_similarity: 0.14,
+        effective_complexity: 0.0,
+        unique_variables: 8,
+        max_nesting: 3,
+        dampening_applied: 1.0,
+    });
+    for (enabled, has_entropy, token_entropy, expected, cognitive_line) in [
+        (
+            true,
+            true,
+            0.24,
+            19.6,
+            "Cognitive input (entropy): trunc(41 × 0.5550) = 22",
+        ),
+        (
+            false,
+            true,
+            0.24,
+            23.2,
+            "Cognitive input (purity): trunc(41 × 0.7000) = 28",
+        ),
+        (
+            true,
+            false,
+            0.24,
+            23.2,
+            "Cognitive input (purity): trunc(41 × 0.7000) = 28",
+        ),
+        (
+            true,
+            true,
+            0.8,
+            31.0,
+            "Cognitive input (entropy): trunc(41 × 1.0000) = 41",
+        ),
+    ] {
+        let mut case = func.clone();
+        case.entropy_score.as_mut().unwrap().token_entropy = token_entropy;
+        if !has_entropy {
+            case.entropy_score = None;
+        }
+        let config = crate::config::DebtmapConfig {
+            entropy: Some(crate::config::EntropyConfig {
+                enabled,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let inputs = ComplexityInputs::for_function(&case, 0.7, false, &config);
+        assert!((inputs.weighted_complexity() - expected).abs() < 1e-10);
+        assert_eq!(inputs.preprocessing_lines()[1], cognitive_line);
+    }
+}
+
+#[test]
+fn complexity_inputs_capture_role_configured_weights_and_clamping() {
+    let mut func = create_test_metrics();
+    func.cyclomatic = 11;
+    func.cognitive = 17;
+    for (orchestrator, weights, expected) in [
+        (false, None, 4.7),
+        (true, None, 5.0),
+        (true, Some((0.8, 0.2)), 3.9),
+        (false, Some((0.8, 0.2)), 3.9),
+    ] {
+        let config = crate::config::DebtmapConfig {
+            complexity_weights: weights.map(|(cyclomatic, cognitive)| {
+                crate::config::ComplexityWeightsConfig {
+                    cyclomatic,
+                    cognitive,
+                    ..Default::default()
+                }
+            }),
+            ..Default::default()
+        };
+        let inputs = ComplexityInputs::for_function(&func, 0.7, orchestrator, &config);
+        assert!((inputs.factor() - expected).abs() < 1e-10);
+        let step = ScoreStep::new(
+            "Complexity factor",
+            0.0,
+            ScoreOperation::Complexity(inputs),
+            expected,
+        );
+        assert!((step.calculated_output() - expected).abs() < 1e-10);
+    }
+    for (raw, expected) in [(0, 0.0), (100, 10.0)] {
+        let inputs = ComplexityInputs::new([raw, raw], 1.0, None, [0.4, 0.6]);
+        assert_eq!(inputs.factor(), expected);
+        assert!(inputs.to_string().contains("/ 2, 0, 10)"));
+    }
+}
+
+#[test]
+fn complexity_trace_withholds_legacy_purity_adjustment() {
+    let mut func = create_test_metrics();
+    func.is_pure = Some(true);
+    func.purity_confidence = Some(0.5);
+    let score = calculate_unified_priority(&func, &CallGraph::new(), None, None);
+    let explanation = crate::priority::scoring::trace::explanation_lines(&score).join("\n");
+    assert!(explanation.contains("Cyclomatic input (purity): trunc(5 × 1.0000) = 5"));
+    assert!(explanation.contains("Cognitive input (purity): trunc(8 × 1.0000) = 8"));
+    assert!((score.complexity_factor - 3.4).abs() < 1e-10);
+}
+
+#[test]
+fn textual_legacy_evidence_cannot_grant_a_rust_discount() {
+    let mut func = create_pure_logic_function(14, 19);
+    func.purity_reason = Some("EffectEvidence: observed=[]; unresolved=[]".into());
+    let id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
+    assert_eq!(graph_purity_adjustment(&func, &id, &CallGraph::new()), 1.0);
+    let unknown = graph_with_assessment(&func, EffectClass::Unknown);
+    assert_eq!(graph_purity_adjustment(&func, &id, &unknown), 1.0);
+    assert_eq!(
+        classify_function_role(&func, &id, &unknown),
+        FunctionRole::Unknown
+    );
+}
+
+#[test]
+fn score_trace_records_custom_data_flow_weights_and_continuous_arithmetic() {
+    let func = create_test_metrics();
+    let graph = CallGraph::new();
+    let data_flow = DataFlowGraph::from_call_graph(graph.clone());
+    for weights in [[0.2, 0.5, 0.3], [0.0, 0.0, 0.0]] {
+        let config = DataFlowScoringConfig {
+            enabled: true,
+            purity_weight: weights[0],
+            refactorability_weight: weights[1],
+            pattern_weight: weights[2],
+        };
+        let score = calculate_unified_priority_with_data_flow(
+            &func, &graph, &data_flow, None, None, None, &config,
+        );
+        assert!(!score.score_trace.is_empty());
+        for pair in score.score_trace.windows(2) {
+            assert!((pair[0].output - pair[1].input).abs() < 1e-10);
+        }
+        for step in &score.score_trace {
+            assert!(
+                (step.calculated_output() - step.output).abs() < 1e-10,
+                "{step}"
+            );
+        }
+        let last = score.score_trace.last().unwrap();
+        assert_eq!(last.output, score.final_score);
+        assert!(
+            matches!(last.operation, ScoreOperation::WeightedBlend { weights: actual, .. } if actual == weights)
+        );
+        let json = serde_json::to_value(&score).unwrap();
+        assert!(json.get("score_trace").is_none());
     }
 }
 
@@ -295,6 +555,10 @@ fn create_entry_point_function(cyclomatic: u32, cognitive: u32) -> FunctionMetri
 fn create_pure_logic_function(cyclomatic: u32, cognitive: u32) -> FunctionMetrics {
     let mut func = create_test_metrics();
     func.name = "calculate_score".to_string(); // Pure logic name pattern
+    func.is_pure = Some(true);
+    func.purity_level = Some(PurityLevel::StrictlyPure);
+    func.purity_confidence = Some(1.0);
+    func.purity_reason = Some("EffectEvidence: observed=[]; unresolved=[]".into());
     func.cyclomatic = cyclomatic;
     func.cognitive = cognitive;
     func
@@ -324,7 +588,7 @@ fn test_entry_point_coverage_adjustment() {
     let entry_point = create_entry_point_function(17, 17);
     let pure_logic = create_pure_logic_function(17, 17);
 
-    let call_graph = CallGraph::new();
+    let call_graph = graph_with_assessment(&pure_logic, EffectClass::StrictlyPure);
     let entry_lcov = create_zero_coverage_data(&entry_point);
     let logic_lcov = create_zero_coverage_data(&pure_logic);
 
@@ -500,7 +764,7 @@ fn test_pure_logic_coverage_weight_unchanged() {
     // BUG-001 fix: PureLogic now has 0.7 multiplier (pure functions are easy to test)
     let pure_logic = create_pure_logic_function(12, 14);
 
-    let call_graph = CallGraph::new();
+    let call_graph = graph_with_assessment(&pure_logic, EffectClass::StrictlyPure);
     let lcov = create_zero_coverage_data(&pure_logic);
 
     let score = calculate_unified_priority(&pure_logic, &call_graph, Some(&lcov), None);
@@ -525,6 +789,7 @@ fn test_pure_logic_coverage_weight_unchanged() {
 #[test]
 fn test_purity_adjustment_strictly_pure_high_confidence() {
     let mut func = create_test_metrics();
+    func.purity_reason = Some("EffectEvidence: observed=[]; unresolved=[]".into());
     func.purity_level = Some(crate::core::PurityLevel::StrictlyPure);
     func.purity_confidence = Some(0.9);
 
@@ -538,6 +803,7 @@ fn test_purity_adjustment_strictly_pure_high_confidence() {
 #[test]
 fn test_purity_adjustment_strictly_pure_medium_confidence() {
     let mut func = create_test_metrics();
+    func.purity_reason = Some("EffectEvidence: observed=[]; unresolved=[]".into());
     func.purity_level = Some(crate::core::PurityLevel::StrictlyPure);
     func.purity_confidence = Some(0.7);
 
@@ -551,6 +817,7 @@ fn test_purity_adjustment_strictly_pure_medium_confidence() {
 #[test]
 fn test_purity_adjustment_locally_pure_high_confidence() {
     let mut func = create_test_metrics();
+    func.purity_reason = Some("EffectEvidence: observed=[local mutation]; unresolved=[]".into());
     func.purity_level = Some(crate::core::PurityLevel::LocallyPure);
     func.purity_confidence = Some(0.9);
 
@@ -564,6 +831,7 @@ fn test_purity_adjustment_locally_pure_high_confidence() {
 #[test]
 fn test_purity_adjustment_locally_pure_medium_confidence() {
     let mut func = create_test_metrics();
+    func.purity_reason = Some("EffectEvidence: observed=[local mutation]; unresolved=[]".into());
     func.purity_level = Some(crate::core::PurityLevel::LocallyPure);
     func.purity_confidence = Some(0.7);
 
@@ -577,6 +845,7 @@ fn test_purity_adjustment_locally_pure_medium_confidence() {
 #[test]
 fn test_purity_adjustment_read_only() {
     let mut func = create_test_metrics();
+    func.purity_reason = Some("EffectEvidence: observed=[external read]; unresolved=[]".into());
     func.purity_level = Some(crate::core::PurityLevel::ReadOnly);
     func.purity_confidence = Some(0.9);
 
@@ -587,6 +856,7 @@ fn test_purity_adjustment_read_only() {
 #[test]
 fn test_purity_adjustment_impure() {
     let mut func = create_test_metrics();
+    func.purity_reason = Some("EffectEvidence: observed=[I/O]; unresolved=[]".into());
     func.purity_level = Some(crate::core::PurityLevel::Impure);
     func.purity_confidence = Some(0.9);
 
@@ -595,7 +865,7 @@ fn test_purity_adjustment_impure() {
 }
 
 #[test]
-fn test_backward_compatibility_with_is_pure() {
+fn rust_legacy_is_pure_high_confidence_is_neutral() {
     let mut func = create_test_metrics();
     func.purity_level = None; // Not set - old code path
     func.is_pure = Some(true);
@@ -603,13 +873,13 @@ fn test_backward_compatibility_with_is_pure() {
 
     let adjustment = calculate_purity_adjustment(&func);
     assert_eq!(
-        adjustment, 0.70,
-        "Old is_pure field with high confidence should still work"
+        adjustment, 1.0,
+        "Legacy Rust booleans cannot establish a purity discount"
     );
 }
 
 #[test]
-fn test_backward_compatibility_with_is_pure_medium_confidence() {
+fn rust_legacy_is_pure_medium_confidence_is_neutral() {
     let mut func = create_test_metrics();
     func.purity_level = None; // Not set - old code path
     func.is_pure = Some(true);
@@ -617,8 +887,8 @@ fn test_backward_compatibility_with_is_pure_medium_confidence() {
 
     let adjustment = calculate_purity_adjustment(&func);
     assert_eq!(
-        adjustment, 0.85,
-        "Old is_pure field with medium confidence should still work"
+        adjustment, 1.0,
+        "Confidence cannot turn legacy evidence into a known classification"
     );
 }
 
@@ -626,21 +896,27 @@ fn test_backward_compatibility_with_is_pure_medium_confidence() {
 fn test_locally_pure_scores_lower_than_impure() {
     // Test that LocallyPure functions get lower scores than Impure functions
     let mut func_locally_pure = create_test_metrics();
+    func_locally_pure.purity_reason =
+        Some("EffectEvidence: observed=[local mutation]; unresolved=[]".into());
     func_locally_pure.purity_level = Some(crate::core::PurityLevel::LocallyPure);
     func_locally_pure.purity_confidence = Some(0.9);
+    func_locally_pure.purity_reason =
+        Some("EffectEvidence: observed=[local mutation]; unresolved=[]".into());
     func_locally_pure.cyclomatic = 10;
     func_locally_pure.cognitive = 15;
 
     let mut func_impure = create_test_metrics();
+    func_impure.purity_reason = Some("EffectEvidence: observed=[I/O]; unresolved=[]".into());
     func_impure.purity_level = Some(crate::core::PurityLevel::Impure);
     func_impure.purity_confidence = Some(0.9);
     func_impure.cyclomatic = 10;
     func_impure.cognitive = 15;
 
-    let call_graph = CallGraph::new();
+    let local_graph = graph_with_assessment(&func_locally_pure, EffectClass::LocallyPure);
+    let impure_graph = graph_with_assessment(&func_impure, EffectClass::Impure);
     let score_locally_pure =
-        calculate_unified_priority(&func_locally_pure, &call_graph, None, None);
-    let score_impure = calculate_unified_priority(&func_impure, &call_graph, None, None);
+        calculate_unified_priority(&func_locally_pure, &local_graph, None, None);
+    let score_impure = calculate_unified_priority(&func_impure, &impure_graph, None, None);
 
     assert!(
         score_locally_pure.final_score < score_impure.final_score,
@@ -662,14 +938,16 @@ fn test_locally_pure_scores_higher_than_strictly_pure() {
     let mut func_strictly_pure = create_test_metrics();
     func_strictly_pure.purity_level = Some(crate::core::PurityLevel::StrictlyPure);
     func_strictly_pure.purity_confidence = Some(0.9);
+    func_strictly_pure.purity_reason = Some("EffectEvidence: observed=[]; unresolved=[]".into());
     func_strictly_pure.cyclomatic = 10;
     func_strictly_pure.cognitive = 15;
 
-    let call_graph = CallGraph::new();
+    let local_graph = graph_with_assessment(&func_locally_pure, EffectClass::LocallyPure);
+    let pure_graph = graph_with_assessment(&func_strictly_pure, EffectClass::StrictlyPure);
     let score_locally_pure =
-        calculate_unified_priority(&func_locally_pure, &call_graph, None, None);
+        calculate_unified_priority(&func_locally_pure, &local_graph, None, None);
     let score_strictly_pure =
-        calculate_unified_priority(&func_strictly_pure, &call_graph, None, None);
+        calculate_unified_priority(&func_strictly_pure, &pure_graph, None, None);
 
     assert!(
         score_locally_pure.final_score > score_strictly_pure.final_score,
@@ -888,6 +1166,9 @@ fn test_calculate_purity_factor_strictly_pure() {
     data_flow.set_purity_info(
         func_id.clone(),
         PurityInfo {
+            assessment: Some(effect_assessment(
+                crate::analysis::effect_evidence::EffectClassification::StrictlyPure,
+            )),
             is_pure: true,
             confidence: 0.9,
             impurity_reasons: vec![],
@@ -920,6 +1201,9 @@ fn test_calculate_purity_factor_locally_pure() {
     data_flow.set_purity_info(
         func_id.clone(),
         PurityInfo {
+            assessment: Some(effect_assessment(
+                crate::analysis::effect_evidence::EffectClassification::LocallyPure,
+            )),
             is_pure: true,
             confidence: 0.9,
             impurity_reasons: vec![],
@@ -939,6 +1223,98 @@ fn test_calculate_purity_factor_locally_pure() {
 
     // Locally pure functions should get 0.3
     assert_eq!(purity_factor, 0.3);
+}
+
+#[test]
+fn purity_factor_uses_assessment_without_io_count_discounts() {
+    use crate::analysis::effect_evidence::EffectClassification;
+    use crate::data_flow::{DataFlowGraph, IoOperation, PurityInfo};
+
+    for (classification, expected) in [
+        (EffectClassification::ReadOnly, 1.0),
+        (EffectClassification::Impure, 1.0),
+        (EffectClassification::Unknown, 1.0),
+    ] {
+        let id = FunctionId::new(PathBuf::from("test.rs"), format!("{classification:?}"), 1);
+        let mut graph = DataFlowGraph::new();
+        graph.set_purity_info(
+            id.clone(),
+            PurityInfo {
+                assessment: Some(effect_assessment(classification)),
+                is_pure: false,
+                confidence: 1.0,
+                impurity_reasons: vec![],
+            },
+        );
+        graph.add_io_operation(
+            id.clone(),
+            IoOperation {
+                operation_type: "file".into(),
+                variables: vec![],
+                line: 1,
+            },
+        );
+        assert_eq!(calculate_purity_factor(&id, &graph), expected);
+    }
+
+    let missing = FunctionId::new(PathBuf::from("test.rs"), "missing".into(), 2);
+    assert_eq!(
+        calculate_purity_factor(&missing, &DataFlowGraph::new()),
+        1.0
+    );
+
+    let legacy = FunctionId::new(PathBuf::from("test.rs"), "legacy".into(), 3);
+    let mut legacy_graph = DataFlowGraph::new();
+    legacy_graph.set_purity_info(
+        legacy.clone(),
+        PurityInfo {
+            assessment: None,
+            is_pure: true,
+            confidence: 1.0,
+            impurity_reasons: vec![],
+        },
+    );
+    assert_eq!(calculate_purity_factor(&legacy, &legacy_graph), 1.0);
+}
+
+#[test]
+fn purity_trace_separates_observed_effects_from_unresolved_behavior() {
+    use crate::analysis::effect_evidence::{
+        EffectProvenance, ObservedEffect, ObservedEffectKind, UnresolvedBehavior, UnresolvedReason,
+    };
+    use crate::data_flow::{DataFlowGraph, PurityInfo};
+
+    let id = FunctionId::new(PathBuf::from("test.rs"), "uncertain".into(), 4);
+    let provenance = EffectProvenance::source(id.clone(), 5, Some(2));
+    let assessment =
+        effect_assessment(crate::analysis::effect_evidence::EffectClassification::Unknown)
+            .with_effect(ObservedEffect {
+                kind: ObservedEffectKind::ExternalRead,
+                detail: "configuration read".into(),
+                provenance: provenance.clone(),
+            })
+            .with_unresolved(UnresolvedBehavior {
+                reason: UnresolvedReason::CallbackInvocation,
+                detail: "callback target".into(),
+                provenance,
+            });
+    let mut data_flow = DataFlowGraph::new();
+    data_flow.set_purity_info(
+        id.clone(),
+        PurityInfo {
+            assessment: Some(assessment),
+            is_pure: false,
+            confidence: 1.0,
+            impurity_reasons: Vec::new(),
+        },
+    );
+
+    let details = purity_trace_details(&id, &data_flow).join("\n");
+    assert!(details.contains("Purity assessment: Unknown"));
+    assert!(details.contains("Observed effects: ExternalRead: configuration read"));
+    assert!(details.contains("Unresolved behavior:"));
+    assert!(details.contains("CallbackInvocation: callback target"));
+    assert!(details.contains("cannot qualify for a purity discount"));
 }
 
 #[test]
@@ -1058,12 +1434,16 @@ fn test_calculate_unified_priority_with_data_flow_enabled() {
     let call_graph = CallGraph::new();
     let mut data_flow = DataFlowGraph::from_call_graph(call_graph.clone());
 
-    let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
+    let func_id =
+        FunctionId::new(func.file.clone(), func.name.clone(), func.line).with_column(func.column);
 
     // Add some purity info
     data_flow.set_purity_info(
         func_id,
         PurityInfo {
+            assessment: Some(effect_assessment(
+                crate::analysis::effect_evidence::EffectClassification::Impure,
+            )),
             is_pure: false,
             confidence: 0.5,
             impurity_reasons: vec!["mutation detected".to_string()],

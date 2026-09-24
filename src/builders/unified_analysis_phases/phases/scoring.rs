@@ -1,7 +1,8 @@
 //! Pure scoring and debt prioritization functions.
 //!
 //! This module provides pure functions for calculating complexity scores
-//! and prioritizing debt items without any I/O or progress reporting.
+//! and prioritizing debt items. Scheduling can notify a caller-owned progress
+//! callback while the per-metric scoring transformation stays pure.
 //!
 //! # Parallelism (spec 196)
 //!
@@ -225,7 +226,8 @@ pub fn create_function_mappings(
     metrics
         .iter()
         .map(|m| {
-            let func_id = AggregatorFunctionId::new(m.file.clone(), m.name.clone(), m.line);
+            let func_id = AggregatorFunctionId::new(m.file.clone(), m.name.clone(), m.line)
+                .with_column(m.column);
             (func_id, m.line, m.line + m.length)
         })
         .collect()
@@ -375,15 +377,33 @@ pub fn score_metrics_with_policy_audited(
     execution: ScoringExecution,
     policy: &crate::config::AnalysisPolicy,
 ) -> SuppressionOutcome<UnifiedDebtItem> {
-    let items: Vec<UnifiedDebtItem> = match execution {
-        ScoringExecution::Sequential => metrics
-            .iter()
-            .flat_map(|metric| score_metric(metric, input, policy))
-            .collect(),
-        ScoringExecution::Parallel => metrics
-            .par_iter()
-            .flat_map(|metric| score_metric(metric, input, policy))
-            .collect(),
+    score_metrics_with_progress(metrics, input, execution, policy, || {})
+}
+
+/// Notify the scheduling caller after each metric, including filtered metrics.
+/// The callback may run concurrently and does not participate in scoring results.
+pub(crate) fn score_metrics_with_progress(
+    metrics: &[FunctionMetrics],
+    input: &PreparedScoringInput<'_>,
+    execution: ScoringExecution,
+    policy: &crate::config::AnalysisPolicy,
+    on_metric_scored: impl Fn() + Sync,
+) -> SuppressionOutcome<UnifiedDebtItem> {
+    let bound_coverage = input
+        .coverage_data
+        .map(|coverage| coverage.with_function_bounds(metrics));
+    let bounded_input = PreparedScoringInput {
+        coverage_data: bound_coverage.as_ref(),
+        ..*input
+    };
+    let score = |metric| {
+        let items = score_metric(metric, &bounded_input, policy);
+        on_metric_scored();
+        items
+    };
+    let items = match execution {
+        ScoringExecution::Sequential => metrics.iter().flat_map(score).collect(),
+        ScoringExecution::Parallel => metrics.par_iter().flat_map(score).collect(),
     };
 
     apply_suppressions(items, input.suppression_contexts)
@@ -439,6 +459,7 @@ mod tests {
 
     fn create_test_metric(name: &str, cyclomatic: u32, cognitive: u32) -> FunctionMetrics {
         FunctionMetrics {
+            column: None,
             name: name.to_string(),
             file: PathBuf::from("test.rs"),
             line: 1,
@@ -480,6 +501,122 @@ mod tests {
         let mut metric = create_test_metric(name, 1, 0);
         metric.is_pure = is_pure;
         metric
+    }
+
+    #[test]
+    fn scoring_kernel_binds_callee_ast_ranges_in_both_schedules() {
+        use crate::priority::call_graph::{CallType, FunctionCall};
+        use std::io::Write;
+        let mut file = tempfile::NamedTempFile::new().unwrap();
+        write!(file, "SF:test.rs\nFN:1,caller\nFN:10,callee\nDA:1,0\nDA:10,0\nDA:20,1\nDA:21,1\nDA:22,1\nDA:23,1\nDA:24,1\nDA:25,1\nDA:26,1\nDA:27,1\nDA:28,1\nend_of_record\n").unwrap();
+        let coverage = crate::risk::lcov::parse_lcov_file(file.path()).unwrap();
+        let mut caller = create_test_metric("caller", 20, 30);
+        caller.length = 1;
+        let mut callee = create_test_metric("callee", 20, 30);
+        callee.line = 10;
+        callee.length = 1;
+        let caller_id = FunctionId::new(caller.file.clone(), caller.name.clone(), caller.line);
+        let callee_id = FunctionId::new(callee.file.clone(), callee.name.clone(), callee.line);
+        let mut graph = CallGraph::new();
+        graph.add_function(caller_id.clone(), false, false, 20, 1);
+        graph.add_function(callee_id.clone(), false, false, 20, 1);
+        graph.add_call(FunctionCall {
+            caller: caller_id,
+            callee: callee_id,
+            call_type: CallType::Delegate,
+        });
+        let exclusions = HashSet::new();
+        let aggregator = DebtAggregator::new();
+        let line_counts = HashMap::from([(PathBuf::from("test.rs"), 100)]);
+        let suppressions = HashMap::new();
+        let input = PreparedScoringInput {
+            call_graph: &graph,
+            test_only_functions: &exclusions,
+            coverage_data: Some(&coverage),
+            framework_exclusions: &exclusions,
+            function_pointer_used_functions: None,
+            debt_aggregator: &aggregator,
+            data_flow: None,
+            risk_analyzer: None,
+            project_path: Path::new("."),
+            file_line_counts: &line_counts,
+            suppression_contexts: &suppressions,
+        };
+        let metrics = [caller, callee];
+        let policy = crate::config::AnalysisPolicy::from_config(&Default::default());
+        for schedule in [ScoringExecution::Sequential, ScoringExecution::Parallel] {
+            let result = score_metrics_with_policy(&metrics, &input, schedule, &policy);
+            let caller = result
+                .iter()
+                .find(|item| item.location.function == "caller")
+                .unwrap();
+            let coverage = caller.transitive_coverage.as_ref().unwrap();
+            assert_eq!((coverage.direct, coverage.transitive), (0.0, 0.0));
+            assert!(coverage.propagated_from.is_empty());
+        }
+    }
+
+    #[test]
+    fn progress_counts_filtered_metrics_without_changing_scoring_or_audit() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let graph = CallGraph::new();
+        let exclusions = HashSet::new();
+        let aggregator = DebtAggregator::new();
+        let line_counts = HashMap::from([(PathBuf::from("test.rs"), 100)]);
+        let suppressions = HashMap::from([(
+            PathBuf::from("test.rs"),
+            parse_suppression_comments(
+                "// debtmap:ignore[complexity] -- audited exception\nfn suppressed() {}",
+                Language::Rust,
+                Path::new("test.rs"),
+            ),
+        )]);
+        let input = PreparedScoringInput {
+            call_graph: &graph,
+            test_only_functions: &exclusions,
+            coverage_data: None,
+            framework_exclusions: &exclusions,
+            function_pointer_used_functions: None,
+            debt_aggregator: &aggregator,
+            data_flow: None,
+            risk_analyzer: None,
+            project_path: Path::new("."),
+            file_line_counts: &line_counts,
+            suppression_contexts: &suppressions,
+        };
+        let policy = crate::config::AnalysisPolicy::from_config(&Default::default());
+        let mut skipped = create_test_metric("test_skipped", 30, 40);
+        skipped.is_test = true;
+        let mut suppressed = create_test_metric("suppressed", 30, 40);
+        suppressed.line = 2;
+        let metrics = vec![create_test_metric("work", 30, 40), skipped, suppressed];
+        let expected = score_metrics_with_policy_audited(
+            &metrics,
+            &input,
+            ScoringExecution::Sequential,
+            &policy,
+        );
+        assert!(!expected.emitted.is_empty());
+        assert!(!expected.audit.is_empty());
+
+        for execution in [ScoringExecution::Sequential, ScoringExecution::Parallel] {
+            let completed = AtomicUsize::new(0);
+            let actual = score_metrics_with_progress(&metrics, &input, execution, &policy, || {
+                completed.fetch_add(1, Ordering::Relaxed);
+            });
+            assert_eq!(completed.load(Ordering::Relaxed), metrics.len());
+            assert_eq!(actual.audit, expected.audit);
+            assert_eq!(
+                serde_json::to_value(actual.emitted).unwrap(),
+                serde_json::to_value(&expected.emitted).unwrap(),
+            );
+            let empty = score_metrics_with_progress(&[], &input, execution, &policy, || {
+                panic!("empty scoring must not report completed metrics");
+            });
+            assert!(empty.emitted.is_empty());
+            assert!(empty.audit.is_empty());
+        }
     }
 
     #[test]
@@ -638,6 +775,7 @@ fn run() {}"#;
                 contextual_risk_multiplier: None,
                 pre_contextual_score: None,
                 debt_type_multiplier: None,
+                score_trace: Vec::new(),
             },
             function_role: FunctionRole::PureLogic,
             recommendation: ActionableRecommendation {
@@ -662,6 +800,7 @@ fn run() {}"#;
             upstream_production_callers: vec![],
             upstream_test_callers: vec![],
             production_blast_radius: 0,
+            immediate_neighbor_count: None,
             nesting_depth: 1,
             function_length: 10,
             cyclomatic_complexity: 10,

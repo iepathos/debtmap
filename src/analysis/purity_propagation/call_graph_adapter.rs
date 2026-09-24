@@ -4,6 +4,7 @@
 //! for purity propagation analysis.
 
 use crate::analysis::call_graph::RustCallGraph;
+use crate::analysis::effect_evidence::EffectAssessment;
 use crate::priority::call_graph::FunctionId;
 use anyhow::Result;
 
@@ -20,7 +21,21 @@ impl PurityCallGraphAdapter {
 
     /// Get dependencies for a function (functions this function calls)
     pub fn get_dependencies(&self, func_id: &FunctionId) -> Vec<FunctionId> {
-        self.rust_graph.base_graph.get_callees(func_id)
+        self.effect_assessment(func_id)
+            .map(|assessment| {
+                assessment
+                    .dependencies()
+                    .map(|dependency| dependency.target.clone())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    pub fn effect_assessment(&self, func_id: &FunctionId) -> Option<EffectAssessment> {
+        self.rust_graph
+            .base_graph
+            .effect_assessment(func_id)
+            .cloned()
     }
 
     /// Get dependents (callers) for a function

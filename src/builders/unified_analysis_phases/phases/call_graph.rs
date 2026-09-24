@@ -120,7 +120,8 @@ pub fn should_process_metric(
         return false;
     }
 
-    let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line);
+    let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line)
+        .with_column(metric.column);
 
     // Skip if in test-only functions set
     if test_only_functions.contains(&func_id) {
@@ -141,6 +142,7 @@ mod tests {
 
     fn create_test_metric(name: &str, is_test: bool, cyclomatic: u32) -> FunctionMetrics {
         FunctionMetrics {
+            column: None,
             name: name.to_string(),
             file: PathBuf::from("test.rs"),
             line: 1,

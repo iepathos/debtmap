@@ -395,9 +395,10 @@ impl GitHistoryProvider {
         history: &function_level::FunctionHistory,
         reference_time: DateTime<Utc>,
     ) -> Context {
-        let contribution = stability::classify_risk_contribution(
+        let contribution = stability::sample_adjusted_contribution(
             history.change_frequency(reference_time),
             history.bug_density(),
+            history.total_commits,
         );
 
         Context {
@@ -421,9 +422,9 @@ impl GitHistoryProvider {
         target: &AnalysisTarget,
     ) -> Result<Option<function_level::FunctionHistory>> {
         if let Some(ref batched) = self.batched_functions
-            && let Some(history) = batched.get(relative_path, &target.function_name)
+            && batched.contains_target(relative_path, &target.function_name)
         {
-            return Ok(Some(history));
+            return Ok(batched.get(relative_path, &target.function_name));
         }
 
         let Some(ref repo) = self.git2_repo else {
@@ -449,8 +450,11 @@ impl GitHistoryProvider {
         let bug_density =
             stability::calculate_bug_density(history.bug_fix_count, history.total_commits);
 
-        let contribution =
-            stability::classify_risk_contribution(history.change_frequency, bug_density);
+        let contribution = stability::sample_adjusted_contribution(
+            history.change_frequency,
+            bug_density,
+            history.total_commits,
+        );
 
         Ok(Context {
             provider: self.name().to_string(),

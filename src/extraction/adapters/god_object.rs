@@ -685,6 +685,7 @@ mod tests {
 
     fn create_test_function(name: &str, line: usize) -> ExtractedFunctionData {
         ExtractedFunctionData {
+            column: None,
             name: name.to_string(),
             qualified_name: name.to_string(),
             line,
@@ -720,6 +721,7 @@ mod tests {
 
         ExtractedFileData {
             path: PathBuf::from("src/god_object.rs"),
+            rust_source: None,
             functions,
             structs: vec![ExtractedStructData {
                 name: "BigStruct".to_string(),
@@ -756,6 +758,7 @@ mod tests {
     fn test_small_file_not_god_object() {
         let file_data = ExtractedFileData {
             path: PathBuf::from("src/small.rs"),
+            rust_source: None,
             functions: vec![create_test_function("foo", 1)],
             structs: vec![],
             impls: vec![],
@@ -777,6 +780,7 @@ mod tests {
             .collect();
         let mut with_tests = ExtractedFileData {
             path: PathBuf::from("src/service.rs"),
+            rust_source: None,
             functions: production_functions.clone(),
             structs: vec![],
             impls: vec![],
@@ -886,6 +890,7 @@ mod tests {
 
         let file_data = ExtractedFileData {
             path: PathBuf::from("worldturtle/api.py"),
+            rust_source: None,
             functions,
             structs,
             impls: vec![],
@@ -926,6 +931,7 @@ mod tests {
         // Test that responsibilities are behavioral categories, not type names
         let file_data = ExtractedFileData {
             path: PathBuf::from("src/big_struct.rs"),
+            rust_source: None,
             functions: vec![],
             structs: vec![ExtractedStructData {
                 name: "BigStruct".to_string(),
@@ -1089,6 +1095,7 @@ mod tests {
         // Spec 197: Each struct should be analyzed independently
         let file_data = ExtractedFileData {
             path: PathBuf::from("src/multi_struct.rs"),
+            rust_source: None,
             functions: vec![],
             structs: vec![
                 ExtractedStructData {
@@ -1157,6 +1164,7 @@ mod tests {
         // DTOs (structs with no impl methods) should not be flagged
         let file_data = ExtractedFileData {
             path: PathBuf::from("src/dto.rs"),
+            rust_source: None,
             functions: vec![],
             structs: vec![ExtractedStructData {
                 name: "DataOnly".to_string(),
@@ -1194,6 +1202,7 @@ mod tests {
         // Spec 197: struct_name should identify the actual god object, not first struct
         let file_data = ExtractedFileData {
             path: PathBuf::from("src/ordered.rs"),
+            rust_source: None,
             functions: vec![],
             structs: vec![
                 ExtractedStructData {
@@ -1330,6 +1339,7 @@ mod tests {
         // - But weighted count = 0.0 + 10*0.1 + 10*0.3 + 3*1.0 = 7.0 (below threshold)
         let file_data = ExtractedFileData {
             path: PathBuf::from("src/data_container.rs"),
+            rust_source: None,
             functions: vec![],
             structs: vec![ExtractedStructData {
                 name: "DataContainer".to_string(),
@@ -1498,6 +1508,7 @@ mod tests {
         // A struct with mostly substantive methods SHOULD be flagged
         let file_data = ExtractedFileData {
             path: PathBuf::from("src/god_class.rs"),
+            rust_source: None,
             functions: vec![],
             structs: vec![ExtractedStructData {
                 name: "GodClass".to_string(),
@@ -1544,6 +1555,7 @@ mod tests {
         // A struct with ONLY accessor/boilerplate methods should never be flagged
         let file_data = ExtractedFileData {
             path: PathBuf::from("src/dto.rs"),
+            rust_source: None,
             functions: vec![],
             structs: vec![ExtractedStructData {
                 name: "DataTransferObject".to_string(),

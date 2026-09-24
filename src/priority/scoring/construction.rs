@@ -11,6 +11,7 @@ use crate::priority::context::{ContextConfig, generate_context_suggestion};
 
 use crate::complexity::EntropyAnalysis;
 use crate::priority::scoring::ContextRecommendationEngine;
+use crate::priority::scoring::trace::{ScoreOperation, ScoreStep};
 use crate::priority::unified_scorer::{
     calculate_unified_priority, calculate_unified_priority_with_data_flow_and_role,
     calculate_unified_priority_with_role,
@@ -19,7 +20,7 @@ use crate::priority::{
     ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location, TransitiveCoverage,
     UnifiedDebtItem, UnifiedScore,
     call_graph::{CallGraph, FunctionId},
-    coverage_propagation::calculate_transitive_coverage,
+    coverage_propagation::calculate_transitive_coverage_with_bounds,
     debt_aggregator::DebtAggregator,
     scoring::debt_item::{
         calculate_entropy_analysis, calculate_expected_impact, classify_all_debt_types_with_role,
@@ -31,6 +32,10 @@ use crate::priority::{
 use crate::risk::lcov::LcovData;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+
+#[path = "construction/dependencies.rs"]
+mod dependencies;
+use dependencies::{DependencyMetrics, extract_dependency_metrics};
 
 /// Type alias for file line count cache (spec 195).
 pub type FileLineCountCache = HashMap<PathBuf, usize>;
@@ -69,6 +74,12 @@ fn calculate_context_multiplier(file_path: &Path) -> (f64, FileType) {
 
 /// Apply context multiplier to a UnifiedScore (spec 191)
 fn apply_context_multiplier_to_score(mut score: UnifiedScore, multiplier: f64) -> UnifiedScore {
+    score.score_trace.push(ScoreStep::new(
+        "File context",
+        score.final_score,
+        ScoreOperation::Multiply(multiplier),
+        score.final_score * multiplier,
+    ));
     // Apply multiplier to final_score and all contributing factors
     score.final_score *= multiplier;
     score.complexity_factor *= multiplier;
@@ -116,6 +127,20 @@ pub fn apply_contextual_risk_to_score(
 
     // Apply multiplier to final_score (floored at 0)
     let adjusted_final = pre_ctx_score * risk_multiplier;
+    score.score_trace.push(ScoreStep::new(
+        "Contextual risk",
+        pre_ctx_score,
+        ScoreOperation::Multiply(risk_multiplier),
+        adjusted_final,
+    ));
+    if adjusted_final < 0.0 {
+        score.score_trace.push(ScoreStep::new(
+            "Nonnegative floor",
+            adjusted_final,
+            ScoreOperation::Floor(0.0),
+            adjusted_final.max(0.0),
+        ));
+    }
     score.final_score = adjusted_final.max(0.0);
 
     // Record the pre-contextual score in base_score if not already set
@@ -138,7 +163,8 @@ pub fn create_unified_debt_item_enhanced(
     _enhanced_call_graph: Option<()>, // Placeholder for future enhanced call graph
     coverage: Option<&LcovData>,
 ) -> Option<UnifiedDebtItem> {
-    let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
+    let func_id =
+        FunctionId::new(func.file.clone(), func.name.clone(), func.line).with_column(func.column);
 
     // Security factor removed per spec 64
     // Organization factor removed per spec 58 - redundant with complexity factor
@@ -153,8 +179,7 @@ pub fn create_unified_debt_item_enhanced(
 
     let role = classify_function_role(func, &func_id, call_graph);
 
-    let transitive_coverage =
-        coverage.map(|cov| calculate_transitive_coverage(&func_id, call_graph, cov));
+    let transitive_coverage = calculate_coverage_data(&func_id, func, call_graph, coverage);
 
     // Use enhanced debt type classification
     let debt_type = classify_debt_type_enhanced(func, call_graph, &func_id);
@@ -163,26 +188,7 @@ pub fn create_unified_debt_item_enhanced(
     let recommendation = generate_recommendation(func, &debt_type, role, &unified_score)?;
     let expected_impact = calculate_expected_impact(func, &debt_type, &unified_score);
 
-    // Use pre-populated call graph data from FunctionMetrics if available,
-    // otherwise fall back to querying the call graph directly
-    let (upstream_caller_names, downstream_callee_names) =
-        if func.upstream_callers.is_some() || func.downstream_callees.is_some() {
-            (
-                func.upstream_callers.clone().unwrap_or_default(),
-                func.downstream_callees.clone().unwrap_or_default(),
-            )
-        } else {
-            // Fallback: query call graph directly
-            let upstream_callers = call_graph.get_callers(&func_id);
-            let downstream_callees = call_graph.get_callees(&func_id);
-            (
-                upstream_callers.iter().map(|id| id.name.clone()).collect(),
-                downstream_callees
-                    .iter()
-                    .map(|id| id.name.clone())
-                    .collect(),
-            )
-        };
+    let deps = extract_dependency_metrics(func, &func_id, call_graph);
 
     // Detect function context (spec 122)
     // Use global singleton to avoid repeated regex compilation
@@ -217,13 +223,6 @@ pub fn create_unified_debt_item_enhanced(
     let responsibility_category =
         crate::organization::god_object::analyze_function_responsibility(&func.name);
 
-    // Spec 267: Classify callers into production and test
-    let classified = crate::priority::caller_classification::classify_callers(
-        upstream_caller_names.iter(),
-        Some(call_graph),
-    );
-    let production_blast_radius = classified.production_count + downstream_callee_names.len();
-
     let item = UnifiedDebtItem {
         location: Location {
             file: func.file.clone(),
@@ -236,14 +235,15 @@ pub fn create_unified_debt_item_enhanced(
         recommendation,
         expected_impact,
         transitive_coverage,
-        upstream_dependencies: upstream_caller_names.len(),
-        downstream_dependencies: downstream_callee_names.len(),
-        upstream_callers: upstream_caller_names,
-        downstream_callees: downstream_callee_names,
+        upstream_dependencies: deps.upstream_count,
+        downstream_dependencies: deps.downstream_count,
+        upstream_callers: deps.upstream_names,
+        downstream_callees: deps.downstream_names,
         // Spec 267: Separated production and test callers
-        upstream_production_callers: classified.production,
-        upstream_test_callers: classified.test,
-        production_blast_radius,
+        upstream_production_callers: deps.production_upstream_names,
+        upstream_test_callers: deps.test_upstream_names,
+        production_blast_radius: deps.production_blast_radius,
+        immediate_neighbor_count: deps.immediate_neighbor_count,
         nesting_depth: func.nesting,
         function_length: func.length,
         cyclomatic_complexity: func.cyclomatic,
@@ -307,7 +307,7 @@ pub fn create_unified_debt_item_with_aggregator(
 
 // Pure function: Extract function ID creation
 pub(crate) fn create_function_id(func: &FunctionMetrics) -> FunctionId {
-    FunctionId::new(func.file.clone(), func.name.clone(), func.line)
+    FunctionId::new(func.file.clone(), func.name.clone(), func.line).with_column(func.column)
 }
 
 /// Pre-computed values shared across all debt types for a single function (spec 205).
@@ -417,68 +417,9 @@ fn calculate_coverage_data(
     coverage: Option<&LcovData>,
 ) -> Option<TransitiveCoverage> {
     coverage.map(|lcov| {
-        let end_line = func.line + func.length.saturating_sub(1);
-        // get_function_coverage_with_bounds now returns Some(0.0) when not found
-        let _direct_coverage =
-            lcov.get_function_coverage_with_bounds(&func.file, &func.name, func.line, end_line);
-        calculate_transitive_coverage(func_id, call_graph, lcov)
+        let end_line = func.line.saturating_add(func.length.saturating_sub(1));
+        calculate_transitive_coverage_with_bounds(func_id, end_line, call_graph, lcov)
     })
-}
-
-// Pure function: Extract dependency metrics (spec 205: public for FunctionScoringContext)
-// Spec 267: Now includes production/test caller separation
-#[derive(Clone)]
-pub(crate) struct DependencyMetrics {
-    upstream_count: usize,
-    downstream_count: usize,
-    upstream_names: Vec<String>,
-    downstream_names: Vec<String>,
-    // Spec 267: Separated production and test callers
-    production_upstream_names: Vec<String>,
-    test_upstream_names: Vec<String>,
-    production_blast_radius: usize,
-}
-
-fn extract_dependency_metrics(
-    func: &FunctionMetrics,
-    func_id: &FunctionId,
-    call_graph: &CallGraph,
-) -> DependencyMetrics {
-    use crate::priority::caller_classification::{ClassifiedCallers, classify_callers};
-
-    // Use pre-populated call graph data from FunctionMetrics if available
-    let (upstream_names, downstream_names) =
-        if func.upstream_callers.is_some() || func.downstream_callees.is_some() {
-            (
-                func.upstream_callers.clone().unwrap_or_default(),
-                func.downstream_callees.clone().unwrap_or_default(),
-            )
-        } else {
-            // Fallback: query call graph directly
-            let upstream = call_graph.get_callers(func_id);
-            let downstream = call_graph.get_callees(func_id);
-            (
-                upstream.iter().map(|f| f.name.clone()).collect(),
-                downstream.iter().map(|f| f.name.clone()).collect(),
-            )
-        };
-
-    // Spec 267: Classify callers into production and test
-    let classified: ClassifiedCallers = classify_callers(upstream_names.iter(), Some(call_graph));
-
-    // Spec 267: Production blast radius = production_upstream_count + downstream_count
-    let production_blast_radius = classified.production_count + downstream_names.len();
-
-    DependencyMetrics {
-        upstream_count: upstream_names.len(),
-        downstream_count: downstream_names.len(),
-        upstream_names,
-        downstream_names,
-        // Spec 267: Separated callers
-        production_upstream_names: classified.production,
-        test_upstream_names: classified.test,
-        production_blast_radius,
-    }
 }
 
 // Apply exponential scaling, debt type multiplier, and risk boosting to a debt item (spec 171, spec 260)
@@ -491,6 +432,35 @@ fn apply_score_scaling(mut item: UnifiedDebtItem) -> UnifiedDebtItem {
     // Calculate final score with scaling and debt type multiplier
     let (final_score, exponent, boost, debt_multiplier) =
         calculate_final_score(base_score, &item.debt_type, &item, &config);
+    let trace = &mut item.unified_score.score_trace;
+    let safe_base = base_score.max(1.0);
+    if safe_base != base_score {
+        trace.push(ScoreStep::new(
+            "Scaling minimum",
+            base_score,
+            ScoreOperation::Floor(1.0),
+            safe_base,
+        ));
+    }
+    let scaled = safe_base.powf(exponent);
+    trace.push(ScoreStep::new(
+        "Severity exponent",
+        safe_base,
+        ScoreOperation::Power(exponent),
+        scaled,
+    ));
+    trace.push(ScoreStep::new(
+        "Debt-type severity",
+        scaled,
+        ScoreOperation::Multiply(debt_multiplier),
+        scaled * debt_multiplier,
+    ));
+    trace.push(ScoreStep::new(
+        "Risk boosts",
+        scaled * debt_multiplier,
+        ScoreOperation::Multiply(boost),
+        final_score,
+    ));
 
     // Update the unified score with scaling information
     item.unified_score.base_score = Some(base_score);
@@ -582,6 +552,7 @@ fn build_unified_debt_item_from_context(
         upstream_production_callers: ctx.deps.production_upstream_names.clone(),
         upstream_test_callers: ctx.deps.test_upstream_names.clone(),
         production_blast_radius: ctx.deps.production_blast_radius,
+        immediate_neighbor_count: ctx.deps.immediate_neighbor_count,
         nesting_depth: func.nesting,
         function_length: func.length,
         cyclomatic_complexity: func.cyclomatic,
@@ -711,7 +682,12 @@ pub fn create_unified_debt_item_with_aggregator_and_data_flow(
             if let Some(analyzer) = risk_analyzer {
                 let complexity_metrics = crate::core::ComplexityMetrics::from_function(func);
                 let func_coverage = coverage.and_then(|cov| {
-                    cov.get_function_coverage_with_line(&func.file, &func.name, func.line)
+                    cov.get_function_coverage_with_bounds(
+                        &func.file,
+                        &func.name,
+                        func.line,
+                        func.line.saturating_add(func.length.saturating_sub(1)),
+                    )
                 });
 
                 let (_, contextual_risk) = analyzer.analyze_function_with_context(
@@ -768,7 +744,8 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
     file_line_counts: &FileLineCountCache,
 ) -> Vec<UnifiedDebtItem> {
-    let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
+    let func_id =
+        FunctionId::new(func.file.clone(), func.name.clone(), func.line).with_column(func.column);
 
     // Compute function role ONCE upfront for reuse
     let function_role = classify_function_role(func, &func_id, call_graph);
@@ -776,14 +753,7 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
     // Calculate transitive coverage if coverage file is provided (Spec 203)
     // Use exact AST boundaries for more accurate coverage matching
     // ALWAYS return Some when coverage is provided, never None (eliminates Cov:N/A)
-    let transitive_coverage = coverage.map(|lcov| {
-        let end_line = func.line + func.length.saturating_sub(1);
-        // get_function_coverage_with_bounds now returns Some(0.0) when not found
-        // So we always get a value, even if it's 0%
-        let _direct_coverage =
-            lcov.get_function_coverage_with_bounds(&func.file, &func.name, func.line, end_line);
-        calculate_transitive_coverage(&func_id, call_graph, lcov)
-    });
+    let transitive_coverage = calculate_coverage_data(&func_id, func, call_graph, coverage);
 
     // Use the enhanced debt type classification with framework exclusions (spec 228)
     // Use precomputed role to avoid redundant computation
@@ -806,22 +776,7 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
     let (context_multiplier, context_type) = calculate_context_multiplier(&func.file);
     unified_score = apply_context_multiplier_to_score(unified_score, context_multiplier);
 
-    // Pre-extract dependencies (shared across all debt items)
-    let (upstream_caller_names, downstream_callee_names) =
-        if func.upstream_callers.is_some() || func.downstream_callees.is_some() {
-            (
-                func.upstream_callers.clone().unwrap_or_default(),
-                func.downstream_callees.clone().unwrap_or_default(),
-            )
-        } else {
-            // Fallback: query call graph directly
-            let upstream = call_graph.get_callers(&func_id);
-            let downstream = call_graph.get_callees(&func_id);
-            (
-                upstream.iter().map(|f| f.name.clone()).collect(),
-                downstream.iter().map(|f| f.name.clone()).collect(),
-            )
-        };
+    let deps = extract_dependency_metrics(func, &func_id, call_graph);
 
     // Pre-calculate shared context data
     // Use global singleton to avoid repeated regex compilation
@@ -849,15 +804,6 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
     let entropy_analysis = calculate_entropy_analysis(func);
     // Look up file line count from cache (spec 195: O(1) lookup instead of file read)
     let file_line_count = get_file_line_count(&func.file, file_line_counts);
-
-    // Spec 267: Classify callers into production and test
-    let classified = crate::priority::caller_classification::classify_callers(
-        upstream_caller_names.iter(),
-        Some(call_graph),
-    );
-    let production_blast_radius = classified.production_count + downstream_callee_names.len();
-    let production_callers = classified.production.clone();
-    let test_callers = classified.test.clone();
 
     // Create one UnifiedDebtItem per debt type (spec 228)
     debt_types
@@ -888,14 +834,15 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
                 recommendation,
                 expected_impact,
                 transitive_coverage: transitive_coverage.clone(),
-                upstream_dependencies: upstream_caller_names.len(),
-                downstream_dependencies: downstream_callee_names.len(),
-                upstream_callers: upstream_caller_names.clone(),
-                downstream_callees: downstream_callee_names.clone(),
+                upstream_dependencies: deps.upstream_count,
+                downstream_dependencies: deps.downstream_count,
+                upstream_callers: deps.upstream_names.clone(),
+                downstream_callees: deps.downstream_names.clone(),
                 // Spec 267: Separated production and test callers
-                upstream_production_callers: production_callers.clone(),
-                upstream_test_callers: test_callers.clone(),
-                production_blast_radius,
+                upstream_production_callers: deps.production_upstream_names.clone(),
+                upstream_test_callers: deps.test_upstream_names.clone(),
+                production_blast_radius: deps.production_blast_radius,
+                immediate_neighbor_count: deps.immediate_neighbor_count,
                 nesting_depth: func.nesting,
                 function_length: func.length,
                 cyclomatic_complexity: func.cyclomatic,
@@ -940,6 +887,66 @@ mod tests {
     use crate::context::FileType;
 
     use std::path::PathBuf;
+
+    #[test]
+    fn scoring_trace_survives_context_scaling_and_output_conversion() {
+        let func: FunctionMetrics = serde_json::from_value(serde_json::json!({
+            "name": "business_logic", "file": "src/business.rs", "line": 1,
+            "cyclomatic": 20, "cognitive": 30, "nesting": 4, "length": 50,
+            "is_test": false, "is_trait_method": false, "in_test_module": false
+        }))
+        .unwrap();
+        let mut item =
+            create_unified_debt_item_enhanced(&func, &CallGraph::new(), None, None).unwrap();
+        item.debt_type = DebtType::ComplexityHotspot {
+            cyclomatic: 20,
+            cognitive: 30,
+        };
+        for base in [0.0, 20.0, 150.0] {
+            item.unified_score.final_score = base;
+            item.unified_score.score_trace.clear();
+            let context = crate::risk::context::ContextualRisk {
+                base_risk: 1.0,
+                contextual_risk: 1.4,
+                contexts: vec![],
+                explanation: String::new(),
+            };
+            item.unified_score =
+                apply_contextual_risk_to_score(item.unified_score.clone(), &context);
+            let scored = apply_score_scaling(item.clone());
+            let trace = &scored.unified_score.score_trace;
+            for step in trace {
+                assert!(
+                    (step.calculated_output() - step.output).abs() < 1e-9,
+                    "{step}"
+                );
+            }
+            for pair in trace.windows(2) {
+                assert!((pair[0].output - pair[1].input).abs() < 1e-9);
+            }
+            assert_eq!(
+                trace.last().unwrap().output,
+                scored.unified_score.final_score
+            );
+            let output =
+                crate::output::unified::FunctionDebtItemOutput::from_function_item(&scored, true);
+            let details = output.scoring_details.unwrap();
+            assert_eq!(details.base_score, base * 1.4);
+            assert_eq!(details.score_trace, *trace);
+            let rendered = crate::io::writers::llm_markdown::format::scoring(
+                Some(&details),
+                &scored.function_role,
+            )
+            .unwrap();
+            assert!(rendered.contains("Severity exponent"));
+            assert!(rendered.contains("Debt-type severity"));
+            assert!(rendered.contains("Risk boosts"));
+            assert!(!rendered.contains("clamped to"));
+            if base == 150.0 {
+                assert!(scored.unified_score.final_score > 100.0);
+            }
+        }
+    }
 
     #[test]
     fn test_calculate_context_multiplier_for_example() {
@@ -1015,6 +1022,7 @@ mod tests {
             contextual_risk_multiplier: None,
             pre_contextual_score: None,
             debt_type_multiplier: None,
+            score_trace: Vec::new(),
         };
 
         let adjusted = apply_context_multiplier_to_score(original_score, 0.1);
@@ -1054,6 +1062,7 @@ mod tests {
             contextual_risk_multiplier: None,
             pre_contextual_score: None,
             debt_type_multiplier: None,
+            score_trace: Vec::new(),
         };
 
         // Test with all file types

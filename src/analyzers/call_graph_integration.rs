@@ -21,7 +21,8 @@ pub fn populate_call_graph_data(
         .iter()
         .enumerate()
         .map(|(idx, metric)| {
-            let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line);
+            let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line)
+                .with_column(metric.column);
             (idx, func_id)
         })
         .collect();
@@ -34,7 +35,10 @@ pub fn populate_call_graph_data(
                 graph_dependencies_for_function(call_graph, func_id);
 
             // If no results and this is a Python file, try with line 0
-            if upstream_callers.is_empty() && downstream_callees.is_empty() {
+            if crate::core::Language::from_path(&metric.file) == crate::core::Language::Python
+                && upstream_callers.is_empty()
+                && downstream_callees.is_empty()
+            {
                 let func_id_zero_line =
                     FunctionId::new(func_id.file.clone(), func_id.name.clone(), 0);
 
@@ -64,17 +68,8 @@ fn graph_dependencies_for_function(
     call_graph: &CallGraph,
     func_id: &FunctionId,
 ) -> (Vec<String>, Vec<String>) {
-    let exact_match = call_graph.get_function_info(func_id).is_some();
-    let callers = if exact_match {
-        call_graph.get_callers_exact(func_id)
-    } else {
-        call_graph.get_callers(func_id)
-    };
-    let callees = if exact_match {
-        call_graph.get_callees_exact(func_id)
-    } else {
-        call_graph.get_callees(func_id)
-    };
+    let callers = call_graph.external_callers(func_id);
+    let callees = call_graph.external_callees(func_id);
 
     (
         callers
@@ -109,6 +104,7 @@ mod tests {
 
     fn create_test_function_metric(name: &str, file: &str, line: usize) -> FunctionMetrics {
         FunctionMetrics {
+            column: None,
             name: name.to_string(),
             file: PathBuf::from(file),
             line,
@@ -283,6 +279,13 @@ mod tests {
         let file2 = syn::parse_str::<syn::File>(file2_code).expect("Failed to parse file2");
 
         let files = vec![
+            (
+                syn::parse_str(
+                    "mod commands { pub mod diagnose_coverage; } mod risk { pub mod lcov; }",
+                )
+                .expect("Failed to parse crate root"),
+                PathBuf::from("src/lib.rs"),
+            ),
             (file1, PathBuf::from("src/commands/diagnose_coverage.rs")),
             (file2, PathBuf::from("src/risk/lcov.rs")),
         ];
@@ -435,6 +438,13 @@ mod tests {
         let file2 = syn::parse_str::<syn::File>(file2_code).expect("Failed to parse file2");
 
         let files = vec![
+            (
+                syn::parse_str(
+                    "mod commands { pub mod diagnose_coverage; } mod risk { pub mod lcov; }",
+                )
+                .expect("Failed to parse crate root"),
+                PathBuf::from("src/lib.rs"),
+            ),
             (file1, PathBuf::from("src/commands/diagnose_coverage.rs")),
             (file2, PathBuf::from("src/risk/lcov.rs")),
         ];

@@ -5,7 +5,8 @@
 //!
 //! # Design
 //!
-//! All functions in this module are pure (no I/O, no parsing). The call graph
+//! All functions in this module are pure (no I/O). Rust source snapshots are
+//! parsed in bounded passes for complete workspace resolution. The call graph
 //! construction is O(n*m) where n is the number of functions and m is the average
 //! number of calls per function.
 //!
@@ -39,7 +40,8 @@ pub fn build_call_graph(extracted: &HashMap<PathBuf, ExtractedFileData>) -> Call
     for (path, file_data) in extracted {
         for func in &file_data.functions {
             // Use qualified_name for method disambiguation (e.g., "Type::method")
-            let func_id = FunctionId::new(path.clone(), func.qualified_name.clone(), func.line);
+            let func_id = FunctionId::new(path.clone(), func.qualified_name.clone(), func.line)
+                .with_column(func.column);
 
             let evidence = crate::analysis::role_policy::evidence_for_facts(
                 crate::analysis::role_policy::RoleFacts {
@@ -57,12 +59,24 @@ pub fn build_call_graph(extracted: &HashMap<PathBuf, ExtractedFileData>) -> Call
         }
     }
 
-    // Second pass: add call edges
-    for (path, file_data) in extracted {
-        for func in &file_data.functions {
-            let caller_id = FunctionId::new(path.clone(), func.qualified_name.clone(), func.line);
+    let (rust_graph, resolved_files) =
+        crate::analyzers::rust_resolution::cached::extract(extracted);
+    graph = crate::builders::rust_workspace::identity::merge(graph, rust_graph);
 
-            for call in &func.calls {
+    // Source-backed Rust outcomes are final; summaries must not add weaker edges.
+    for (path, file_data) in extracted {
+        if resolved_files.contains(path) {
+            continue;
+        }
+        for func in &file_data.functions {
+            let caller_id = FunctionId::new(path.clone(), func.qualified_name.clone(), func.line)
+                .with_column(func.column);
+
+            for (ordinal, call) in func.calls.iter().enumerate() {
+                if missing_rust_context(path, call) {
+                    record_unavailable_call(&mut graph, &caller_id, call, ordinal);
+                    continue;
+                }
                 if let Some(callee_id) = resolve_call(path, call, extracted) {
                     let call_type = convert_call_type(call.call_type);
                     graph.add_call(FunctionCall {
@@ -76,6 +90,39 @@ pub fn build_call_graph(extracted: &HashMap<PathBuf, ExtractedFileData>) -> Call
     }
 
     graph
+}
+
+fn missing_rust_context(path: &std::path::Path, call: &CallSite) -> bool {
+    crate::core::Language::from_path(path) == crate::core::Language::Rust
+        && matches!(
+            call.call_type,
+            ExtractedCallType::Method
+                | ExtractedCallType::StaticMethod
+                | ExtractedCallType::TraitMethod
+        )
+}
+
+fn record_unavailable_call(
+    graph: &mut CallGraph,
+    caller: &FunctionId,
+    call: &CallSite,
+    ordinal: usize,
+) {
+    graph.record_uncertain_call(crate::priority::call_graph::UncertainCall {
+        call_ordinal: Some(ordinal),
+        caller: caller.clone(),
+        call_site: crate::priority::call_graph::CallSite {
+            file: caller.file.clone(),
+            line: call.line,
+            column: None,
+        },
+        lexical_module: caller.module_path.clone(),
+        call_type: convert_call_type(call.call_type),
+        query: call.callee_name.clone(),
+        receiver: None,
+        candidates: Vec::new(),
+        reason: crate::priority::call_graph::UncertaintyReason::UnavailableDefinition,
+    });
 }
 
 /// Convert extracted CallType to call graph CallType.
@@ -99,15 +146,17 @@ fn resolve_call(
     call: &CallSite,
     extracted: &HashMap<PathBuf, ExtractedFileData>,
 ) -> Option<FunctionId> {
+    if missing_rust_context(caller_file, call) {
+        return None;
+    }
     // Try same file first (most common case)
     if let Some(file_data) = extracted.get(caller_file)
         && let Some(func) = find_function_by_name(file_data, &call.callee_name)
     {
-        return Some(FunctionId::new(
-            caller_file.clone(),
-            func.name.clone(),
-            func.line,
-        ));
+        return Some(
+            FunctionId::new(caller_file.clone(), func.name.clone(), func.line)
+                .with_column(func.column),
+        );
     }
 
     // Try cross-file resolution for direct and static method calls
@@ -119,7 +168,10 @@ fn resolve_call(
                     continue;
                 }
                 if let Some(func) = find_function_by_name(file_data, &call.callee_name) {
-                    return Some(FunctionId::new(path.clone(), func.name.clone(), func.line));
+                    return Some(
+                        FunctionId::new(path.clone(), func.name.clone(), func.line)
+                            .with_column(func.column),
+                    );
                 }
             }
         }
@@ -185,10 +237,15 @@ pub fn build_single_file_graph(file_data: &ExtractedFileData) -> CallGraph {
 ///
 /// Useful for validation and debugging.
 pub fn count_resolvable_calls(extracted: &HashMap<PathBuf, ExtractedFileData>) -> (usize, usize) {
-    let mut resolved = 0;
-    let mut unresolved = 0;
+    let (rust_graph, resolved_files) =
+        crate::analyzers::rust_resolution::cached::extract(extracted);
+    let mut resolved = rust_graph.edge_evidence().count();
+    let mut unresolved = rust_graph.uncertain_calls().count();
 
     for (path, file_data) in extracted {
+        if resolved_files.contains(path) {
+            continue;
+        }
         for func in &file_data.functions {
             for call in &func.calls {
                 if resolve_call(path, call, extracted).is_some() {
@@ -213,6 +270,7 @@ mod tests {
 
     fn create_test_function(name: &str, line: usize) -> ExtractedFunctionData {
         ExtractedFunctionData {
+            column: None,
             name: name.to_string(),
             qualified_name: name.to_string(),
             line,
@@ -250,6 +308,7 @@ mod tests {
             total_lines: 50,
             detected_patterns: vec![],
             test_lines: 0, // Spec 214
+            rust_source: None,
         }
     }
 
@@ -384,7 +443,7 @@ mod tests {
     }
 
     #[test]
-    fn test_qualified_name_resolution() {
+    fn test_qualified_name_without_source_stays_uncertain() {
         let mut extracted = HashMap::new();
         let mut file_data = create_test_file();
 
@@ -405,7 +464,8 @@ mod tests {
         let foo_id = FunctionId::new(PathBuf::from("src/main.rs"), "foo".to_string(), 1);
         let callees = graph.get_callees(&foo_id);
 
-        assert_eq!(callees.len(), 1);
+        assert!(callees.is_empty());
+        assert_eq!(graph.uncertain_calls().count(), 1);
     }
 
     #[test]

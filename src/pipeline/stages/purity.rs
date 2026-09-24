@@ -121,7 +121,8 @@ pub fn analyze_purity(
     let mut func_ids = Vec::new();
 
     for metric in metrics {
-        let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line);
+        let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line)
+            .with_column(metric.column);
         let category = analyze_local_purity(metric);
         initial.insert(func_id.clone(), category);
         func_ids.push((func_id, metric.name.clone()));

@@ -19,8 +19,9 @@
 //!
 //! # Solution
 //!
-//! Parse each file exactly once and extract ALL needed data into `Send+Sync`-safe
-//! structures that can be shared across all analysis phases.
+//! Extract metric summaries into `Send+Sync`-safe structures shared by analysis
+//! phases. Rust also retains its original source snapshot: call graph construction
+//! parses each snapshot once to build a complete workspace declaration index.
 //!
 //! # Example
 //!

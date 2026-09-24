@@ -164,6 +164,7 @@ fn symbol_key(file: &Path, name: &str) -> PackageSymbol {
 
 fn function_id(metric: &FunctionMetrics) -> FunctionId {
     FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line)
+        .with_column(metric.column)
 }
 
 fn is_production_go(metric: &FunctionMetrics) -> bool {

@@ -185,12 +185,18 @@ fn test_multiple_methods_same_name() {
     let callers_a = graph.get_callers(method_a);
     let callers_b = graph.get_callers(method_b);
 
-    // Each method should have distinct callers (or possibly none if type inference fails)
-    // The key is they should NOT both report the same callers
-    assert!(
-        !(callers_a.len() == 2 && callers_b.len() == 2),
-        "TypeA::method and TypeB::method should not both have all callers"
+    assert_eq!(
+        callers_a.len(),
+        1,
+        "TypeA::method requires its typed caller"
     );
+    assert_eq!(callers_a[0].name, "call_a");
+    assert_eq!(
+        callers_b.len(),
+        1,
+        "TypeB::method requires its typed caller"
+    );
+    assert_eq!(callers_b[0].name, "call_b");
 }
 
 #[test]

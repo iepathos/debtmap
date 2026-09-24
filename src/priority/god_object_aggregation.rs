@@ -795,14 +795,15 @@ pub fn aggregate_coverage_from_raw_metrics(
     let mut coverage_data: Vec<(f64, usize, Vec<usize>)> = Vec::with_capacity(functions.len());
 
     for func in functions {
-        let end_line = func.line + func.length.saturating_sub(1);
+        let end_line = func.line.saturating_add(func.length.saturating_sub(1));
         // Use get_function_coverage_with_bounds for accurate AST-based matching
         let direct_coverage = coverage
             .get_function_coverage_with_bounds(&func.file, &func.name, func.line, end_line)
             .unwrap_or(0.0);
 
         let uncovered = coverage
-            .get_function_uncovered_lines(&func.file, &func.name, func.line)
+            .get_function_uncovered_lines_with_bounds(&func.file, func.line, end_line)
+            .or_else(|| coverage.get_function_uncovered_lines(&func.file, &func.name, func.line))
             .unwrap_or_default();
 
         coverage_data.push((direct_coverage, func.length, uncovered));
@@ -1053,6 +1054,7 @@ mod tests {
                 contextual_risk_multiplier: None,
                 pre_contextual_score: None,
                 debt_type_multiplier: None,
+                score_trace: Vec::new(),
             },
             function_role: FunctionRole::Unknown,
             recommendation: ActionableRecommendation {
@@ -1077,6 +1079,7 @@ mod tests {
             upstream_production_callers: Vec::new(),
             upstream_test_callers: Vec::new(),
             production_blast_radius: 0,
+            immediate_neighbor_count: None,
             nesting_depth: nest,
             function_length: length,
             cyclomatic_complexity: cyc,
@@ -1217,6 +1220,7 @@ mod tests {
     fn test_aggregate_error_swallowing() {
         let functions = vec![
             FunctionMetrics {
+                column: None,
                 name: "func1".to_string(),
                 file: PathBuf::from("test.rs"),
                 line: 1,
@@ -1248,6 +1252,7 @@ mod tests {
                 entropy_analysis: None,
             },
             FunctionMetrics {
+                column: None,
                 name: "func2".to_string(),
                 file: PathBuf::from("test.rs"),
                 line: 25,
@@ -1280,6 +1285,7 @@ mod tests {
                 entropy_analysis: None,
             },
             FunctionMetrics {
+                column: None,
                 name: "func3".to_string(),
                 file: PathBuf::from("test.rs"),
                 line: 50,
@@ -1424,6 +1430,7 @@ mod tests {
     #[test]
     fn test_aggregate_from_raw_metrics_includes_error_swallowing() {
         let functions = vec![FunctionMetrics {
+            column: None,
             name: "func1".to_string(),
             file: PathBuf::from("test.rs"),
             line: 1,
@@ -1472,6 +1479,7 @@ mod tests {
 
         let functions = vec![
             FunctionMetrics {
+                column: None,
                 name: "func1".to_string(),
                 file: PathBuf::from("test.rs"),
                 line: 1,
@@ -1509,6 +1517,7 @@ mod tests {
                 entropy_analysis: None,
             },
             FunctionMetrics {
+                column: None,
                 name: "func2".to_string(),
                 file: PathBuf::from("test.rs"),
                 line: 50,
@@ -1564,6 +1573,7 @@ mod tests {
         use crate::complexity::entropy_core::EntropyScore as RawEntropyScore;
 
         let functions = vec![FunctionMetrics {
+            column: None,
             name: "func1".to_string(),
             file: PathBuf::from("test.rs"),
             line: 1,
@@ -1619,6 +1629,7 @@ mod tests {
 
         let functions = vec![
             FunctionMetrics {
+                column: None,
                 name: "with_entropy".to_string(),
                 file: PathBuf::from("test.rs"),
                 line: 1,
@@ -1656,6 +1667,7 @@ mod tests {
                 entropy_analysis: None,
             },
             FunctionMetrics {
+                column: None,
                 name: "without_entropy".to_string(),
                 file: PathBuf::from("test.rs"),
                 line: 50,
@@ -1791,6 +1803,7 @@ mod tests {
     fn test_aggregate_dependency_metrics_from_raw() {
         let functions = vec![
             FunctionMetrics {
+                column: None,
                 name: "func1".to_string(),
                 file: PathBuf::from("test.rs"),
                 line: 1,
@@ -1820,6 +1833,7 @@ mod tests {
                 entropy_analysis: None,
             },
             FunctionMetrics {
+                column: None,
                 name: "func2".to_string(),
                 file: PathBuf::from("test.rs"),
                 line: 10,
@@ -1876,6 +1890,7 @@ mod tests {
         // produced by `format_function_name`.
         let functions = vec![
             FunctionMetrics {
+                column: None,
                 name: "func1".to_string(),
                 file: PathBuf::from("src/foo/classifier.rs"),
                 line: 10,
@@ -1915,6 +1930,7 @@ mod tests {
                 entropy_analysis: None,
             },
             FunctionMetrics {
+                column: None,
                 name: "func2".to_string(),
                 file: PathBuf::from("src/foo/classifier.rs"),
                 line: 30,
@@ -1983,6 +1999,7 @@ mod tests {
     #[test]
     fn test_internal_member_set_indexes_method_only_names() {
         let set = build_internal_member_set(&[FunctionMetrics {
+            column: None,
             name: "SelfUsageVisitor::check_body".to_string(),
             file: PathBuf::from("src/foo/classifier.rs"),
             line: 404,
@@ -2022,6 +2039,7 @@ mod tests {
         // (e.g. filtered before aggregation). GodFile scope must still treat it
         // as internal cohesion.
         let functions = vec![FunctionMetrics {
+            column: None,
             name: "infer_method_domain".to_string(),
             file: PathBuf::from("src/organization/god_object/classifier.rs"),
             line: 1243,
@@ -2072,6 +2090,7 @@ mod tests {
     #[test]
     fn test_god_class_scope_keeps_same_file_non_struct_callee() {
         let functions = vec![FunctionMetrics {
+            column: None,
             name: "Builder::build".to_string(),
             file: PathBuf::from("src/foo.rs"),
             line: 10,
@@ -2123,6 +2142,7 @@ mod tests {
     #[test]
     fn test_aggregate_from_raw_metrics_includes_dependencies() {
         let functions = vec![FunctionMetrics {
+            column: None,
             name: "func1".to_string(),
             file: PathBuf::from("test.rs"),
             line: 1,
@@ -2306,6 +2326,7 @@ mod tests {
     fn test_aggregate_distribution_metrics_from_raw() {
         let functions = vec![
             FunctionMetrics {
+                column: None,
                 name: "prod_func1".to_string(),
                 file: PathBuf::from("test.rs"),
                 line: 1,
@@ -2335,6 +2356,7 @@ mod tests {
                 entropy_analysis: None,
             },
             FunctionMetrics {
+                column: None,
                 name: "prod_func2".to_string(),
                 file: PathBuf::from("test.rs"),
                 line: 50,
@@ -2364,6 +2386,7 @@ mod tests {
                 entropy_analysis: None,
             },
             FunctionMetrics {
+                column: None,
                 name: "test_something".to_string(),
                 file: PathBuf::from("test.rs"),
                 line: 100,
@@ -2415,6 +2438,7 @@ mod tests {
         let mut functions = Vec::new();
         for i in 0..30 {
             functions.push(FunctionMetrics {
+                column: None,
                 name: format!("func_{}", i),
                 file: PathBuf::from("overflow.rs"),
                 line: i * 20 + 1,
@@ -2505,6 +2529,7 @@ mod tests {
     #[test]
     fn test_aggregate_from_raw_metrics_includes_distribution() {
         let functions = vec![FunctionMetrics {
+            column: None,
             name: "func1".to_string(),
             file: PathBuf::from("test.rs"),
             line: 1,
@@ -2556,6 +2581,7 @@ mod tests {
     /// filter and aggregator inspect.
     fn raw_fn(name: &str, cyclomatic: u32, cognitive: u32) -> FunctionMetrics {
         FunctionMetrics {
+            column: None,
             name: name.to_string(),
             file: PathBuf::from("src/foo.rs"),
             line: 1,

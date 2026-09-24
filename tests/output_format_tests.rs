@@ -10,6 +10,7 @@ fn test_output_json_format() {
         timestamp: Utc::now(),
         complexity: ComplexityReport {
             metrics: vec![FunctionMetrics {
+                column: None,
                 name: "test_func".to_string(),
                 file: PathBuf::from("test.rs"),
                 line: 10,

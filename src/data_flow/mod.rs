@@ -17,108 +17,9 @@ use std::collections::{HashMap, HashSet};
 
 pub mod population;
 
-mod function_id_serde {
-    use super::*;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-    use std::collections::HashMap as StdHashMap;
-
-    pub fn serialize<S, V>(map: &HashMap<FunctionId, V>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-        V: Serialize,
-    {
-        let string_map: StdHashMap<String, &V> = map
-            .iter()
-            .map(|(k, v)| (format!("{}:{}:{}", k.file.display(), k.name, k.line), v))
-            .collect();
-        string_map.serialize(serializer)
-    }
-
-    pub fn deserialize<'de, D, V>(deserializer: D) -> Result<HashMap<FunctionId, V>, D::Error>
-    where
-        D: Deserializer<'de>,
-        V: Deserialize<'de>,
-    {
-        let string_map: StdHashMap<String, V> = StdHashMap::deserialize(deserializer)?;
-        let mut result = HashMap::new();
-        for (key, value) in string_map {
-            let parts: Vec<&str> = key.rsplitn(3, ':').collect();
-            if parts.len() == 3 {
-                let func_id = FunctionId::new(
-                    parts[2].into(),
-                    parts[1].to_string(),
-                    parts[0].parse().unwrap_or(0),
-                );
-                result.insert(func_id, value);
-            }
-        }
-        Ok(result)
-    }
-}
-
-mod function_id_tuple_serde {
-    use super::*;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-    use std::collections::HashMap as StdHashMap;
-
-    pub fn serialize<S, V>(
-        map: &HashMap<(FunctionId, FunctionId), V>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-        V: Serialize,
-    {
-        let string_map: StdHashMap<String, &V> = map
-            .iter()
-            .map(|((k1, k2), v)| {
-                let key = format!(
-                    "{}:{}:{}|{}:{}:{}",
-                    k1.file.display(),
-                    k1.name,
-                    k1.line,
-                    k2.file.display(),
-                    k2.name,
-                    k2.line
-                );
-                (key, v)
-            })
-            .collect();
-        string_map.serialize(serializer)
-    }
-
-    pub fn deserialize<'de, D, V>(
-        deserializer: D,
-    ) -> Result<HashMap<(FunctionId, FunctionId), V>, D::Error>
-    where
-        D: Deserializer<'de>,
-        V: Deserialize<'de>,
-    {
-        let string_map: StdHashMap<String, V> = StdHashMap::deserialize(deserializer)?;
-        let mut result = HashMap::new();
-        for (key, value) in string_map {
-            let parts: Vec<&str> = key.split('|').collect();
-            if parts.len() == 2 {
-                let parts1: Vec<&str> = parts[0].rsplitn(3, ':').collect();
-                let parts2: Vec<&str> = parts[1].rsplitn(3, ':').collect();
-                if parts1.len() == 3 && parts2.len() == 3 {
-                    let func_id1 = FunctionId::new(
-                        parts1[2].into(),
-                        parts1[1].to_string(),
-                        parts1[0].parse().unwrap_or(0),
-                    );
-                    let func_id2 = FunctionId::new(
-                        parts2[2].into(),
-                        parts2[1].to_string(),
-                        parts2[0].parse().unwrap_or(0),
-                    );
-                    result.insert((func_id1, func_id2), value);
-                }
-            }
-        }
-        Ok(result)
-    }
-}
+mod identity;
+mod identity_serde;
+use identity_serde::{function_id_serde, function_id_tuple_serde};
 
 /// DataFlowGraph provides data flow analysis capabilities built on top of the CallGraph.
 /// It tracks variable dependencies, data transformations, and information flow between functions.
@@ -173,6 +74,9 @@ pub struct IoOperation {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PurityInfo {
+    /// Typed effect evidence. When present, this is authoritative for consumers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assessment: Option<crate::analysis::effect_evidence::EffectAssessment>,
     /// Whether the function is pure (no side effects)
     pub is_pure: bool,
     /// Confidence level in the purity analysis (0.0 to 1.0)
@@ -298,11 +202,12 @@ impl DataFlowGraph {
 
     /// Get variable dependencies for a function
     pub fn get_variable_dependencies(&self, func_id: &FunctionId) -> Option<&HashSet<String>> {
-        self.variable_deps.get(func_id)
+        self.identity_lookup(&self.variable_deps, func_id)
     }
 
     /// Add variable dependencies for a function
     pub fn add_variable_dependencies(&mut self, func_id: FunctionId, variables: HashSet<String>) {
+        let func_id = self.storage_identity(func_id);
         self.variable_deps.insert(func_id, variables);
     }
 
@@ -312,7 +217,19 @@ impl DataFlowGraph {
         from: &FunctionId,
         to: &FunctionId,
     ) -> Option<&DataTransformation> {
-        self.data_transformations.get(&(from.clone(), to.clone()))
+        if from.column.is_some()
+            && to.column.is_some()
+            && let Some(value) = self.data_transformations.get(&(from.clone(), to.clone()))
+        {
+            return Some(value);
+        }
+        let from = self.identity_candidates(from)?;
+        let to = self.identity_candidates(to)?;
+        from.iter().flatten().find_map(|from| {
+            to.iter()
+                .flatten()
+                .find_map(|to| self.data_transformations.get(&(from.clone(), to.clone())))
+        })
     }
 
     /// Add data transformation between two functions
@@ -322,16 +239,29 @@ impl DataFlowGraph {
         to: FunctionId,
         transformation: DataTransformation,
     ) {
+        let from = self.storage_identity(from);
+        let to = self.storage_identity(to);
         self.data_transformations.insert((from, to), transformation);
     }
 
     /// Get I/O operations for a function
     pub fn get_io_operations(&self, func_id: &FunctionId) -> Option<&Vec<IoOperation>> {
-        self.io_operations.get(func_id)
+        self.identity_lookup(&self.io_operations, func_id)
     }
 
     /// Add I/O operation for a function
     pub fn add_io_operation(&mut self, func_id: FunctionId, operation: IoOperation) {
+        let func_id = self.storage_identity(func_id);
+        if !self.io_operations.contains_key(&func_id) {
+            let operations = self
+                .identity_candidates(&func_id)
+                .into_iter()
+                .flatten()
+                .flatten()
+                .find_map(|key| self.io_operations.remove(&key))
+                .unwrap_or_default();
+            self.io_operations.insert(func_id.clone(), operations);
+        }
         self.io_operations
             .entry(func_id)
             .or_default()
@@ -340,31 +270,34 @@ impl DataFlowGraph {
 
     /// Get purity information for a function
     pub fn get_purity_info(&self, func_id: &FunctionId) -> Option<&PurityInfo> {
-        self.purity_analysis.get(func_id)
+        self.identity_lookup(&self.purity_analysis, func_id)
     }
 
     /// Set purity information for a function
     pub fn set_purity_info(&mut self, func_id: FunctionId, purity: PurityInfo) {
+        let func_id = self.storage_identity(func_id);
         self.purity_analysis.insert(func_id, purity);
     }
 
     /// Get CFG-based data flow analysis for a function
     pub fn get_cfg_analysis(&self, func_id: &FunctionId) -> Option<&DataFlowAnalysis> {
-        self.cfg_analysis.get(func_id)
+        self.identity_lookup(&self.cfg_analysis, func_id)
     }
 
     /// Set CFG-based data flow analysis for a function
     pub fn set_cfg_analysis(&mut self, func_id: FunctionId, analysis: DataFlowAnalysis) {
+        let func_id = self.storage_identity(func_id);
         self.cfg_analysis.insert(func_id, analysis);
     }
 
     /// Get mutation analysis for a function
     pub fn get_mutation_info(&self, func_id: &FunctionId) -> Option<&MutationInfo> {
-        self.mutation_analysis.get(func_id)
+        self.identity_lookup(&self.mutation_analysis, func_id)
     }
 
     /// Set mutation analysis for a function
     pub fn set_mutation_info(&mut self, func_id: FunctionId, info: MutationInfo) {
+        let func_id = self.storage_identity(func_id);
         self.mutation_analysis.insert(func_id, info);
     }
 
@@ -373,7 +306,7 @@ impl DataFlowGraph {
         &self,
         func_id: &FunctionId,
     ) -> Option<&CfgAnalysisWithContext> {
-        self.cfg_analysis_with_context.get(func_id)
+        self.identity_lookup(&self.cfg_analysis_with_context, func_id)
     }
 
     /// Set CFG analysis with context
@@ -382,6 +315,7 @@ impl DataFlowGraph {
         func_id: FunctionId,
         context: CfgAnalysisWithContext,
     ) {
+        let func_id = self.storage_identity(func_id);
         self.cfg_analysis_with_context.insert(func_id, context);
     }
 
@@ -534,6 +468,7 @@ mod tests {
         let func_id = create_test_function_id("pure_func");
 
         let purity = PurityInfo {
+            assessment: None,
             is_pure: true,
             confidence: 0.95,
             impurity_reasons: vec![],

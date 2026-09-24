@@ -42,6 +42,8 @@ pub mod data_flow;
 /// Generates detailed reports with summaries, attributions, recommendations,
 /// and comparative analysis for multi-pass complexity results.
 pub mod diagnostics;
+/// Owned evidence for modeled program effects and unresolved behavior.
+pub mod effect_evidence;
 /// Effect utilities for analysis modules.
 ///
 /// Provides effect wrappers enabling testable, composable analysis operations

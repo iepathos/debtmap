@@ -8,6 +8,7 @@ use std::path::PathBuf;
 
 fn create_function(name: &str, path: &str, visibility: Option<String>) -> FunctionMetrics {
     FunctionMetrics {
+        column: None,
         name: name.to_string(),
         file: PathBuf::from(path),
         line: 1,

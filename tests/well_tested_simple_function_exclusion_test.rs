@@ -26,6 +26,7 @@ fn test_well_tested_simple_functions_excluded_from_top_10() {
     // Add 5 well-tested simple functions (these should NOT be in top 10)
     for i in 0..5 {
         let func = FunctionMetrics {
+            column: None,
             file: test_dir.join("simple.rs"),
             name: format!("simple_well_tested_{}", i),
             line: 10 + i * 10,
@@ -75,6 +76,7 @@ fn test_well_tested_simple_functions_excluded_from_top_10() {
     // Add 10 complex/untested functions (these SHOULD be in top 10)
     for i in 0..10 {
         let func = FunctionMetrics {
+            column: None,
             file: test_dir.join("complex.rs"),
             name: format!("complex_untested_{}", i),
             line: 10 + i * 20,
@@ -180,6 +182,7 @@ fn test_well_tested_simple_function_has_low_score() {
     // Verify that a single well-tested simple function gets a low score
 
     let func = FunctionMetrics {
+        column: None,
         file: PathBuf::from("test.rs"),
         name: "simple_tested".to_string(),
         line: 10,

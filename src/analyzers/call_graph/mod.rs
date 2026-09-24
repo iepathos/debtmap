@@ -32,26 +32,6 @@ pub use macro_expansion::{MacroExpander, MacroExpansionStats, MacroHandlingConfi
 pub use module_tree::ModuleTree;
 pub use path_resolver::{PathResolver, PathResolverBuilder};
 
-fn resolution_confidence(call_site: &call_resolution::CallSiteType) -> u8 {
-    match call_site {
-        call_resolution::CallSiteType::Static => 100,
-        call_resolution::CallSiteType::Instance {
-            receiver_type: Some(_),
-        }
-        | call_resolution::CallSiteType::TraitMethod {
-            receiver_type: Some(_),
-            ..
-        } => 95,
-        call_resolution::CallSiteType::Indirect => 75,
-        call_resolution::CallSiteType::Instance {
-            receiver_type: None,
-        }
-        | call_resolution::CallSiteType::TraitMethod {
-            receiver_type: None,
-            ..
-        } => 60,
-    }
-}
 pub use trait_handling::TraitHandler;
 pub use validation::{CallGraphValidator, ValidationReport};
 
@@ -133,6 +113,7 @@ impl CallGraphExtractor {
 
     /// Set the function signature registry
     pub fn set_function_registry(&mut self, registry: Arc<FunctionSignatureRegistry>) {
+        self.type_tracker.set_function_registry(registry.clone());
         self.function_registry = Some(registry);
     }
 
@@ -152,63 +133,13 @@ impl CallGraphExtractor {
     }
 
     /// Main extraction method - performs two-phase extraction
-    pub fn extract(mut self, file: &syn::File) -> CallGraph {
-        // Phase 1: Extract functions and unresolved calls
-        self.extract_phase1(file);
-
-        // Merge graphs before phase 2 so functions are available for resolution
-        self.call_graph.merge(self.graph_builder.call_graph.clone());
-
-        // Phase 2: Resolve calls
-        self.resolve_phase2();
-
-        self.call_graph
+    pub fn extract(self, file: &syn::File) -> CallGraph {
+        crate::analyzers::rust_resolution::extract(&[(self.current_file, file.clone())])
     }
 
     /// Phase 1: Extract functions and collect unresolved calls
     pub fn extract_phase1(&mut self, file: &syn::File) {
         self.visit_file(file);
-    }
-
-    /// Phase 2: Resolve all collected calls
-    fn resolve_phase2(&mut self) {
-        let mut resolved_calls = Vec::new();
-
-        {
-            let resolver = CallResolver::new(&self.call_graph, &self.current_file);
-
-            for unresolved in &self.unresolved_calls {
-                if let call_resolution::ResolutionOutcome::Resolved(callee) =
-                    resolver.resolve_call_outcome(unresolved)
-                {
-                    resolved_calls.push((unresolved.clone(), callee));
-                }
-            }
-        }
-
-        // Add resolved calls to the graph
-        for (unresolved, callee) in resolved_calls {
-            let provenance = match &unresolved.call_site_type {
-                call_resolution::CallSiteType::Static => {
-                    crate::priority::call_graph::CallEdgeProvenance::AstDirect
-                }
-                _ => crate::priority::call_graph::CallEdgeProvenance::TypeResolution,
-            };
-            self.call_graph.add_resolution(
-                unresolved.caller.clone(),
-                unresolved.call_type,
-                crate::priority::call_graph::ResolutionOutcome::Resolved {
-                    target: callee,
-                    provenance,
-                    confidence: resolution_confidence(&unresolved.call_site_type),
-                    call_site: Some(crate::priority::call_graph::CallSite {
-                        file: self.current_file.clone(),
-                        line: unresolved.caller.line,
-                        column: None,
-                    }),
-                },
-            );
-        }
     }
 
     /// Add an unresolved call for later resolution
@@ -963,6 +894,12 @@ mod tests {
         let file2 = parse_rust_code(file2_code);
 
         let files = vec![
+            (
+                parse_rust_code(
+                    "mod commands { pub mod diagnose_coverage; } mod risk { pub mod lcov; }",
+                ),
+                PathBuf::from("src/lib.rs"),
+            ),
             (file1, PathBuf::from("src/commands/diagnose_coverage.rs")),
             (file2, PathBuf::from("src/risk/lcov.rs")),
         ];
@@ -1084,6 +1021,10 @@ mod tests {
         let file2 = parse_rust_code(file2_code);
 
         let files = vec![
+            (
+                parse_rust_code("mod commands { pub mod process; } mod data;"),
+                PathBuf::from("src/lib.rs"),
+            ),
             (file1, PathBuf::from("src/commands/process.rs")),
             (file2, PathBuf::from("src/data/mod.rs")),
         ];

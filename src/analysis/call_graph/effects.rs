@@ -51,6 +51,9 @@ fn build_call_graph_pure(
     config: &AnalysisConfig,
 ) -> anyhow::Result<RustCallGraph> {
     let mut builder = RustCallGraphBuilder::with_config(config.clone());
+    builder.merge_base_graph(crate::analyzers::rust_call_graph::extract_call_graph(
+        ast, file_path,
+    ));
 
     builder.analyze_basic_calls(file_path, ast)?;
     builder.analyze_trait_dispatch(file_path, ast)?;

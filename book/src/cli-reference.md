@@ -181,6 +181,12 @@ Use one or the other to specify the target location.
 **Description:**
 Compares two analysis results and generates a diff showing improvements or regressions in code quality metrics.
 
+Requires matching analyzer versions and compatible analysis receipts with
+complete scope. Incompatible or unverifiable inputs exit nonzero, explain the
+reason on stderr, and do not emit or overwrite a comparison report. Regenerate
+both reports using the same Debtmap version and settings after an upgrade;
+legacy reports without receipts cannot establish comparable measurements.
+
 ### `validate-improvement`
 
 Validate that technical debt improvements meet quality thresholds.

@@ -205,6 +205,7 @@ fn test_complexity_metrics_from_function() {
 
     // Test with a simple function
     let func = FunctionMetrics {
+        column: None,
         name: "test_func".to_string(),
         file: PathBuf::from("test.rs"),
         line: 42,
@@ -255,6 +256,7 @@ fn test_complexity_metrics_from_function_zero_values() {
 
     // Test with zero complexity values
     let func = FunctionMetrics {
+        column: None,
         name: "simple_func".to_string(),
         file: PathBuf::from("simple.rs"),
         line: 1,
@@ -297,6 +299,7 @@ fn test_complexity_metrics_from_function_high_values() {
 
     // Test with high complexity values
     let func = FunctionMetrics {
+        column: None,
         name: "complex_func".to_string(),
         file: PathBuf::from("complex.rs"),
         line: 100,
@@ -342,6 +345,7 @@ fn test_complexity_metrics_from_function_preserves_path() {
     // Test that file path is preserved correctly
     let complex_path = PathBuf::from("/src/deeply/nested/module/impl.rs");
     let func = FunctionMetrics {
+        column: None,
         name: "nested_func".to_string(),
         file: complex_path.clone(),
         line: 200,

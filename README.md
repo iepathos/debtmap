@@ -43,7 +43,7 @@ debtmap analyze . --format markdown --top 1 | claude "Fix this"
 
 ## Supported Languages
 
-- **Rust** — Full AST analysis with syn, including macro expansion and trait detection
+- **Rust** — AST analysis with syn, bounded workspace call resolution, and evidence-based effect analysis (no general macro expansion)
 - **Python** — Tree-sitter-based analysis for functions, classes, decorators, comprehensions, and Python-specific complexity patterns
 - **JavaScript** — Tree-sitter parsing with ES modules, React/JSX patterns, and async workflow analysis
 - **TypeScript** — Tree-sitter parsing with TS/TSX support, type-aware patterns, and modern frontend/server syntax

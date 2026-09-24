@@ -37,10 +37,10 @@ jobs:
       with:
         cache-bin: "false"
 
-    - name: Install cargo-llvm-cov
-      uses: taiki-e/install-action@v2.87.0
+    - name: Install coverage tools
+      uses: taiki-e/install-action@v2.87.14
       with:
-        tool: cargo-llvm-cov
+        tool: cargo-llvm-cov,just
 
     - name: Free up disk space
       run: |
@@ -51,43 +51,15 @@ jobs:
         sudo docker image prune --all --force
         df -h
 
-    - name: Generate code coverage
-      run: |
-        mkdir -p target/coverage
-        cargo llvm-cov --json --summary-only \
-          --output-path target/coverage/coverage-summary.json \
-          --lib --test analyzer_tests --test complexity_tests --test core_metrics_tests \
-          --test debt_tests --test entropy_tests --test parallel_unified_analysis_test \
-          --test cli_output_format_integration_test --test batch_integration \
-          --test call_graph_cross_file_resolution_test --test call_graph_comprehensive_test \
-          --test risk_analysis_tests --test integrated_analysis \
-          --test validate_improvement_integration_test --test output_validation_test \
-          --test solidity_analyzer_tests --test python_extraction_test \
-          --test risk_context_tests -- --quiet
-        python3 - <<'PY'
-        import json
-        import sys
+    - name: Generate and check representative coverage
+      run: just coverage-check
 
-        threshold = 80.0
-        with open("target/coverage/coverage-summary.json", encoding="utf-8") as coverage_file:
-            totals = json.load(coverage_file)["data"][0]["totals"]["lines"]
-
-        percent = float(totals["percent"])
-        covered = int(totals["covered"])
-        count = int(totals["count"])
-        print(f"Line coverage: {percent:.2f}% ({covered}/{count})")
-
-        if percent < threshold:
-            print(
-                f"::error::Line coverage {percent:.2f}% is below the required "
-                f"{threshold:.2f}% threshold"
-            )
-            sys.exit(1)
-        PY
+    - name: Generate LCOV report
+      run: just coverage-report-lcov
 
     - name: Generate HTML coverage report
       if: github.event_name == 'push'
-      run: cargo llvm-cov report --html --output-dir target/coverage/html
+      run: just coverage-report-html
 
     - name: Archive code coverage results
       if: always()

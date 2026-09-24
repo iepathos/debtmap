@@ -666,6 +666,7 @@ mod tests {
         };
 
         let function = FunctionMetrics {
+            column: None,
             name: "PaymentProcessor.process".to_string(),
             file: PathBuf::from("services.py"),
             line: 20,

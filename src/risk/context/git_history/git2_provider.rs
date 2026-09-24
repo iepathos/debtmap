@@ -570,28 +570,28 @@ pub fn compute_repo_function_histories(
     }
 
     let processed = std::sync::atomic::AtomicUsize::new(0);
-    let mut commit_data: Vec<CommitFunctionData> = oids
+    let commit_results: Result<Vec<Option<CommitFunctionData>>> = oids
         .par_iter()
-        .filter_map(|&oid| {
-            let repo = Repository::open(repo_path).ok()?;
+        .map(|&oid| {
+            let repo = Repository::open(repo_path)?;
             let data = process_commit_for_function_history(
                 &repo,
                 oid,
                 file_targets,
                 &intro_patterns,
                 &mod_regexes,
-            )
-            .ok()
-            .flatten();
+            )?;
             let done = processed.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
             if let Some(cb) = progress_cb
                 && (done % 50 == 0 || done == total)
             {
                 cb(GitPreloadPhase::Commits, done, total);
             }
-            data
+            Ok(data)
         })
         .collect();
+    // A negative preload result is valid only after a complete successful scan.
+    let mut commit_data: Vec<_> = commit_results?.into_iter().flatten().collect();
 
     commit_data.sort_by_key(|d| d.date);
     let file_scans = commit_data
@@ -620,7 +620,12 @@ fn build_function_pattern_tables(
         .map(|(file, names)| {
             let v = names
                 .iter()
-                .map(|n| (n.clone(), format!("fn {n}")))
+                .map(|n| {
+                    (
+                        n.clone(),
+                        super::function_level::introduction_search_pattern(n),
+                    )
+                })
                 .collect();
             (file.clone(), v)
         })
@@ -632,8 +637,7 @@ fn build_function_pattern_tables(
             let v = names
                 .iter()
                 .filter_map(|n| {
-                    regex::Regex::new(n)
-                        .or_else(|_| regex::Regex::new(&regex::escape(n)))
+                    super::function_level::modification_search_regex(n)
                         .ok()
                         .map(|r| (n.clone(), r))
                 })
@@ -650,7 +654,9 @@ fn collect_repo_oids(repo_path: &Path) -> Result<Vec<Oid>> {
     let mut revwalk = repo.revwalk()?;
     revwalk.push_head()?;
     revwalk.set_sorting(Sort::TIME | Sort::REVERSE)?;
-    Ok(revwalk.filter_map(|r| r.ok()).collect())
+    revwalk
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(Into::into)
 }
 
 fn process_commit_for_function_history(
@@ -965,6 +971,75 @@ mod tests {
             .output()?;
 
         Ok(())
+    }
+
+    #[test]
+    fn qualified_method_history_is_found_in_both_lookup_paths() -> Result<()> {
+        use super::super::{blame_cache::FileBlameCache, function_level};
+        let (_temp, path) = setup_test_repo()?;
+        create_and_commit_file(
+            &path,
+            "test.rs",
+            "mod inner { struct A; impl A { fn run(&self) {} } }",
+            "Add method",
+        )?;
+        let repo = Git2Repository::open(&path)?;
+        let file = PathBuf::from("test.rs");
+        let name = "inner::A::run";
+        let targets = HashMap::from([(file.clone(), vec![name.to_string()])]);
+        let scan = compute_repo_function_histories(&path, &targets, None)?;
+        let expected = get_head_oid(&path)?;
+        assert_eq!(
+            scan.functions[&(file.clone(), name.to_string())].introduction_oid,
+            Some(expected)
+        );
+        let history = function_level::get_function_history_git2(
+            &repo,
+            &file,
+            name,
+            (1, 1),
+            &FileBlameCache::new(path.clone()),
+        )?;
+        assert_eq!(history.introduction_commit, Some(expected.to_string()));
+        Ok(())
+    }
+
+    #[test]
+    fn incomplete_commit_scan_does_not_publish_negative_results() -> Result<()> {
+        use super::super::batched_function::GitPreloadPhase;
+        let (_temp, path) = setup_test_repo()?;
+        create_and_commit_file(&path, "test.rs", "fn work() {}", "Add work")?;
+        let targets = HashMap::from([(PathBuf::from("test.rs"), vec!["missing".to_string()])]);
+        let hide_repository = |phase, processed, _| {
+            if matches!(phase, GitPreloadPhase::Commits) && processed == 0 {
+                std::fs::rename(path.join(".git"), path.join("hidden-git")).unwrap();
+            }
+        };
+        assert!(compute_repo_function_histories(&path, &targets, Some(&hide_repository)).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn batched_patterns_preserve_qualified_keys_and_match_source_names() {
+        let file = PathBuf::from("src/lib.rs");
+        let names = vec![
+            "left::Worker::run".to_string(),
+            "right::Worker::run".to_string(),
+        ];
+        let targets = HashMap::from([(file.clone(), names.clone())]);
+        let (intro, modifications) = build_function_pattern_tables(&targets);
+        for name in names {
+            assert!(
+                intro[&file]
+                    .iter()
+                    .any(|(key, pattern)| key == &name && pattern == "fn run")
+            );
+            assert!(
+                modifications[&file]
+                    .iter()
+                    .any(|(key, regex)| key == &name && regex.is_match("fn run() {}"))
+            );
+        }
     }
 
     #[test]

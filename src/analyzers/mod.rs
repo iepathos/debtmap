@@ -329,3 +329,5 @@ mod tests {
         assert_eq!(result.language, crate::core::Language::Rust);
     }
 }
+
+pub(crate) mod rust_resolution;

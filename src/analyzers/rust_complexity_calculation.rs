@@ -106,24 +106,122 @@ pub fn count_lines(block: &syn::Block) -> usize {
 
 /// Count the number of source lines in a function.
 ///
-/// Returns the span of lines from the function signature to the end of its body.
+/// Matches `FunctionMetrics::line`: the identifier's line through the closing
+/// body brace, inclusive. Attributes and signature prefixes before the identifier
+/// must not extend the computed end past the actual body.
 pub fn count_function_lines(item_fn: &syn::ItemFn) -> usize {
-    use syn::spanned::Spanned;
-
-    let span = item_fn.span();
-    let start_line = span.start().line;
-    let end_line = span.end().line;
-
-    if end_line >= start_line {
-        end_line - start_line + 1
-    } else {
-        1
-    }
+    let start_line = item_fn.sig.ident.span().start().line;
+    let end_line = item_fn.block.brace_token.span.close().start().line;
+    end_line.saturating_sub(start_line) + 1
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rust_metric_bounds_start_at_identity_and_end_at_body() {
+        use crate::analyzers::{Analyzer, rust::RustAnalyzer};
+        use crate::extraction::{UnifiedFileExtractor, adapters};
+        let source = r#"
+/// Free function documentation.
+#[inline]
+pub
+fn
+free(
+    value: u32,
+) -> u32 {
+    value
+} // end free
+fn after_free() {}
+struct Widget;
+impl Widget {
+    /// Inherent method documentation.
+    #[inline]
+    pub fn method(
+        &self,
+    ) -> u32 {
+        1
+    } // end method
+    fn after_method(&self) {}
+}
+trait Api { fn operation(&self) -> u32; }
+impl Api for Widget {
+    /// Trait implementation documentation.
+    #[inline]
+    fn operation(&self) -> u32 {
+        2
+    } // end operation
+}
+fn after_impl() {}
+"#;
+        let path = std::path::PathBuf::from("src/bounds.rs");
+        let analyzer = RustAnalyzer::new();
+        let ast = analyzer.parse(source, path.clone()).unwrap();
+        let direct = analyzer.analyze(&ast);
+        let cached = UnifiedFileExtractor::extract(&path, source).unwrap();
+        let cached_metrics = adapters::metrics::all_function_metrics(&cached);
+        for metrics in [&direct.complexity.functions, &cached_metrics] {
+            for (name, start, end) in [
+                ("free", "free(", "} // end free"),
+                (
+                    "Widget::method",
+                    "    pub fn method(",
+                    "    } // end method",
+                ),
+                (
+                    "Widget::operation",
+                    "    fn operation(&self) -> u32 {",
+                    "    } // end operation",
+                ),
+            ] {
+                let metric = metrics.iter().find(|metric| metric.name == name).unwrap();
+                let line_of = |text| source.lines().position(|line| line == text).unwrap() + 1;
+                assert_eq!(metric.line, line_of(start), "{name}: identity line");
+                assert_eq!(
+                    metric.line + metric.length - 1,
+                    line_of(end),
+                    "{name}: body end"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn expression_closure_metrics_end_at_the_original_body_span() {
+        use crate::analyzers::{Analyzer, rust::RustAnalyzer};
+        let source = "fn outer() {\n    let closure = |value: bool|\n        if value {\n            1\n        } else {\n            2\n        };\n    closure(true);\n}\n";
+        let analyzer = RustAnalyzer::new();
+        let ast = analyzer.parse(source, "src/closure.rs".into()).unwrap();
+        let metrics = analyzer.analyze(&ast);
+        let closure = metrics
+            .complexity
+            .functions
+            .iter()
+            .find(|metric| metric.name.contains("::<closure@"))
+            .unwrap();
+        assert_eq!(closure.line, 3);
+        assert_eq!(closure.line + closure.length - 1, 7);
+    }
+
+    #[test]
+    fn trait_default_body_length_excludes_attributes_and_multiline_prefix() {
+        let source = "trait T {\n/// Default body.\n#[inline]\nfn\nprovided(\n &self,\n) {\n}\n}\n";
+        let ast = syn::parse_file(source).unwrap();
+        let syn::Item::Trait(item) = &ast.items[0] else {
+            panic!("trait fixture")
+        };
+        let syn::TraitItem::Fn(method) = &item.items[0] else {
+            panic!("method fixture")
+        };
+        let function = syn::ItemFn {
+            attrs: method.attrs.clone(),
+            vis: syn::Visibility::Inherited,
+            sig: method.sig.clone(),
+            block: Box::new(method.default.clone().unwrap()),
+        };
+        assert_eq!(count_function_lines(&function), 4);
+    }
 
     #[test]
     fn test_count_lines_simple_block() {

@@ -11,43 +11,8 @@ use super::patterns::{extract_complexity_pattern, extract_pattern_data};
 use super::priority::Priority;
 #[cfg(debug_assertions)]
 use super::priority::assert_priority_invariants;
-use crate::core::PurityLevel;
 use crate::priority::{DebtType, FunctionRole, UnifiedDebtItem};
 use serde::{Deserialize, Serialize};
-
-/// Generate side effects description based on purity level.
-///
-/// This provides human-readable reasons for why a function is not strictly pure,
-/// derived from the `PurityLevel` classification.
-fn generate_side_effects_from_purity(
-    is_pure: bool,
-    purity_level: Option<PurityLevel>,
-) -> Option<Vec<String>> {
-    if is_pure {
-        return None;
-    }
-
-    let effects = match purity_level {
-        Some(PurityLevel::Impure) => {
-            vec!["Has side effects (I/O, mutations, or external state modification)".to_string()]
-        }
-        Some(PurityLevel::ReadOnly) => {
-            vec!["Reads external state (but does not modify it)".to_string()]
-        }
-        Some(PurityLevel::LocallyPure) => {
-            vec!["Has local mutations only (no external side effects)".to_string()]
-        }
-        Some(PurityLevel::StrictlyPure) => {
-            // Shouldn't happen if is_pure is false, but handle gracefully
-            return None;
-        }
-        None => {
-            vec!["Function may have side effects".to_string()]
-        }
-    };
-
-    Some(effects)
-}
 
 /// Function-level debt item in unified format
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -132,8 +97,12 @@ impl FunctionDebtItemOutput {
         let (pattern_type, pattern_confidence, pattern_details) =
             extract_pattern_data(&item.language_specific);
 
-        // Round coverage and entropy if present
-        let rounded_coverage = item
+        // Keep measured execution separate from the callee-based estimate.
+        let direct_coverage = item
+            .transitive_coverage
+            .as_ref()
+            .map(|c| round_ratio(c.direct));
+        let transitive_coverage = item
             .transitive_coverage
             .as_ref()
             .map(|c| round_ratio(c.transitive));
@@ -175,7 +144,7 @@ impl FunctionDebtItemOutput {
                 cognitive_complexity: item.cognitive_complexity,
                 length: item.function_length,
                 nesting_depth: item.nesting_depth,
-                coverage: rounded_coverage,
+                coverage: direct_coverage,
                 uncovered_lines: None, // Not currently tracked
                 entropy_score: rounded_entropy,
                 pattern_repetition,
@@ -184,10 +153,7 @@ impl FunctionDebtItemOutput {
                     .entropy_analysis
                     .as_ref()
                     .map(|e| e.adjusted_complexity),
-                transitive_coverage: item
-                    .transitive_coverage
-                    .as_ref()
-                    .map(|c| round_ratio(c.transitive)),
+                transitive_coverage,
             },
             debt_type: item.debt_type.clone(),
             function_role: item.function_role,
@@ -196,21 +162,24 @@ impl FunctionDebtItemOutput {
                     .purity_level
                     .as_ref()
                     .map(|level| format!("{:?}", level));
-                let side_effects = generate_side_effects_from_purity(is_pure, item.purity_level);
                 PurityAnalysis {
                     is_pure,
                     confidence: item.purity_confidence.unwrap_or(0.0),
                     purity_level,
-                    side_effects,
+                    // The public compatibility item does not carry source evidence;
+                    // do not fabricate effects from a classification label.
+                    side_effects: None,
                 }
             }),
             dependencies: {
                 let upstream = item.upstream_dependencies;
                 let downstream = item.downstream_dependencies;
-                let blast_radius = upstream + downstream;
-                let critical_path = upstream > 5 || downstream > 10;
-                let instability = if blast_radius > 0 {
-                    Some(round_ratio(downstream as f64 / blast_radius as f64))
+                let blast_radius = item.immediate_neighbors();
+                // Degree alone does not establish an execution path.
+                let critical_path = false;
+                let degree = upstream + downstream;
+                let instability = if degree > 0 {
+                    Some(round_ratio(downstream as f64 / degree as f64))
                 } else {
                     None
                 };
@@ -253,13 +222,14 @@ impl FunctionDebtItemOutput {
             },
             scoring_details: if include_scoring_details {
                 Some(FunctionScoringDetails {
+                    score_trace: item.unified_score.score_trace.clone(),
                     coverage_score: round_score(item.unified_score.coverage_factor),
                     complexity_score: round_score(item.unified_score.complexity_factor),
                     dependency_score: round_score(item.unified_score.dependency_factor),
                     base_score: round_score(
-                        item.unified_score.complexity_factor
-                            + item.unified_score.coverage_factor
-                            + item.unified_score.dependency_factor,
+                        item.unified_score
+                            .base_score
+                            .unwrap_or(item.unified_score.final_score),
                     ),
                     entropy_dampening: item
                         .entropy_analysis
@@ -292,8 +262,8 @@ impl FunctionDebtItemOutput {
                 None
             },
             adjusted_complexity: item.entropy_analysis.as_ref().map(|e| AdjustedComplexity {
-                // Dampened cyclomatic = cyclomatic * dampening_factor (spec 232)
-                // When dampening_factor = 1.0, dampened_cyclomatic equals original cyclomatic
+                // Legacy descriptive field retained for JSON compatibility.
+                // Scoring applies entropy to cognitive complexity, not cyclomatic.
                 dampened_cyclomatic: round_score(
                     item.cyclomatic_complexity as f64 * e.dampening_factor,
                 ),
@@ -382,6 +352,7 @@ fn derive_coupling_classification(
 /// Adjusted complexity based on entropy analysis
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AdjustedComplexity {
+    /// Legacy descriptive product, not a complexity scoring operand.
     pub dampened_cyclomatic: f64,
     pub dampening_factor: f64,
 }
@@ -393,6 +364,8 @@ pub struct FunctionMetricsOutput {
     pub cognitive_complexity: u32,
     pub length: usize,
     pub nesting_depth: u32,
+    /// Measured direct line coverage (0.0–1.0), regardless of which test executed it.
+    /// The existing JSON key `coverage` is retained for compatibility.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub coverage: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -408,7 +381,8 @@ pub struct FunctionMetricsOutput {
     /// Entropy-adjusted cognitive complexity (Spec 264)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub entropy_adjusted_cognitive: Option<u32>,
-    /// Transitive coverage from callers (Spec 264)
+    /// Direct coverage when positive; otherwise the fraction of well-covered callees.
+    /// This fallback is an estimate, not evidence that this function executed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transitive_coverage: Option<f64>,
 }
@@ -448,6 +422,9 @@ impl ContextualRiskImpactOutput {
 /// Function scoring details
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FunctionScoringDetails {
+    /// Transient arithmetic evidence; public JSON v3 keeps its existing fields.
+    #[serde(skip)]
+    pub score_trace: Vec<crate::priority::scoring::trace::ScoreStep>,
     pub coverage_score: f64,
     pub complexity_score: f64,
     pub dependency_score: f64,
