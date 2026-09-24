@@ -166,6 +166,32 @@ fn explicit_reexports_preserve_original_declaration_identity() {
 }
 
 #[test]
+fn a_function_reexported_through_its_own_module_name_resolves_once() {
+    let files = [
+        (
+            "src/lib.rs",
+            "mod evaluate; pub use evaluate::evaluate; fn call() { evaluate(); }",
+        ),
+        ("src/evaluate.rs", "mod run; pub use run::evaluate;"),
+        ("src/evaluate/run.rs", "pub fn evaluate() {}"),
+    ]
+    .map(|(file, source)| {
+        (
+            PathBuf::from(file),
+            syn::parse_file(source).expect("valid fixture"),
+        )
+    });
+    let index = WorkspaceIndex::build(&files);
+    let lookup = index.lookup_call(&syn::parse_quote!(evaluate), None, &root(&index));
+    assert!(lookup.justified);
+    assert_eq!(lookup.candidates.len(), 1);
+    assert_eq!(
+        lookup.candidates[0].id.file,
+        PathBuf::from("src/evaluate/run.rs")
+    );
+}
+
+#[test]
 fn ambiguous_declared_owners_exclude_unrelated_possible_methods() {
     let index = index(
         "mod a { pub struct Same; impl Same { fn run(&self) {} } } mod b { pub struct Same; impl Same { fn run(&self) {} } } struct Unrelated; impl Unrelated { fn run(&self) {} } use a::Same; use b::Same;",

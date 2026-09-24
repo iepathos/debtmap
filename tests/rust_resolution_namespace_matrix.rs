@@ -175,3 +175,18 @@ fn cyclic_explicit_import_does_not_erase_constructor_call_uncertainty() {
     )
     .expect("an exhausted import search does not establish constructor-only bindings");
 }
+
+#[test]
+fn cfg_value_keeps_local_and_import_candidates() {
+    use support::Expectation as E;
+    let source = "mod imp { /*@fallback*/ pub fn fallback() {} }
+        #[cfg(feature=\"native\")] /*@local*/ fn imp() {}
+        #[cfg(not(feature=\"native\"))] use crate::imp::fallback as imp;
+        /*@caller*/ fn call() { /*#call*/ imp(); }";
+    verify(
+        "cfg_value_keeps_local_and_import_candidates",
+        source,
+        &[E::uncertain("call", "imp(", &["local", "fallback"])],
+    )
+    .expect("configuration alternatives must both remain admissible");
+}

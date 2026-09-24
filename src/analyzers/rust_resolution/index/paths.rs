@@ -99,6 +99,9 @@ impl WorkspaceIndex {
         depth: usize,
         namespace: Namespace,
     ) -> Vec<Vec<String>> {
+        if self.declaration_shadows(import, context, namespace) {
+            return Vec::new();
+        }
         let targets = if import.path == [import.alias.clone()] {
             vec![relative_path(&import.path, &import.context.module)]
         } else {
@@ -115,6 +118,20 @@ impl WorkspaceIndex {
                     || !self.has_binding(path, context, other)
             })
             .collect()
+    }
+
+    /// Type declarations bind path prefixes, so following a same-named import back
+    /// through one only grows the path. Value bindings may be conditional alternatives.
+    fn declaration_shadows(
+        &self,
+        import: &Import,
+        context: &Context,
+        namespace: Namespace,
+    ) -> bool {
+        let bound = qualified(&import.context.module, &import.alias);
+        matches!(namespace, Namespace::Type)
+            && self.has_binding(&bound, context, namespace)
+            && relative_path(&import.path, &import.context.module).starts_with(&bound)
     }
 
     fn expand_reexports(
