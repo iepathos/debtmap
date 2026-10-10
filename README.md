@@ -172,6 +172,33 @@ jobs:
           fail-on-violation: 'true'
 ```
 
+## Pre-commit
+
+Add Debtmap to `.pre-commit-config.yaml` to fail commits that exceed your quality gates:
+
+```yaml
+repos:
+  - repo: https://github.com/iepathos/debtmap
+    rev: v0.23.0  # pin a released tag
+    hooks:
+      - id: debtmap
+```
+
+This runs `debtmap validate .` using the version pinned by `rev`. Configure thresholds in `.debtmap.toml` (`debtmap init`). The first install compiles Debtmap from source and needs a Rust toolchain.
+
+To use a `debtmap` binary already on your `PATH` instead of compiling from the pinned revision:
+
+```yaml
+      - id: debtmap-system
+```
+
+Override the default arguments when you need extra flags:
+
+```yaml
+      - id: debtmap
+        args: [validate, ., --max-debt-density, "30"]
+```
+
 ## Documentation
 
 **[Full Documentation](https://iepathos.github.io/debtmap/)** — guides, examples, configuration reference
