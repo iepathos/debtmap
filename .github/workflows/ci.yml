@@ -57,6 +57,7 @@ jobs:
           --test data_flow_identity_matrix \
           --test rust_resolution_namespace_matrix \
           --test compare_safety_test \
+          --test documentation_contract_test \
           --status-level fail --final-status-level slow
 
     - name: Configure vendored OpenSSL prerequisites (Windows)
@@ -84,6 +85,7 @@ jobs:
           --test data_flow_identity_matrix `
           --test rust_resolution_namespace_matrix `
           --test compare_safety_test `
+          --test documentation_contract_test `
           --status-level fail --final-status-level slow
 
   integration:

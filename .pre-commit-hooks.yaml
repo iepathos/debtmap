@@ -2,7 +2,7 @@
 #
 #   repos:
 #     - repo: https://github.com/iepathos/debtmap
-#       rev: v0.23.0
+#       rev: <release-tag>
 #       hooks:
 #         - id: debtmap
 #
@@ -17,7 +17,7 @@
   args: [validate, .]
   pass_filenames: false
   require_serial: true
-  files: (\.debtmap\.toml$)|(\.(rs|py|js|jsx|ts|tsx|go|sol)$)
+  files: (\.debtmap\.toml$)|(\.(rs|py|pyw|js|jsx|mjs|cjs|ts|tsx|mts|cts|go|sol)$)
 
 - id: debtmap-system
   name: debtmap (system)
@@ -27,4 +27,4 @@
   args: [validate, .]
   pass_filenames: false
   require_serial: true
-  files: (\.debtmap\.toml$)|(\.(rs|py|js|jsx|ts|tsx|go|sol)$)
+  files: (\.debtmap\.toml$)|(\.(rs|py|pyw|js|jsx|mjs|cjs|ts|tsx|mts|cts|go|sol)$)

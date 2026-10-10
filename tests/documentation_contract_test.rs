@@ -48,16 +48,58 @@ fn public_docs_describe_current_language_and_output_contracts() {
     assert!(!architecture.contains("focused exclusively on Rust"));
 }
 
+fn pre_commit_hooks() -> Vec<serde_yaml::Value> {
+    serde_yaml::from_str(include_str!("../.pre-commit-hooks.yaml"))
+        .expect(".pre-commit-hooks.yaml must be a YAML list of hooks")
+}
+
+fn hook_field<'a>(hook: &'a serde_yaml::Value, key: &str) -> &'a serde_yaml::Value {
+    hook.get(key)
+        .unwrap_or_else(|| panic!("hook {:?} missing `{key}`", hook.get("id")))
+}
+
 #[test]
 fn pre_commit_hooks_manifest_exposes_validate_hooks() {
-    let manifest = include_str!("../.pre-commit-hooks.yaml");
-    assert!(manifest.contains("id: debtmap\n"));
-    assert!(manifest.contains("id: debtmap-system\n"));
-    assert!(manifest.contains("language: rust"));
-    assert!(manifest.contains("language: system"));
-    assert!(manifest.contains("entry: debtmap"));
-    assert!(manifest.contains("pass_filenames: false"));
-    assert!(manifest.contains("validate"));
+    let hooks = pre_commit_hooks();
+    let ids: Vec<_> = hooks
+        .iter()
+        .map(|hook| hook_field(hook, "id").as_str().unwrap())
+        .collect();
+    assert_eq!(ids, ["debtmap", "debtmap-system"]);
+
+    for (hook, language) in hooks.iter().zip(["rust", "system"]) {
+        let args: Vec<_> = hook_field(hook, "args")
+            .as_sequence()
+            .unwrap()
+            .iter()
+            .map(|arg| arg.as_str().unwrap())
+            .collect();
+        assert_eq!(hook_field(hook, "language").as_str(), Some(language));
+        assert_eq!(hook_field(hook, "entry").as_str(), Some("debtmap"));
+        assert_eq!(args, ["validate", "."]);
+        assert_eq!(hook_field(hook, "pass_filenames").as_bool(), Some(false));
+        assert_eq!(hook_field(hook, "require_serial").as_bool(), Some(true));
+    }
+}
+
+#[test]
+fn pre_commit_hooks_files_filter_matches_supported_sources() {
+    let supported = [
+        "rs", "py", "pyw", "js", "jsx", "mjs", "cjs", "ts", "tsx", "mts", "cts", "go", "sol",
+    ];
+    let ignored = ["README.md", "Cargo.toml", "src/lib.rs.bak", "notes.txt"];
+
+    for hook in pre_commit_hooks() {
+        let filter = regex::Regex::new(hook_field(&hook, "files").as_str().unwrap()).unwrap();
+        assert!(filter.is_match(".debtmap.toml"));
+        assert!(filter.is_match("nested/.debtmap.toml"));
+        for ext in supported {
+            assert!(filter.is_match(&format!("src/module.{ext}")), "{ext}");
+        }
+        for path in ignored {
+            assert!(!filter.is_match(path), "{path}");
+        }
+    }
 }
 
 #[test]

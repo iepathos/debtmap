@@ -179,7 +179,7 @@ Add Debtmap to `.pre-commit-config.yaml` to fail commits that exceed your qualit
 ```yaml
 repos:
   - repo: https://github.com/iepathos/debtmap
-    rev: v0.23.0  # pin a released tag
+    rev: <release-tag>  # first release that ships .pre-commit-hooks.yaml
     hooks:
       - id: debtmap
 ```
