@@ -129,6 +129,11 @@ fn write_metric_section(writer: &mut dyn Write, section: &FormattedSection) -> i
             ..
         } => write_coverage_section(writer, *percentage, level, *crap)?,
 
+        FormattedSection::LlmEditability {
+            summary,
+            top_action,
+        } => write_llm_section(writer, summary, top_action.as_deref())?,
+
         FormattedSection::Dependencies {
             upstream,
             downstream,
@@ -175,6 +180,7 @@ fn write_text_section(writer: &mut dyn Write, section: &FormattedSection) -> io:
         | FormattedSection::Complexity { .. }
         | FormattedSection::Pattern { .. }
         | FormattedSection::Coverage { .. }
+        | FormattedSection::LlmEditability { .. }
         | FormattedSection::Dependencies { .. }
         | FormattedSection::ContextualRisk { .. } => Ok(()),
     }
@@ -345,6 +351,19 @@ fn write_coverage_section(
         write!(writer, " CRAP: {crap:.1}")?;
     }
     writeln!(writer)
+}
+
+/// Writes per-model LLM editability and the most impactful fix.
+fn write_llm_section(
+    writer: &mut dyn Write,
+    summary: &str,
+    top_action: Option<&str>,
+) -> io::Result<()> {
+    write_labeled_value(writer, "├─ LLM:", summary)?;
+    match top_action {
+        Some(action) => writeln!(writer, "│  {} {}", "fix:".dimmed(), action),
+        None => Ok(()),
+    }
 }
 
 /// Writes the dependencies section with upstream/downstream counts and caller/callee lists.
@@ -659,6 +678,22 @@ mod tests {
         assert!(output_str.contains("COVERAGE"));
         assert!(output_str.contains("87.5%"));
         assert!(!output_str.contains("CRAP"));
+    }
+
+    #[test]
+    fn test_write_llm_section_with_fix() {
+        let mut output = Vec::new();
+        super::write_llm_section(
+            &mut output,
+            "tier:mid 41.2 human; tier:frontier 78.9 feasible (recommended)",
+            Some("Add tests covering this function"),
+        )
+        .unwrap();
+
+        let output_str = String::from_utf8(output).unwrap();
+        assert!(output_str.contains("LLM:"));
+        assert!(output_str.contains("(recommended)"));
+        assert!(output_str.contains("fix:"));
     }
 
     #[test]

@@ -58,6 +58,7 @@ pub mod format {
             context(item.context.as_ref()),
             git_history(item.git_history.as_ref()),
             contextual_risk(item.contextual_risk.as_ref()),
+            llm_editability(item.llm_editability.as_ref()),
         ]
         .into_iter()
         .flatten()
@@ -186,6 +187,45 @@ pub mod format {
         }
         if let Some(crap) = m.crap {
             writeln!(out, "- CRAP: {:.1}", crap).unwrap();
+        }
+        Some(out)
+    }
+
+    /// Format LLM editability section (returns None when the estimate is disabled)
+    pub fn llm_editability(llm: Option<&crate::llm::LlmEditabilityOutput>) -> Option<String> {
+        let llm = llm?;
+        let mut out = String::new();
+        write_section_heading(&mut out, "LLM Editability");
+        writeln!(out, "- Basis: {}", llm.basis).unwrap();
+        writeln!(
+            out,
+            "- Recommended Model: {}",
+            llm.recommended_model.as_deref().unwrap_or("none (human)")
+        )
+        .unwrap();
+        for m in &llm.models {
+            let factors: Vec<_> = m.top_factors.iter().map(|f| f.as_str()).collect();
+            let reason = m
+                .reason
+                .as_deref()
+                .map(|r| format!(", {r}"))
+                .unwrap_or_default();
+            writeln!(
+                out,
+                "- {}: {:.1} ({}{}; top factors: {})",
+                m.model,
+                m.score,
+                m.verdict.as_str(),
+                reason,
+                factors.join(", ")
+            )
+            .unwrap();
+        }
+        if !llm.actions.is_empty() {
+            writeln!(out, "- Actions:").unwrap();
+            for (i, action) in llm.actions.iter().enumerate() {
+                writeln!(out, "  {}. {}", i + 1, action.text).unwrap();
+            }
         }
         Some(out)
     }
@@ -1057,6 +1097,7 @@ mod tests {
             context: None,
             git_history: None,
             contextual_risk: None,
+            llm_editability: None,
         };
 
         let result = writer.write_function_item(&item);
@@ -1186,6 +1227,7 @@ mod tests {
             context: None,
             git_history: None,
             contextual_risk: None,
+            llm_editability: None,
         };
 
         let result = writer.write_function_item(&item);
@@ -1347,6 +1389,7 @@ mod tests {
                 stability: "Frequently Changed".to_string(),
             }),
             contextual_risk: None,
+            llm_editability: None,
         };
 
         let result = writer.write_function_item(&item);
@@ -1542,6 +1585,7 @@ mod tests {
             context: None,
             git_history: None,
             contextual_risk: None,
+            llm_editability: None,
         }
     }
 

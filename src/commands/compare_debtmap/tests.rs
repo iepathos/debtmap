@@ -126,6 +126,7 @@ fn create_function_item(
         context: None,
         git_history: None,
         contextual_risk: None,
+        llm_editability: None,
     }))
 }
 

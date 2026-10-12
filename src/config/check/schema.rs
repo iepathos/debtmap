@@ -86,6 +86,7 @@ const ROOT_KEYS: &[&str] = &[
     "god_object_detection",
     "ignore",
     "languages",
+    "llm_editability",
     "loc",
     "mapping_patterns",
     "normalization",

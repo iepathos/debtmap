@@ -1,0 +1,47 @@
+# Built-in language profiles for the LLM editability estimate.
+#
+# These are rough priors, overridable under [llm_editability.languages.<name>].
+# Python is the verbosity baseline (1.0).
+#
+# tokens_per_line  Average LLM tokens per source line.
+# verbosity        Tokens this language needs for the same logic, relative to Python.
+#                  Sizes are divided by this before scoring.
+# type_check_gap   How much a wrong edit can slip past the compiler or type checker:
+#                  0 = strong static checking, 1 = none.
+#
+# Every language debtmap analyzes must have an entry; `default` covers the rest.
+
+[default]
+tokens_per_line = 9.0
+verbosity = 1.2
+type_check_gap = 0.6
+
+[python]
+tokens_per_line = 8.0
+verbosity = 1.0
+type_check_gap = 0.7
+
+[javascript]
+tokens_per_line = 8.0
+verbosity = 1.1
+type_check_gap = 0.8
+
+[typescript]
+tokens_per_line = 9.0
+verbosity = 1.2
+type_check_gap = 0.3
+
+[rust]
+tokens_per_line = 9.0
+verbosity = 1.3
+type_check_gap = 0.1
+
+[go]
+tokens_per_line = 8.0
+verbosity = 1.5
+type_check_gap = 0.25
+
+[solidity]
+tokens_per_line = 9.0
+verbosity = 1.3
+type_check_gap = 0.35

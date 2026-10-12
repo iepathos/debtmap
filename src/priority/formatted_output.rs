@@ -95,6 +95,11 @@ pub enum FormattedSection {
         details: Option<String>,
         crap: Option<f64>,
     },
+    /// LLM editability summary and the most impactful fix
+    LlmEditability {
+        summary: String,
+        top_action: Option<String>,
+    },
     /// Dependency information
     Dependencies {
         upstream: usize,

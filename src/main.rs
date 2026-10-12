@@ -14,6 +14,7 @@ use debtmap::cli::{
     handle_analyze_command_with_profiling, handle_compare_command, handle_explain_coverage_command,
     handle_validate_command, handle_validate_improvement_command, show_config_sources,
 };
+use debtmap::config::DebtmapConfig;
 use debtmap::di::create_app_container;
 use debtmap::observability::{extract_thread_panic_message, init_tracing, install_panic_hook};
 use std::path::Path;
@@ -57,11 +58,11 @@ fn selected_config_path(cli: &Cli) -> Option<&Path> {
 fn command_uses_runtime_config(command: &Commands) -> bool {
     matches!(
         command,
-        Commands::Analyze { .. } | Commands::Validate { .. }
+        Commands::Analyze { .. } | Commands::Validate { .. } | Commands::LlmModels
     )
 }
 
-fn install_runtime_config() -> Result<()> {
+fn install_runtime_config(command: &Commands) -> Result<()> {
     let traced = debtmap::config::load_multi_source_config().map_err(|errors| {
         let details = errors
             .into_iter()
@@ -71,8 +72,28 @@ fn install_runtime_config() -> Result<()> {
         anyhow::anyhow!("Configuration loading failed:\n{details}")
     })?;
 
-    debtmap::config::install_config(traced.into_config())
+    let config = apply_llm_cli_flags(traced.into_config(), command);
+    debtmap::llm::evaluator_for(&config)
+        .map_err(|e| anyhow::anyhow!("Invalid LLM editability configuration: {e}"))?;
+    debtmap::config::install_config(config)
         .map_err(|_| anyhow::anyhow!("Configuration was already initialized"))
+}
+
+fn apply_llm_cli_flags(mut config: DebtmapConfig, command: &Commands) -> DebtmapConfig {
+    if let Commands::Analyze {
+        llm_editability,
+        llm_models,
+        ..
+    } = command
+        && (*llm_editability || llm_models.is_some())
+    {
+        let llm = config.llm_editability.get_or_insert_with(Default::default);
+        llm.enabled = true;
+        if let Some(models) = llm_models {
+            llm.models = models.clone();
+        }
+    }
+    config
 }
 
 fn main() -> Result<()> {
@@ -111,7 +132,7 @@ fn main_inner() -> Result<()> {
     }
 
     if command_uses_runtime_config(&cli.command) {
-        install_runtime_config()?;
+        install_runtime_config(&cli.command)?;
     }
 
     // Configure rayon only after all process-environment setup is complete.
@@ -171,6 +192,7 @@ fn main_inner() -> Result<()> {
             handle_explain_coverage_command(command)?;
             Ok(())
         }
+        Commands::LlmModels => debtmap::commands::llm_models::list_llm_models(),
     }
 }
 
@@ -238,6 +260,22 @@ mod tests {
     fn test_extract_jobs_from_diagnose_coverage_command() {
         let cmd = parse_command(&["diagnose-coverage", "lcov.info"]);
         assert_eq!(extract_jobs(&cmd), 0);
+    }
+
+    #[test]
+    fn llm_models_flag_enables_estimate_with_selected_models() {
+        let cmd = parse_command(&["analyze", ".", "--llm-models", "claude-sonnet,gpt-5-mini"]);
+        let config = apply_llm_cli_flags(DebtmapConfig::default(), &cmd);
+        let llm = config.llm_editability.unwrap();
+        assert!(llm.enabled);
+        assert_eq!(llm.models, ["claude-sonnet", "gpt-5-mini"]);
+    }
+
+    #[test]
+    fn llm_estimate_stays_disabled_without_flags() {
+        let cmd = parse_command(&["analyze", "."]);
+        let config = apply_llm_cli_flags(DebtmapConfig::default(), &cmd);
+        assert!(config.llm_editability.is_none());
     }
 
     #[test]

@@ -12,6 +12,7 @@ use super::priority::Priority;
 #[cfg(debug_assertions)]
 use super::priority::assert_priority_invariants;
 use crate::config::get_crap_config;
+use crate::llm::LlmEditabilityOutput;
 use crate::priority::{DebtType, FunctionRole, UnifiedDebtItem};
 use crate::risk::crap::crap_for_item;
 use serde::{Deserialize, Serialize};
@@ -55,6 +56,9 @@ pub struct FunctionDebtItemOutput {
     /// Contextual risk impact from providers such as git history.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub contextual_risk: Option<ContextualRiskImpactOutput>,
+    /// Per-model LLM editability estimate; omitted when the feature is disabled.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub llm_editability: Option<LlmEditabilityOutput>,
 }
 
 impl FunctionDebtItemOutput {
@@ -288,6 +292,7 @@ impl FunctionDebtItemOutput {
                 .contextual_risk
                 .as_ref()
                 .map(ContextualRiskImpactOutput::from_contextual_risk),
+            llm_editability: crate::llm::evaluator().map(|e| e.evaluate(item)),
         }
     }
 }
@@ -661,6 +666,7 @@ mod tests {
             context: None,
             git_history: None,
             contextual_risk: None,
+            llm_editability: None,
         };
 
         // Serialize and deserialize
@@ -674,6 +680,7 @@ mod tests {
 
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert!(!value["metrics"].as_object().unwrap().contains_key("crap"));
+        assert!(!value.as_object().unwrap().contains_key("llm_editability"));
     }
 
     #[test]
@@ -749,6 +756,7 @@ mod tests {
             context: None,
             git_history: None,
             contextual_risk: None,
+            llm_editability: None,
         };
 
         let json = serde_json::to_string(&item).unwrap();
