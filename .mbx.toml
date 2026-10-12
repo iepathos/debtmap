@@ -1,0 +1,10 @@
+[linker]
+default = "system"
+
+[linker.profiles.dev]
+x86_64-unknown-linux-gnu = "mold@2.42.1"
+
+# Release builds use fat LTO with one codegen unit, so linking is a small share of
+# build time, and release.yml passes --target, which mbx never link-caches.
+[linker.profiles.release]
+default = "system"

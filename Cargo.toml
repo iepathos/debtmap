@@ -170,7 +170,6 @@ strip = true
 [profile.dev]
 opt-level = 0
 debug = true
-split-debuginfo = "unpacked"  # Faster linking on macOS
 incremental = true            # Enable incremental compilation
 
 [profile.dev.package."*"]

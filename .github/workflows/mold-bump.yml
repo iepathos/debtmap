@@ -1,0 +1,44 @@
+name: Bump mold
+
+# Dependabot can't read .mbx.toml, so this opens a PR when a newer mold 2.x
+# release appears. Major-version bumps are done by hand.
+on:
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Open a PR for a newer mold release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          current=$(sed -n 's/.*"mold@\([0-9.]*\)".*/\1/p' .mbx.toml)
+          latest=$(gh release list -R rui314/mold --exclude-drafts --exclude-pre-releases \
+            --limit 50 --json tagName \
+            --jq "[.[].tagName | ltrimstr(\"v\") | select(startswith(\"${current%%.*}.\"))] | first")
+          if [ -z "$latest" ] || [ "$latest" = "$current" ]; then
+            echo "mold $current is up to date"
+            exit 0
+          fi
+          branch="deps/mold-$latest"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+            echo "$branch already exists"
+            exit 0
+          fi
+          sed -i "s/mold@$current/mold@$latest/" .mbx.toml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -am "chore(deps): Bump mold to $latest"
+          git push origin "$branch"
+          gh pr create --title "chore(deps): Bump mold to $latest" \
+            --body "Updates the mold linker pinned in \`.mbx.toml\` from $current to $latest. Release notes: https://github.com/rui314/mold/releases/tag/v$latest"
