@@ -36,10 +36,8 @@ jobs:
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
 
-    - name: Cache Rust dependencies
-      uses: Swatinem/rust-cache@v2
-      with:
-        cache-bin: "false"
+    - name: Set up mbx build cache
+      uses: jdx/mr-boxington-action@47ce49b32025d93a7a2f4570815afaa2b7092240 # v1.7.2
 
     - name: Install cargo-nextest
       uses: taiki-e/install-action@v2.87.14
@@ -50,7 +48,7 @@ jobs:
       if: runner.os != 'Windows'
       run: |
         echo "Running tests with cargo nextest..."
-        cargo nextest run --lib \
+        mbx nextest run --lib \
           --test analyzer_tests --test complexity_tests --test core_metrics_tests \
           --test debt_tests --test entropy_tests \
           --test rust_method_resolution_cached \
@@ -76,7 +74,7 @@ jobs:
       shell: pwsh
       run: |
         Write-Output "Running tests with cargo nextest..."
-        cargo nextest run --lib `
+        mbx nextest run --lib `
           --test analyzer_tests `
           --test complexity_tests --test core_metrics_tests `
           --test debt_tests --test entropy_tests `
@@ -97,10 +95,8 @@ jobs:
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
 
-    - name: Cache Rust dependencies
-      uses: Swatinem/rust-cache@v2
-      with:
-        cache-bin: "false"
+    - name: Set up mbx build cache
+      uses: jdx/mr-boxington-action@47ce49b32025d93a7a2f4570815afaa2b7092240 # v1.7.2
 
     - name: Install cargo-nextest
       uses: taiki-e/install-action@v2.87.14
@@ -109,7 +105,7 @@ jobs:
 
     - name: Run bounded integration suite
       run: |
-        cargo nextest run --profile integration \
+        mbx nextest run --profile integration \
           --test language_tests \
           --test python_extraction_test \
           --test batch_integration \
@@ -149,11 +145,6 @@ jobs:
       with:
         components: rustfmt
 
-    - name: Cache Rust dependencies
-      uses: Swatinem/rust-cache@v2
-      with:
-        cache-bin: "false"
-
     - name: Check formatting
       run: cargo fmt --all -- --check
 
@@ -172,17 +163,15 @@ jobs:
       with:
         components: clippy
 
-    - name: Cache Rust dependencies
-      uses: Swatinem/rust-cache@v2
-      with:
-        cache-bin: "false"
+    - name: Set up mbx build cache
+      uses: jdx/mr-boxington-action@47ce49b32025d93a7a2f4570815afaa2b7092240 # v1.7.2
 
     - name: Install SARIF tools
       run: cargo install clippy-sarif sarif-fmt --locked
 
     - name: Run Clippy with SARIF output
       run: >
-        cargo clippy --workspace --all-features --all-targets --message-format=json
+        mbx clippy --workspace --all-features --all-targets --message-format=json
         | clippy-sarif
         | tee clippy-results.sarif
         | sarif-fmt
@@ -195,7 +184,7 @@ jobs:
         wait-for-processing: true
 
     - name: Check for errors
-      run: cargo clippy --all-targets --all-features -- -D warnings
+      run: mbx clippy --all-targets --all-features -- -D warnings
 
   msrv:
     name: Check MSRV
@@ -207,16 +196,14 @@ jobs:
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
 
-    - name: Cache Rust dependencies
-      uses: Swatinem/rust-cache@v2
-      with:
-        cache-bin: "false"
+    - name: Set up mbx build cache
+      uses: jdx/mr-boxington-action@47ce49b32025d93a7a2f4570815afaa2b7092240 # v1.7.2
 
     - name: Install cargo-hack
       uses: taiki-e/install-action@cargo-hack
 
     - name: Check MSRV
-      run: cargo hack check --locked --rust-version --workspace --all-targets --keep-going
+      run: mbx hack check --locked --rust-version --workspace --all-targets --keep-going
 
   minimal-versions:
     name: Minimal versions
@@ -231,16 +218,16 @@ jobs:
     - name: Install Rust nightly
       uses: dtolnay/rust-toolchain@nightly
 
-    - name: Cache Rust dependencies
-      uses: Swatinem/rust-cache@v2
+    - name: Set up mbx build cache
+      uses: jdx/mr-boxington-action@47ce49b32025d93a7a2f4570815afaa2b7092240 # v1.7.2
       with:
-        cache-bin: "false"
+        toolchain: stable
 
     - name: Generate minimal lockfile
       run: cargo +nightly generate-lockfile -Z minimal-versions
 
     - name: Check with minimal versions
-      run: cargo +stable check --workspace --all-features --locked
+      run: mbx +stable check --workspace --all-features --locked
 
   # Aggregation job that reports overall CI status
   ci:
