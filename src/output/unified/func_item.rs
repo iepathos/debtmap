@@ -561,6 +561,7 @@ impl GitHistoryOutput {
                     author_count,
                     total_commits,
                     bug_fix_count,
+                    ..
                 } = git_context.details
                 {
                     let stability =

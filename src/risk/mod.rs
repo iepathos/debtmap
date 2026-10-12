@@ -486,6 +486,7 @@ mod tests {
                     author_count: 3,
                     total_commits: 3,
                     bug_fix_count: 0,
+                    activity: Default::default(),
                 },
             })
         }

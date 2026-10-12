@@ -1,5 +1,6 @@
 //! `[llm_editability]` configuration section.
 
+use super::churn::ChurnConfig;
 use super::features::Feature;
 use super::languages::LanguageOverride;
 use super::profiles::ProfileSpec;
@@ -67,6 +68,8 @@ pub struct LlmEditabilityConfig {
     pub languages: BTreeMap<String, LanguageOverride>,
     /// Overrides for built-in model profiles, or new custom profiles.
     pub profiles: BTreeMap<String, ProfileSpec>,
+    /// Recent LLM churn detection from git history.
+    pub churn: ChurnConfig,
 }
 
 impl Default for LlmEditabilityConfig {
@@ -81,6 +84,7 @@ impl Default for LlmEditabilityConfig {
             unknown_coverage: 0.5,
             languages: BTreeMap::new(),
             profiles: BTreeMap::new(),
+            churn: ChurnConfig::default(),
         }
     }
 }
@@ -119,7 +123,7 @@ impl LlmEditabilityConfig {
         if !(0.0..=1.0).contains(&self.unknown_coverage) {
             return Err("llm_editability.unknown_coverage must be between 0 and 1".into());
         }
-        Ok(())
+        self.churn.validate()
     }
 }
 
@@ -134,6 +138,7 @@ mod tests {
 enabled = true
 thresholds = { feasible = 80.0 }
 weights = { ripple = 2.0 }
+churn = { window_days = 7, agents = ["*our-bot*"] }
 "#,
         )
         .unwrap();
@@ -143,6 +148,8 @@ weights = { ripple = 2.0 }
         assert_eq!(config.weight(Feature::Ripple), 2.0);
         assert_eq!(config.weight(Feature::Reasoning), 1.5);
         assert_eq!(config.tokens_per_dependency, 150.0);
+        assert_eq!(config.churn.window_days, 7);
+        assert!(config.churn.builtin_agents);
         assert!(config.validate().is_ok());
     }
 

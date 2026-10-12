@@ -221,6 +221,20 @@ pub mod format {
             )
             .unwrap();
         }
+        if let Some(c) = &llm.churn {
+            writeln!(
+                out,
+                "- Recent LLM Churn ({}d): {} LLM edits, {} fixes after LLM edits, \
+                 {} reverted LLM edits, {}, {} proven LLM edits",
+                c.window_days,
+                c.llm_edits,
+                c.fixes_after_llm_edit,
+                c.reverts_of_llm_edits,
+                crate::llm::fix_burst_text(c),
+                c.proven_llm_edits
+            )
+            .unwrap();
+        }
         if !llm.actions.is_empty() {
             writeln!(out, "- Actions:").unwrap();
             for (i, action) in llm.actions.iter().enumerate() {

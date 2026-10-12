@@ -8,14 +8,17 @@
 //! itself, but is not a calibrated probability.
 //!
 //! All inputs come from existing analysis data: size, complexity, nesting,
-//! callers and callees, coverage, purity and per-language verbosity.
+//! callers and callees, coverage, purity, per-language verbosity and, with
+//! git history, recent LLM-co-authored churn.
 
+mod churn;
 mod config;
 mod features;
 mod languages;
 mod profiles;
 mod score;
 
+pub use churn::{AgentMatcher, BUILTIN_AGENTS, ChurnConfig, ChurnSummary, summarize};
 pub use config::{DEFAULT_MODELS, LlmEditabilityConfig, Thresholds};
 pub use features::{EditabilityFeatures, Feature, FeatureInputs};
 pub use languages::{
@@ -23,11 +26,16 @@ pub use languages::{
     resolve_languages,
 };
 pub use profiles::{ModelProfile, ProfileSpec, Registry};
-pub use score::{Action, ModelScore, Verdict, actions, assess, recommend, round1, score};
+pub use score::{
+    Action, ModelScore, Verdict, actions, assess, fix_burst_text, recommend, round1, score,
+};
 
 use crate::core::Language;
 use crate::priority::UnifiedDebtItem;
+use crate::risk::context::ContextDetails;
+use crate::risk::context::git_history::activity::CommitActivity;
 use crate::risk::crap::CoverageBasis;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
 
@@ -41,6 +49,9 @@ pub struct LlmEditabilityOutput {
     pub models: Vec<ModelScore>,
     pub recommended_model: Option<String>,
     pub actions: Vec<Action>,
+    /// Recent LLM churn; `null` without function-level git history.
+    #[serde(default)]
+    pub churn: Option<ChurnSummary>,
 }
 
 /// Resolved configuration, language profiles and model profiles.
@@ -50,6 +61,9 @@ pub struct Evaluator {
     languages: LanguageProfiles,
     models: Vec<ModelProfile>,
     coverage_basis: CoverageBasis,
+    agents: AgentMatcher,
+    /// Reference time for the churn window.
+    now: DateTime<Utc>,
 }
 
 impl Evaluator {
@@ -69,6 +83,8 @@ impl Evaluator {
             languages: resolve_languages(&config.languages)?,
             models,
             coverage_basis,
+            agents: AgentMatcher::new(&config.churn)?,
+            now: Utc::now(),
         })
     }
 
@@ -79,8 +95,11 @@ impl Evaluator {
     pub fn evaluate(&self, item: &UnifiedDebtItem) -> LlmEditabilityOutput {
         let language = Language::from_path(&item.location.file);
         let profile = profile_for(&self.languages, language);
+        let churn = commit_activity(item)
+            .map(|a| summarize(a, &self.agents, self.now, self.config.churn.window_days));
         let features =
-            EditabilityFeatures::from_item(item, &self.config, &profile, self.coverage_basis);
+            EditabilityFeatures::from_item(item, &self.config, &profile, self.coverage_basis)
+                .with_churn(churn);
         self.evaluate_features(features, language_key(language))
     }
 
@@ -99,6 +118,7 @@ impl Evaluator {
             basis: "heuristic".to_string(),
             language: language.to_string(),
             actions: actions(&features, &self.models, &self.config),
+            churn: features.inputs.churn.clone(),
             features: rounded(features),
             models: scores
                 .into_iter()
@@ -122,8 +142,24 @@ fn rounded(f: EditabilityFeatures) -> EditabilityFeatures {
         ripple: f.ripple,
         verification_gap: r2(f.verification_gap),
         side_effects: r2(f.side_effects),
+        rework: f.rework,
+        proven_edits: f.proven_edits,
         inputs: f.inputs,
     }
+}
+
+/// Function-level commit facts; `None` without them (file-level history only).
+fn commit_activity(item: &UnifiedDebtItem) -> Option<&CommitActivity> {
+    item.contextual_risk
+        .as_ref()?
+        .contexts
+        .iter()
+        .find_map(|c| match &c.details {
+            ContextDetails::Historical { activity, .. } if !activity.commits.is_empty() => {
+                Some(activity)
+            }
+            _ => None,
+        })
 }
 
 /// Build the evaluator for a configuration, or `None` when the feature is disabled.
@@ -203,6 +239,8 @@ mod tests {
             ripple: 12.0,
             verification_gap: 0.55,
             side_effects: 1.0,
+            rework: 0.0,
+            proven_edits: 0.0,
             inputs: FeatureInputs {
                 lines: 120.0,
                 fan_out: 8.0,
@@ -210,11 +248,15 @@ mod tests {
                 verification_factor: 0.55,
                 tokens_per_line: 9.0,
                 verbosity: 1.3,
+                churn: None,
             },
         };
         let output = evaluator().evaluate_features(features, "rust");
         let json = serde_json::to_value(&output).unwrap();
         assert_eq!(json["basis"], "heuristic");
+        assert!(json.as_object().unwrap().contains_key("churn"));
+        assert!(json["churn"].is_null());
+        assert_eq!(json["features"]["rework"], 0.0);
         assert_eq!(json["models"].as_array().unwrap().len(), 4);
         assert!(json["recommended_model"].is_string() || json["recommended_model"].is_null());
         assert!(!json["actions"].as_array().unwrap().is_empty());

@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
 
+pub mod activity;
 mod batched;
 pub mod batched_function;
 mod blame_cache;
@@ -412,6 +413,7 @@ impl GitHistoryProvider {
                 author_count: history.authors.len(),
                 total_commits: history.total_commits_including_introduction() as u32,
                 bug_fix_count: history.bug_fix_count as u32,
+                activity: history.activity.clone(),
             },
         }
     }
@@ -467,6 +469,7 @@ impl GitHistoryProvider {
                 author_count: history.author_count,
                 total_commits: history.total_commits as u32,
                 bug_fix_count: history.bug_fix_count as u32,
+                activity: Default::default(),
             },
         })
     }

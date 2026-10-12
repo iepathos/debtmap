@@ -1,5 +1,6 @@
 //! Editability features extracted from existing per-function analysis data.
 
+use super::churn::ChurnSummary;
 use super::config::LlmEditabilityConfig;
 use super::languages::LanguageProfile;
 use crate::core::PurityLevel;
@@ -23,16 +24,19 @@ pub enum Feature {
     VerificationGap,
     /// Side effects from purity analysis, 0–1.
     SideEffects,
+    /// Recent LLM rework from git history (see [`super::churn`]).
+    Rework,
 }
 
 impl Feature {
-    pub const ALL: [Feature; 6] = [
+    pub const ALL: [Feature; 7] = [
         Feature::UnitTokens,
         Feature::ContextTokens,
         Feature::Reasoning,
         Feature::Ripple,
         Feature::VerificationGap,
         Feature::SideEffects,
+        Feature::Rework,
     ];
 
     /// Ratio features are already in 0–1; count features need a tolerance.
@@ -44,7 +48,7 @@ impl Feature {
         match self {
             Feature::UnitTokens | Feature::ContextTokens => 1.0,
             Feature::Reasoning | Feature::VerificationGap => 1.5,
-            Feature::Ripple => 1.2,
+            Feature::Ripple | Feature::Rework => 1.2,
             Feature::SideEffects => 0.8,
         }
     }
@@ -57,12 +61,13 @@ impl Feature {
             Feature::Ripple => "ripple",
             Feature::VerificationGap => "verification_gap",
             Feature::SideEffects => "side_effects",
+            Feature::Rework => "rework",
         }
     }
 }
 
 /// Raw inputs kept for writing concrete, human-readable actions.
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct FeatureInputs {
     pub lines: f64,
     pub fan_out: f64,
@@ -71,6 +76,8 @@ pub struct FeatureInputs {
     pub verification_factor: f64,
     pub tokens_per_line: f64,
     pub verbosity: f64,
+    /// `None` without function-level git history.
+    pub churn: Option<ChurnSummary>,
 }
 
 /// Feature values for one function.
@@ -84,6 +91,9 @@ pub struct EditabilityFeatures {
     pub ripple: f64,
     pub verification_gap: f64,
     pub side_effects: f64,
+    pub rework: f64,
+    /// Older LLM edits never followed by a fix; raises the score, capped.
+    pub proven_edits: f64,
     #[serde(skip)]
     pub inputs: FeatureInputs,
 }
@@ -112,6 +122,8 @@ impl EditabilityFeatures {
             ripple: production_fan_in(item) as f64,
             verification_gap: (1.0 - tested) * verification_factor,
             side_effects: side_effect_level(item),
+            rework: 0.0,
+            proven_edits: 0.0,
             inputs: FeatureInputs {
                 lines,
                 fan_out,
@@ -119,7 +131,24 @@ impl EditabilityFeatures {
                 verification_factor,
                 tokens_per_line: language.tokens_per_line,
                 verbosity: language.verbosity,
+                churn: None,
             },
+        }
+    }
+
+    /// Add the git-history churn signals.
+    pub fn with_churn(self, churn: Option<ChurnSummary>) -> Self {
+        Self {
+            rework: churn.as_ref().map(ChurnSummary::rework).unwrap_or(0.0),
+            proven_edits: churn
+                .as_ref()
+                .map(|c| c.proven_llm_edits as f64)
+                .unwrap_or(0.0),
+            inputs: FeatureInputs {
+                churn,
+                ..self.inputs
+            },
+            ..self
         }
     }
 
@@ -131,6 +160,7 @@ impl EditabilityFeatures {
             Feature::Ripple => self.ripple,
             Feature::VerificationGap => self.verification_gap,
             Feature::SideEffects => self.side_effects,
+            Feature::Rework => self.rework,
         }
     }
 
@@ -144,6 +174,7 @@ impl EditabilityFeatures {
             Feature::Ripple => next.ripple = value,
             Feature::VerificationGap => next.verification_gap = value,
             Feature::SideEffects => next.side_effects = value,
+            Feature::Rework => next.rework = value,
         }
         next
     }

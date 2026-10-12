@@ -5,6 +5,7 @@
 //! The score ranks functions and explains itself; it is not a calibrated
 //! probability.
 
+use super::churn::ChurnSummary;
 use super::config::{LlmEditabilityConfig, Thresholds};
 use super::features::{EditabilityFeatures, Feature};
 use super::profiles::ModelProfile;
@@ -88,7 +89,8 @@ pub fn score(
         .iter()
         .map(|(_, p)| p)
         .sum();
-    100.0 / (1.0 + (total - profile.capability).exp())
+    let capability = profile.capability + config.churn.proven_bonus(features.proven_edits);
+    100.0 / (1.0 + (total - capability).exp())
 }
 
 pub fn assess(
@@ -147,7 +149,8 @@ pub fn recommend(profiles: &[ModelProfile], scores: &[ModelScore]) -> Option<Str
 }
 
 /// Fixes the agent can make inside the function, most impactful first.
-/// Ripple needs a design-level change, so it is advice-only and listed last.
+/// Rework and ripple can't be refactored away directly, so they are
+/// advice-only and listed last, ripple last of all.
 pub fn actions(
     features: &EditabilityFeatures,
     profiles: &[ModelProfile],
@@ -167,6 +170,7 @@ pub fn actions(
     scored
         .into_iter()
         .map(|(_, a)| a)
+        .chain(rework_advice(features))
         .chain(ripple_advice(features, profiles))
         .collect()
 }
@@ -215,7 +219,7 @@ fn target_value(
         Feature::VerificationGap => {
             Some((1.0 - TARGET_COVERAGE) * features.inputs.verification_factor)
         }
-        Feature::Ripple => None,
+        Feature::Ripple | Feature::Rework => None,
         _ => profiles
             .iter()
             .map(|p| p.tolerance(feature))
@@ -257,7 +261,43 @@ fn action_text(feature: Feature, features: &EditabilityFeatures, target: f64) ->
             inputs.fan_out
         ),
         Feature::Ripple => ripple_text(features.ripple),
+        Feature::Rework => rework_text(inputs.churn.as_ref().unwrap_or(&Default::default())),
     }
+}
+
+fn rework_text(churn: &ChurnSummary) -> String {
+    let signals: Vec<String> = [
+        (churn.llm_edits > 1).then(|| format!("{} LLM edits", churn.llm_edits)),
+        (churn.fixes_after_llm_edit > 0)
+            .then(|| format!("{} fixes after LLM edits", churn.fixes_after_llm_edit)),
+        (churn.reverts_of_llm_edits > 0)
+            .then(|| format!("{} reverted LLM edits", churn.reverts_of_llm_edits)),
+        (churn.fix_burst > 1).then(|| fix_burst_text(churn)),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    format!(
+        "LLMs keep reworking this ({} in the last {} days): pin the intended behavior \
+         with a failing test and simplify it before the next LLM edit",
+        signals.join(", "),
+        churn.window_days
+    )
+}
+
+pub fn fix_burst_text(churn: &ChurnSummary) -> String {
+    match &churn.fix_burst_scope {
+        Some(scope) => format!("{} fix({scope}) commits", churn.fix_burst),
+        None => format!("{} fix commits in this file", churn.fix_burst),
+    }
+}
+
+fn rework_advice(features: &EditabilityFeatures) -> Option<Action> {
+    (features.rework >= 1.0).then(|| Action {
+        feature: Feature::Rework,
+        text: action_text(Feature::Rework, features, 0.0),
+        score_after: BTreeMap::new(),
+    })
 }
 
 fn ripple_text(ripple: f64) -> String {
@@ -314,6 +354,8 @@ mod tests {
             ripple,
             verification_gap: gap,
             side_effects: side,
+            rework: 0.0,
+            proven_edits: 0.0,
             inputs: FeatureInputs {
                 lines,
                 fan_out: 8.0,
@@ -321,8 +363,60 @@ mod tests {
                 verification_factor: 0.55,
                 tokens_per_line: 9.0,
                 verbosity: 1.3,
+                churn: None,
             },
         }
+    }
+
+    fn churn(llm_edits: u32, fixes: u32, proven: u32) -> ChurnSummary {
+        ChurnSummary {
+            window_days: 14,
+            llm_edits,
+            fixes_after_llm_edit: fixes,
+            proven_llm_edits: proven,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn recent_rework_lowers_score_and_adds_advice_before_ripple() {
+        let config = LlmEditabilityConfig::default();
+        let base = hard();
+        let reworked = base.clone().with_churn(Some(churn(4, 2, 0)));
+        for p in profiles() {
+            assert!(score(&reworked, &p, &config) < score(&base, &p, &config));
+        }
+        let list = actions(&reworked, &profiles(), &config);
+        let n = list.len();
+        assert_eq!(list[n - 2].feature, Feature::Rework);
+        assert!(
+            list[n - 2]
+                .text
+                .contains("4 LLM edits, 2 fixes after LLM edits in the last 14 days"),
+            "{}",
+            list[n - 2].text
+        );
+        assert_eq!(list[n - 1].feature, Feature::Ripple);
+    }
+
+    #[test]
+    fn proven_llm_edits_raise_score_within_the_cap() {
+        let config = LlmEditabilityConfig::default();
+        let base = hard();
+        let proven = base.clone().with_churn(Some(churn(0, 0, 5)));
+        assert_eq!(proven.rework, 0.0);
+        for p in profiles() {
+            let (before, after) = (score(&base, &p, &config), score(&proven, &p, &config));
+            assert!(after > before);
+            let mut capped = p.clone();
+            capped.capability += config.churn.proven_edit_bonus;
+            assert!(after < score(&base, &capped, &config));
+        }
+        assert!(
+            actions(&proven, &profiles(), &config)
+                .iter()
+                .all(|a| a.feature != Feature::Rework)
+        );
     }
 
     fn hard() -> EditabilityFeatures {
@@ -455,7 +549,7 @@ mod tests {
         }
 
         #[test]
-        fn worse_feature_never_raises_score(f in arb_features(), i in 0usize..6, bump in 0.0f64..50.0) {
+        fn worse_feature_never_raises_score(f in arb_features(), i in 0usize..7, bump in 0.0f64..50.0) {
             let config = LlmEditabilityConfig::default();
             let feature = Feature::ALL[i];
             let worse = f.with(feature, f.get(feature) + bump);
