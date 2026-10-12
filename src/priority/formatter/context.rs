@@ -159,6 +159,7 @@ pub(crate) struct CoverageInfo {
     pub tag: String,
     pub color: colored::Color,
     pub coverage_percentage: Option<f64>,
+    pub crap: Option<f64>,
 }
 
 impl CoverageInfo {
@@ -169,12 +170,20 @@ impl CoverageInfo {
 
         if let Some(ref trans_cov) = item.transitive_coverage {
             let coverage_pct = trans_cov.direct * 100.0;
-            Some(Self::from_coverage_percentage(coverage_pct))
+            let crap = crate::risk::crap::crap_for_item(
+                item,
+                crate::config::get_crap_config().coverage_source,
+            );
+            Some(Self {
+                crap,
+                ..Self::from_coverage_percentage(coverage_pct)
+            })
         } else if item.unified_score.coverage_factor >= 10.0 {
             Some(Self {
                 tag: "[ERROR UNTESTED]".to_string(),
                 color: colored::Color::BrightRed,
                 coverage_percentage: None,
+                crap: None,
             })
         } else {
             None
@@ -195,6 +204,7 @@ impl CoverageInfo {
             tag,
             color,
             coverage_percentage: Some(coverage_pct),
+            crap: None,
         }
     }
 }

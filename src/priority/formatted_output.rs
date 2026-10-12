@@ -93,6 +93,7 @@ pub enum FormattedSection {
         percentage: f64,
         level: CoverageLevel,
         details: Option<String>,
+        crap: Option<f64>,
     },
     /// Dependency information
     Dependencies {

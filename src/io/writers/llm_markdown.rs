@@ -184,6 +184,9 @@ pub mod format {
             )
             .unwrap();
         }
+        if let Some(crap) = m.crap {
+            writeln!(out, "- CRAP: {:.1}", crap).unwrap();
+        }
         Some(out)
     }
 
@@ -1016,6 +1019,7 @@ mod tests {
                 branch_similarity: Some(0.4),
                 entropy_adjusted_cognitive: Some(24),
                 transitive_coverage: Some(0.75),
+                crap: None,
             },
             debt_type: DebtType::ComplexityHotspot {
                 cyclomatic: 25,

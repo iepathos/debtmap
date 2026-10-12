@@ -565,6 +565,7 @@ fn merge_config(
         source_id,
         field_sources
     );
+    merge_optional_field!(target, source, crap, "crap", source_id, field_sources);
 }
 
 /// Apply environment variable overrides to the config.
@@ -669,6 +670,7 @@ mod tests {
             ),
             data_flow_scoring: Some(crate::config::DataFlowScoringConfig::default()),
             context_suggestion: Some(crate::priority::context::ContextConfig::default()),
+            crap: Some(crate::risk::crap::CrapConfig::default()),
             ..DebtmapConfig::default()
         };
         let mut merged = DebtmapConfig::default();
@@ -683,6 +685,7 @@ mod tests {
         assert!(merged.state_detection.is_some());
         assert!(merged.data_flow_scoring.is_some());
         assert!(merged.context_suggestion.is_some());
+        assert!(merged.crap.is_some());
         for name in [
             "batch_analysis",
             "retry",
@@ -690,6 +693,7 @@ mod tests {
             "state_detection",
             "data_flow_scoring",
             "context_suggestion",
+            "crap",
         ] {
             assert_eq!(fields.get(name), Some(&origin));
         }
