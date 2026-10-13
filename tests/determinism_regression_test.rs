@@ -135,6 +135,7 @@ fn test_context_summation_determinism() {
                     author_count: 0,
                     total_commits: 0,
                     bug_fix_count: 0,
+                    activity: Default::default(),
                 },
             },
         );
