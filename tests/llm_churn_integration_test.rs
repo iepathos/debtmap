@@ -86,7 +86,7 @@ fn agent_repo() -> GitFixture {
     let repo = GitFixture::new();
     repo.commit(
         FILE,
-        &source(&[helper.clone()]),
+        &source(std::slice::from_ref(&helper)),
         "feat: add stable_helper",
         Some(CLAUDE_TRAILER),
         100,

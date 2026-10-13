@@ -632,7 +632,7 @@ fn fix_dates_by<K: std::hash::Hash + Eq>(
         .filter_map(|d| Some((d, super::activity::conventional_fix_scope(&d.message)?)))
         .flat_map(|(d, scope)| keys(d, scope).into_iter().map(|k| (k, d.date)))
         .fold(HashMap::new(), |mut acc, (key, date)| {
-            acc.entry(key).or_insert_with(Vec::new).push(date);
+            acc.entry(key).or_default().push(date);
             acc
         })
 }
