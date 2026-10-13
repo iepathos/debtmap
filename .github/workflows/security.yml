@@ -36,11 +36,6 @@ jobs:
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
 
-    - name: Cache Rust dependencies
-      uses: Swatinem/rust-cache@v2
-      with:
-        cache-bin: "false"
-
     - name: Install cargo-audit
       uses: taiki-e/install-action@v2.87.14
       with:
@@ -72,11 +67,6 @@ jobs:
 
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
-
-    - name: Cache Rust dependencies
-      uses: Swatinem/rust-cache@v2
-      with:
-        cache-bin: "false"
 
     - name: Install cargo-deny
       uses: taiki-e/install-action@v2.87.14
@@ -137,10 +127,11 @@ jobs:
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
 
-    - name: Cache Rust dependencies
-      uses: Swatinem/rust-cache@v2
+    - name: Set up mbx build cache
+      uses: jdx/mr-boxington-action@47ce49b32025d93a7a2f4570815afaa2b7092240 # v1.7.2
       with:
-        cache-bin: "false"
+        cache-key: ${{ runner.os }}-${{ runner.arch }}-mbx-security-${{ hashFiles('rust-toolchain.toml') }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: ${{ runner.os }}-${{ runner.arch }}-mbx-security-${{ hashFiles('rust-toolchain.toml') }}-
 
     - name: Check for suspicious dependencies
       run: |
@@ -153,7 +144,7 @@ jobs:
     - name: Verify Cargo.lock is valid
       run: |
         # Verify lockfile is consistent with Cargo.toml (not necessarily latest versions)
-        cargo check --locked --quiet
+        mbx check --locked --quiet
         echo "Cargo.lock is valid and consistent with Cargo.toml"
 
     - name: Check for overly broad feature flags
