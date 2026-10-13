@@ -388,8 +388,8 @@ pub struct FunctionMetricsOutput {
     /// This fallback is an estimate, not evidence that this function executed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transitive_coverage: Option<f64>,
-    /// CRAP score (`cc² · (1 − cov)³ + cc`); `null` when no coverage data was provided.
-    #[serde(default)]
+    /// CRAP score (`cc² · (1 − cov)³ + cc`); omitted when no coverage data was provided.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub crap: Option<f64>,
 }
 
@@ -672,10 +672,8 @@ mod tests {
         assert!(matches!(deserialized.priority, Priority::Medium));
         assert_eq!(item.metrics.coverage, deserialized.metrics.coverage);
 
-        // Optional metrics consumers parse by key are present as null
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
-        assert!(value["metrics"]["crap"].is_null());
-        assert!(value["metrics"].as_object().unwrap().contains_key("crap"));
+        assert!(!value["metrics"].as_object().unwrap().contains_key("crap"));
     }
 
     #[test]
