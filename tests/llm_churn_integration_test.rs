@@ -339,3 +339,46 @@ fn topic_matching_corroborates_scopes_and_reports_cross_scope_fixes() {
         "{on:#}"
     );
 }
+
+/// Claude adds and then edits `hot_parser`; a human silently restores the
+/// previous version without saying "revert".
+fn silent_revert_repo() -> GitFixture {
+    let repo = GitFixture::new();
+    repo.commit(
+        FILE,
+        &hot_parser(1),
+        "feat: add hot_parser",
+        Some(CLAUDE_TRAILER),
+        6,
+    )
+    .commit(
+        FILE,
+        &hot_parser(2),
+        "perf: faster tab handling",
+        Some(CLAUDE_TRAILER),
+        4,
+    )
+    .commit(
+        FILE,
+        &hot_parser(1),
+        "Restore previous tab handling",
+        None,
+        2,
+    );
+    repo
+}
+
+#[test]
+fn content_reverts_detect_silent_reverts_when_enabled() {
+    let repo = silent_revert_repo();
+    let off = analyze_hot_parser(&repo, "[llm_editability]\nenabled = true\n");
+    assert_eq!(off["churn"]["reverts_of_llm_edits"], 0, "{off:#}");
+    assert_eq!(off["features"]["rework"], 1.0, "{off:#}");
+
+    let on = analyze_hot_parser(
+        &repo,
+        "[llm_editability]\nenabled = true\n[llm_editability.churn]\ncontent_reverts = true\n",
+    );
+    assert_eq!(on["churn"]["reverts_of_llm_edits"], 1, "{on:#}");
+    assert_eq!(on["features"]["rework"], 2.0, "{on:#}");
+}

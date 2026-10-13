@@ -58,6 +58,9 @@ pub struct ChurnConfig {
     /// Proven edits at which half the bonus applies.
     pub proven_edit_tolerance: f64,
     pub topics: TopicConfig,
+    /// Treat commits that exactly undo an earlier commit's file changes as
+    /// reverts of it, even when their messages don't say so.
+    pub content_reverts: bool,
 }
 
 impl Default for ChurnConfig {
@@ -69,6 +72,7 @@ impl Default for ChurnConfig {
             proven_edit_bonus: 0.5,
             proven_edit_tolerance: 3.0,
             topics: TopicConfig::default(),
+            content_reverts: false,
         }
     }
 }

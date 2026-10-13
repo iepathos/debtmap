@@ -83,6 +83,7 @@ impl BatchedFunctionGitHistory {
         let file_history = super::batched::BatchedGitHistory::from_commit_scans(&scan.file_scans);
         let records = &scan.functions;
         let topics = topic_index(&scan);
+        let content_reverts = content_reverts_enabled().then_some(&scan.content_reverts);
 
         let histories: DashMap<FunctionHistoryKey, FunctionHistory> = DashMap::new();
         let processed_files = AtomicUsize::new(0);
@@ -126,6 +127,7 @@ impl BatchedFunctionGitHistory {
                     file,
                 );
                 let history = with_topic_fixes(history, record, topics.as_ref());
+                let history = with_content_reverts(history, content_reverts);
                 histories.insert(
                     FunctionHistoryKey {
                         file: file.clone(),
@@ -226,6 +228,31 @@ fn topic_index(scan: &git2_provider::RepoHistoryScan) -> Option<TopicIndex> {
         let since = chrono::Utc::now() - chrono::Duration::days(churn.window_days.into());
         TopicIndex::new(&scan.file_scans, since, churn.topics.min_similarity)
     })
+}
+
+fn content_reverts_enabled() -> bool {
+    crate::config::get_config()
+        .llm_editability
+        .as_ref()
+        .is_some_and(|llm| llm.enabled && llm.churn.content_reverts)
+}
+
+/// Marks commits that exactly undo an earlier commit as reverts of it,
+/// unless their message already names what they revert.
+fn with_content_reverts(
+    mut history: FunctionHistory,
+    content_reverts: Option<&HashMap<String, String>>,
+) -> FunctionHistory {
+    let Some(reverts) = content_reverts else {
+        return history;
+    };
+    for fact in &mut history.activity.commits {
+        if let (None, Some(target)) = (&fact.reverted_hash, reverts.get(&fact.hash)) {
+            fact.revert = true;
+            fact.reverted_hash = Some(target.clone());
+        }
+    }
+    history
 }
 
 fn with_topic_fixes(
