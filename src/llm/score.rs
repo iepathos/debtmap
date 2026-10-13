@@ -5,7 +5,7 @@
 //! The score ranks functions and explains itself; it is not a calibrated
 //! probability.
 
-use super::churn::ChurnSummary;
+use super::churn::{ChurnSummary, FixGroup};
 use super::config::{LlmEditabilityConfig, Thresholds};
 use super::features::{EditabilityFeatures, Feature};
 use super::profiles::ModelProfile;
@@ -273,6 +273,13 @@ fn rework_text(churn: &ChurnSummary) -> String {
         (churn.reverts_of_llm_edits > 0)
             .then(|| format!("{} reverted LLM edits", churn.reverts_of_llm_edits)),
         (churn.fix_burst > 1).then(|| fix_burst_text(churn)),
+        (churn.corroborated_fixes > 0).then(|| {
+            format!(
+                "{} fixes matching both scope and topic",
+                churn.corroborated_fixes
+            )
+        }),
+        cross_scope_text(churn),
     ]
     .into_iter()
     .flatten()
@@ -285,10 +292,29 @@ fn rework_text(churn: &ChurnSummary) -> String {
     )
 }
 
+/// e.g. "3 fixes on this topic under other scopes (lexer: 2, tokens: 1)".
+pub fn cross_scope_text(churn: &ChurnSummary) -> Option<String> {
+    let total: u32 = churn.cross_scope_fixes.values().sum();
+    let scopes: Vec<String> = churn
+        .cross_scope_fixes
+        .iter()
+        .map(|(scope, n)| format!("{scope}: {n}"))
+        .collect();
+    (total > 0).then(|| {
+        format!(
+            "{total} fixes on this topic under other scopes ({})",
+            scopes.join(", ")
+        )
+    })
+}
+
 pub fn fix_burst_text(churn: &ChurnSummary) -> String {
-    match &churn.fix_burst_scope {
-        Some(scope) => format!("{} fix({scope}) commits", churn.fix_burst),
-        None => format!("{} fix commits in this file", churn.fix_burst),
+    let n = churn.fix_burst;
+    match &churn.fix_burst_group {
+        Some(FixGroup::Scope(scope)) => format!("{n} fix({scope}) commits"),
+        Some(FixGroup::File) => format!("{n} fix commits in this file"),
+        Some(FixGroup::Topic) => format!("{n} fix commits on the same topic"),
+        None => format!("{n} fix commits"),
     }
 }
 

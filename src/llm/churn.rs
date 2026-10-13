@@ -15,6 +15,7 @@ use crate::risk::context::git_history::activity::{CommitActivity, CommitFact};
 use chrono::{DateTime, Duration, Utc};
 use globset::{GlobBuilder, GlobSet, GlobSetBuilder};
 use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Case-insensitive globs matched against `Co-authored-by` values and
 /// "Generated with/by" footers. Patterns avoid bare first names (e.g. "devin")
@@ -56,6 +57,7 @@ pub struct ChurnConfig {
     pub proven_edit_bonus: f64,
     /// Proven edits at which half the bonus applies.
     pub proven_edit_tolerance: f64,
+    pub topics: TopicConfig,
 }
 
 impl Default for ChurnConfig {
@@ -66,6 +68,27 @@ impl Default for ChurnConfig {
             builtin_agents: true,
             proven_edit_bonus: 0.5,
             proven_edit_tolerance: 3.0,
+            topics: TopicConfig::default(),
+        }
+    }
+}
+
+/// `[llm_editability.churn.topics]`: group recent fixes by commit-message
+/// topic. Compares every recent fix with each function's recent commits, so
+/// it is off by default.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct TopicConfig {
+    pub enabled: bool,
+    /// Weighted share of terms two messages must have in common (0..=1].
+    pub min_similarity: f64,
+}
+
+impl Default for TopicConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            min_similarity: 0.3,
         }
     }
 }
@@ -79,6 +102,9 @@ impl ChurnConfig {
             return Err("llm_editability.churn: proven_edit_bonus must be >= 0 and \
                  proven_edit_tolerance > 0"
                 .into());
+        }
+        if !(self.topics.min_similarity > 0.0 && self.topics.min_similarity <= 1.0) {
+            return Err("llm_editability.churn.topics.min_similarity must be in (0, 1]".into());
         }
         AgentMatcher::new(self).map(|_| ())
     }
@@ -133,27 +159,83 @@ pub struct ChurnSummary {
     /// an LLM edit.
     #[serde(default)]
     pub reverts_of_llm_edits: u32,
-    /// Conventional fixes inside the window in this function's busiest fix
-    /// group: a scope its recent commits used (`fix(scope):`), or its file
-    /// for scope-less `fix:` commits.
+    /// Fixes inside the window in this function's busiest fix group.
     pub fix_burst: u32,
-    /// Scope of the busiest group; `None` when it is the file.
-    pub fix_burst_scope: Option<String>,
+    /// `None` without recent fixes in any group.
+    pub fix_burst_group: Option<FixGroup>,
+    /// On-topic fixes in a scope this function's recent commits used: both
+    /// signals agree, so each adds [`CORROBORATION_BONUS`] to rework.
+    #[serde(default)]
+    pub corroborated_fixes: u32,
+    /// On-topic fixes filed under scopes this function's recent commits did
+    /// not use, by scope: LLM edits here may break code elsewhere.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub cross_scope_fixes: BTreeMap<String, u32>,
     /// LLM edits older than the window, never reverted, that no fix or revert
     /// followed within the window.
     pub proven_llm_edits: u32,
 }
 
+/// How a function's related fixes were grouped.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FixGroup {
+    /// Conventional `fix(scope):` commits for a scope its recent commits used.
+    Scope(String),
+    /// Scope-less conventional `fix:` commits touching its file.
+    File,
+    /// Fix commits whose messages share a topic with its recent commits.
+    Topic,
+}
+
+/// Extra rework per fix that matches both the function's scope and topic.
+pub const CORROBORATION_BONUS: f64 = 0.5;
+
 impl ChurnSummary {
-    /// Rework count: a single recent LLM edit or scope fix is normal; every
-    /// follow-up fix and revert of an LLM edit counts.
+    /// Rework count: a single recent LLM edit or grouped fix is normal; every
+    /// follow-up fix and revert of an LLM edit counts, corroborated fixes
+    /// count extra, and on-topic fixes under other scopes count too.
     pub fn rework(&self) -> f64 {
         let excess = |n: u32| n.saturating_sub(1) as f64;
         excess(self.llm_edits)
             + self.fixes_after_llm_edit as f64
             + self.reverts_of_llm_edits as f64
             + excess(self.fix_burst)
+            + CORROBORATION_BONUS * self.corroborated_fixes as f64
+            + self.cross_scope_fixes.values().sum::<u32>() as f64
     }
+}
+
+/// Recent on-topic fixes, split against the function's recent scopes.
+#[derive(Default)]
+struct TopicSplit {
+    /// Scope-less or same-scope fixes: the topic fix group.
+    grouped: u32,
+    corroborated: u32,
+    cross_scope: BTreeMap<String, u32>,
+}
+
+fn split_topic_fixes(
+    activity: &CommitActivity,
+    scopes: &BTreeSet<&str>,
+    since: DateTime<Utc>,
+) -> TopicSplit {
+    activity
+        .topic_fixes
+        .iter()
+        .filter(|f| f.date >= since)
+        .fold(TopicSplit::default(), |mut split, fix| {
+            match fix.scope.as_deref() {
+                Some(s) if scopes.contains(s) => split.corroborated += 1,
+                Some(s) if !scopes.is_empty() => {
+                    *split.cross_scope.entry(s.to_string()).or_insert(0) += 1;
+                    return split;
+                }
+                _ => {}
+            }
+            split.grouped += 1;
+            split
+        })
 }
 
 /// A function's commits split by authorship, within one churn window.
@@ -211,14 +293,19 @@ pub fn summarize(
         .collect();
     let count =
         |pred: &dyn Fn(&CommitFact) -> bool| recent.iter().filter(|c| pred(c)).count() as u32;
-    let (fix_burst_scope, fix_burst) = busiest_fix_group(activity, now - window);
+    let since = now - window;
+    let scopes: BTreeSet<&str> = recent.iter().filter_map(|c| c.scope.as_deref()).collect();
+    let topics = split_topic_fixes(activity, &scopes, since);
+    let (fix_burst_group, fix_burst) = busiest_fix_group(activity, &scopes, topics.grouped, since);
     ChurnSummary {
         window_days,
         llm_edits: count(&|c| matcher.is_llm(c)),
         fixes_after_llm_edit: count(&|c| c.fix && !c.revert && history.follows_llm(c)),
         reverts_of_llm_edits: count(&|c| c.revert && history.undoes_llm(c)),
         fix_burst,
-        fix_burst_scope,
+        fix_burst_group,
+        corroborated_fixes: topics.corroborated,
+        cross_scope_fixes: topics.cross_scope,
         proven_llm_edits: history
             .llm
             .iter()
@@ -227,27 +314,41 @@ pub fn summarize(
     }
 }
 
-/// Busiest recent fix group: a scope used by recent commits, or the file
-/// (`None`) for scope-less fixes. Scopes win ties.
-fn busiest_fix_group(activity: &CommitActivity, since: DateTime<Utc>) -> (Option<String>, u32) {
+/// Busiest recent fix group. Ties go to scopes (alphabetically), then the
+/// file, then the topic.
+fn busiest_fix_group(
+    activity: &CommitActivity,
+    scopes: &BTreeSet<&str>,
+    topic_fixes: u32,
+    since: DateTime<Utc>,
+) -> (Option<FixGroup>, u32) {
     let recent = |dates: &[DateTime<Utc>]| dates.iter().filter(|d| **d >= since).count() as u32;
-    let file = (None, recent(&activity.file_fixes));
-    activity
-        .commits
+    let groups: Vec<(FixGroup, u32)> = scopes
         .iter()
-        .filter(|c| c.date >= since)
-        .filter_map(|c| c.scope.as_deref())
-        .filter_map(|scope| Some((scope, recent(activity.scope_fixes.get(scope)?))))
-        .max_by(|a, b| a.1.cmp(&b.1).then_with(|| b.0.cmp(a.0)))
-        .map(|(scope, n)| (Some(scope.to_string()), n))
-        .filter(|scoped| scoped.1 >= file.1)
-        .unwrap_or(file)
+        .filter_map(|&s| {
+            Some((
+                FixGroup::Scope(s.into()),
+                recent(activity.scope_fixes.get(s)?),
+            ))
+        })
+        .chain([
+            (FixGroup::File, recent(&activity.file_fixes)),
+            (FixGroup::Topic, topic_fixes),
+        ])
+        .filter(|(_, n)| *n > 0)
+        .collect();
+    groups
+        .into_iter()
+        .rev()
+        .max_by_key(|(_, n)| *n)
+        .map(|(group, n)| (Some(group), n))
+        .unwrap_or((None, 0))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::risk::context::git_history::activity::commit_fact;
+    use crate::risk::context::git_history::activity::{TopicFix, commit_fact};
     use std::collections::BTreeMap;
 
     const CLAUDE: &str = "\n\nCo-authored-by: Claude <noreply@anthropic.com>";
@@ -396,12 +497,11 @@ mod tests {
             commits: vec![days_ago(3, "feat(parser): tokens")],
             scope_fixes: BTreeMap::from([("parser".to_string(), days(&[40, 5, 3, 1]))]),
             file_fixes: days(&[2, 1]),
+            ..Default::default()
         };
         let s = summarize(&activity, &matcher(), now(), 14);
-        assert_eq!(
-            (s.fix_burst_scope.as_deref(), s.fix_burst),
-            (Some("parser"), 3)
-        );
+        let parser = FixGroup::Scope("parser".into());
+        assert_eq!((s.fix_burst_group.clone(), s.fix_burst), (Some(parser), 3));
         assert_eq!(s.rework(), 2.0);
     }
 
@@ -413,8 +513,108 @@ mod tests {
             ..Default::default()
         };
         let s = summarize(&activity, &matcher(), now(), 14);
-        assert_eq!((s.fix_burst_scope.as_deref(), s.fix_burst), (None, 3));
+        assert_eq!(
+            (s.fix_burst_group.clone(), s.fix_burst),
+            (Some(FixGroup::File), 3)
+        );
         assert_eq!(s.rework(), 2.0);
+    }
+
+    #[test]
+    fn topic_fix_bursts_count_and_lose_ties() {
+        let activity = CommitActivity {
+            commits: vec![days_ago(3, "feat: tokens")],
+            file_fixes: days(&[5, 1]),
+            topic_fixes: topic(&[(6, None), (4, None), (2, None)]),
+            ..Default::default()
+        };
+        let s = summarize(&activity, &matcher(), now(), 14);
+        assert_eq!((s.fix_burst_group, s.fix_burst), (Some(FixGroup::Topic), 3));
+        let tie = CommitActivity {
+            topic_fixes: topic(&[(4, None), (2, None)]),
+            ..activity
+        };
+        let s = summarize(&tie, &matcher(), now(), 14);
+        assert_eq!(s.fix_burst_group, Some(FixGroup::File));
+    }
+
+    fn topic(fixes: &[(i64, Option<&str>)]) -> Vec<TopicFix> {
+        fixes
+            .iter()
+            .map(|(n, scope)| TopicFix {
+                date: now() - Duration::days(*n),
+                scope: scope.map(String::from),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn same_scope_topic_fixes_corroborate_and_count_extra() {
+        let activity = CommitActivity {
+            commits: vec![days_ago(5, "feat(parser): tabs")],
+            scope_fixes: BTreeMap::from([("parser".to_string(), days(&[4, 3, 1]))]),
+            topic_fixes: topic(&[
+                (4, Some("parser")),
+                (3, Some("parser")),
+                (40, Some("parser")),
+            ]),
+            ..Default::default()
+        };
+        let s = summarize(&activity, &matcher(), now(), 14);
+        assert_eq!(s.fix_burst, 3);
+        assert_eq!(s.corroborated_fixes, 2);
+        assert_eq!(s.rework(), 2.0 + 2.0 * CORROBORATION_BONUS);
+    }
+
+    #[test]
+    fn other_scope_topic_fixes_are_reported_and_count() {
+        let activity = CommitActivity {
+            commits: vec![days_ago(5, "feat(parser): tabs")],
+            topic_fixes: topic(&[(4, Some("lexer")), (3, Some("lexer")), (2, None)]),
+            ..Default::default()
+        };
+        let s = summarize(&activity, &matcher(), now(), 14);
+        assert_eq!(
+            s.cross_scope_fixes,
+            BTreeMap::from([("lexer".to_string(), 2)])
+        );
+        assert_eq!(
+            (s.fix_burst_group.clone(), s.fix_burst),
+            (Some(FixGroup::Topic), 1)
+        );
+        assert_eq!(s.rework(), 2.0);
+    }
+
+    #[test]
+    fn scoped_topic_fixes_join_the_topic_group_for_unscoped_functions() {
+        let activity = CommitActivity {
+            commits: vec![days_ago(5, "feat: tabs")],
+            topic_fixes: topic(&[(4, Some("lexer")), (3, None)]),
+            ..Default::default()
+        };
+        let s = summarize(&activity, &matcher(), now(), 14);
+        assert!(s.cross_scope_fixes.is_empty());
+        assert_eq!((s.fix_burst, s.corroborated_fixes), (2, 0));
+    }
+
+    #[test]
+    fn no_recent_fixes_means_no_group() {
+        let s = summary(vec![days_ago(3, "feat: tokens")]);
+        assert_eq!((s.fix_burst_group, s.fix_burst), (None, 0));
+    }
+
+    #[test]
+    fn rejects_out_of_range_topic_similarity() {
+        let config = |min_similarity| ChurnConfig {
+            topics: TopicConfig {
+                enabled: true,
+                min_similarity,
+            },
+            ..Default::default()
+        };
+        assert!(config(0.0).validate().is_err());
+        assert!(config(1.5).validate().is_err());
+        assert!(config(1.0).validate().is_ok());
     }
 
     #[test]

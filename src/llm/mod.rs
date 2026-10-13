@@ -18,7 +18,9 @@ mod languages;
 mod profiles;
 mod score;
 
-pub use churn::{AgentMatcher, BUILTIN_AGENTS, ChurnConfig, ChurnSummary, summarize};
+pub use churn::{
+    AgentMatcher, BUILTIN_AGENTS, ChurnConfig, ChurnSummary, FixGroup, TopicConfig, summarize,
+};
 pub use config::{DEFAULT_MODELS, LlmEditabilityConfig, Thresholds};
 pub use features::{EditabilityFeatures, Feature, FeatureInputs};
 pub use languages::{
@@ -27,7 +29,8 @@ pub use languages::{
 };
 pub use profiles::{ModelProfile, ProfileSpec, Registry};
 pub use score::{
-    Action, ModelScore, Verdict, actions, assess, fix_burst_text, recommend, round1, score,
+    Action, ModelScore, Verdict, actions, assess, cross_scope_text, fix_burst_text, recommend,
+    round1, score,
 };
 
 use crate::core::Language;

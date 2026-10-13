@@ -4,7 +4,7 @@ mod common;
 
 use common::git_fixture::{CLAUDE_TRAILER, CURSOR_TRAILER, GitFixture};
 use debtmap::core::FunctionMetrics;
-use debtmap::llm::{AgentMatcher, ChurnConfig, ChurnSummary, summarize};
+use debtmap::llm::{AgentMatcher, ChurnConfig, ChurnSummary, FixGroup, summarize};
 use debtmap::risk::context::git_history::GitHistoryProvider;
 use debtmap::risk::context::{AnalysisTarget, ContextDetails, ContextProvider};
 use std::process::Command;
@@ -192,8 +192,8 @@ fn git_history_yields_llm_churn_per_function() {
     assert_eq!(hot.llm_edits, 3, "{hot:?}");
     assert_eq!(hot.fixes_after_llm_edit, 1, "{hot:?}");
     assert_eq!(
-        (hot.fix_burst_scope.as_deref(), hot.fix_burst),
-        (Some("parser"), 2),
+        (hot.fix_burst_group.clone(), hot.fix_burst),
+        (Some(FixGroup::Scope("parser".into())), 2),
         "{hot:?}"
     );
     assert_eq!(hot.reverts_of_llm_edits, 0, "{hot:?}");
@@ -209,19 +209,17 @@ fn git_history_yields_llm_churn_per_function() {
     assert_eq!(reverted.fixes_after_llm_edit, 0, "{reverted:?}");
     assert_eq!(reverted.reverts_of_llm_edits, 1, "{reverted:?}");
     assert_eq!(
-        (reverted.fix_burst_scope.as_deref(), reverted.fix_burst),
-        (None, 1),
+        (reverted.fix_burst_group.clone(), reverted.fix_burst),
+        (Some(FixGroup::File), 1),
         "the scope-less fix is grouped under the file: {reverted:?}"
     );
     assert_eq!(reverted.rework(), 1.0, "{reverted:?}");
 }
 
-#[test]
-fn analyze_json_reports_churn_and_rework_action() {
-    let repo = agent_repo();
+/// `llm_editability` of `hot_parser` from `debtmap analyze --format json`.
+fn analyze_hot_parser(repo: &GitFixture, config_toml: &str) -> serde_json::Value {
     let config = repo.path().join("llm.toml");
-    std::fs::write(&config, "[llm_editability]\nenabled = true\n").expect("write config");
-
+    std::fs::write(&config, config_toml).expect("write config");
     let output = Command::new(env!("CARGO_BIN_EXE_debtmap"))
         .args([
             "analyze",
@@ -249,9 +247,17 @@ fn analyze_json_reports_churn_and_rework_action() {
         .iter()
         .find(|i| i["location"]["function"] == "hot_parser")
         .unwrap_or_else(|| panic!("hot_parser not reported: {json:#}"));
-    let llm = &hot["llm_editability"];
+    hot["llm_editability"].clone()
+}
+
+#[test]
+fn analyze_json_reports_churn_and_rework_action() {
+    let llm = analyze_hot_parser(&agent_repo(), "[llm_editability]\nenabled = true\n");
     assert_eq!(llm["churn"]["llm_edits"], 3, "{llm:#}");
-    assert_eq!(llm["churn"]["fix_burst_scope"], "parser", "{llm:#}");
+    assert_eq!(
+        llm["churn"]["fix_burst_group"]["scope"], "parser",
+        "{llm:#}"
+    );
     assert_eq!(llm["features"]["rework"], 4.0, "{llm:#}");
     let actions = llm["actions"].as_array().expect("actions array");
     assert!(
@@ -260,5 +266,76 @@ fn analyze_json_reports_churn_and_rework_action() {
                 .as_str()
                 .is_some_and(|t| t.contains("3 LLM edits"))),
         "{llm:#}"
+    );
+}
+
+/// An LLM edit to `hot_parser` under `parser`, then human fixes on the same
+/// topic in another file (one under `parser`, one under `lexer`, one
+/// scope-less), and an unrelated fix.
+fn topic_repo() -> GitFixture {
+    let repo = GitFixture::new();
+    let tabs = "src/tabs.rs";
+    repo.commit(
+        FILE,
+        &hot_parser(1),
+        "feat(parser): parse tab characters in parser input",
+        Some(CLAUDE_TRAILER),
+        6,
+    )
+    .commit(
+        tabs,
+        "// v1\n",
+        "fix(parser): tab characters miscounted in parser input",
+        None,
+        4,
+    )
+    .commit(
+        tabs,
+        "// v2\n",
+        "fix(lexer): parser input with tab characters crashes",
+        None,
+        3,
+    )
+    .commit(
+        tabs,
+        "// v3\n",
+        "fix: tab characters in parser input lose their column",
+        None,
+        2,
+    )
+    .commit("README.md", "typo fixed\n", "fix: readme typo", None, 1);
+    repo
+}
+
+#[test]
+fn topic_matching_corroborates_scopes_and_reports_cross_scope_fixes() {
+    let repo = topic_repo();
+    let off = analyze_hot_parser(&repo, "[llm_editability]\nenabled = true\n");
+    assert_eq!(
+        off["churn"]["fix_burst_group"]["scope"], "parser",
+        "{off:#}"
+    );
+    assert_eq!(off["churn"]["corroborated_fixes"], 0, "{off:#}");
+    assert_eq!(off["features"]["rework"], 0.0, "{off:#}");
+
+    let on = analyze_hot_parser(
+        &repo,
+        "[llm_editability]\nenabled = true\n[llm_editability.churn.topics]\nenabled = true\n",
+    );
+    let churn = &on["churn"];
+    assert_eq!(churn["fix_burst_group"], "topic", "{on:#}");
+    assert_eq!(churn["fix_burst"], 2, "same-scope and scope-less: {on:#}");
+    assert_eq!(churn["corroborated_fixes"], 1, "{on:#}");
+    assert_eq!(churn["cross_scope_fixes"]["lexer"], 1, "{on:#}");
+    assert_eq!(on["features"]["rework"], 2.5, "1 + 0.5 + 1: {on:#}");
+    let rework = on["actions"]
+        .as_array()
+        .and_then(|a| a.iter().find(|a| a["feature"] == "rework"))
+        .unwrap_or_else(|| panic!("no rework action: {on:#}"));
+    assert!(
+        rework["text"]
+            .as_str()
+            .is_some_and(|t| t.contains("under other scopes (lexer: 1)")),
+        "{on:#}"
     );
 }

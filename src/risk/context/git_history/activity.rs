@@ -36,6 +36,18 @@ pub struct CommitActivity {
     /// touched this function's file, oldest first.
     #[serde(default)]
     pub file_fixes: Vec<DateTime<Utc>>,
+    /// Recent fix commits whose messages share a topic with this function's
+    /// recent commits; empty unless topic matching is enabled.
+    #[serde(default)]
+    pub topic_fixes: Vec<TopicFix>,
+}
+
+/// A fix commit on the same topic as a function's recent commits.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TopicFix {
+    pub date: DateTime<Utc>,
+    /// The fix's own lowercased conventional-commit scope.
+    pub scope: Option<String>,
 }
 
 impl CommitActivity {

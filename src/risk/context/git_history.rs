@@ -15,6 +15,7 @@ mod blame_cache;
 mod function_level;
 pub mod git2_provider;
 mod stability;
+pub mod topics;
 
 #[cfg(test)]
 mod test_helpers;

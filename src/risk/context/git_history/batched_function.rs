@@ -8,6 +8,7 @@ use super::activity::commit_fact;
 use super::blame_cache::{FileBlameCache, extract_authors_for_range};
 use super::function_level::{CommitInfo, FunctionHistory, calculate_function_history_with_authors};
 use super::git2_provider::{self, Git2Repository};
+use super::topics::TopicIndex;
 use crate::time_span;
 use anyhow::Result;
 use dashmap::DashMap;
@@ -81,6 +82,7 @@ impl BatchedFunctionGitHistory {
         )?;
         let file_history = super::batched::BatchedGitHistory::from_commit_scans(&scan.file_scans);
         let records = &scan.functions;
+        let topics = topic_index(&scan);
 
         let histories: DashMap<FunctionHistoryKey, FunctionHistory> = DashMap::new();
         let processed_files = AtomicUsize::new(0);
@@ -123,6 +125,7 @@ impl BatchedFunctionGitHistory {
                     &scan,
                     file,
                 );
+                let history = with_topic_fixes(history, record, topics.as_ref());
                 histories.insert(
                     FunctionHistoryKey {
                         file: file.clone(),
@@ -212,6 +215,35 @@ fn with_activity_context(
         .filter_map(|s| Some((s.to_string(), scan.scope_fixes.get(s)?.clone())))
         .collect();
     history.activity.file_fixes = scan.file_fixes.get(file).cloned().unwrap_or_default();
+    history
+}
+
+/// Topic index over recent fixes, when `[llm_editability.churn.topics]` is enabled.
+fn topic_index(scan: &git2_provider::RepoHistoryScan) -> Option<TopicIndex> {
+    let llm = crate::config::get_config().llm_editability.as_ref()?;
+    let churn = &llm.churn;
+    (llm.enabled && churn.topics.enabled).then(|| {
+        let since = chrono::Utc::now() - chrono::Duration::days(churn.window_days.into());
+        TopicIndex::new(&scan.file_scans, since, churn.topics.min_similarity)
+    })
+}
+
+fn with_topic_fixes(
+    mut history: FunctionHistory,
+    record: &git2_provider::FileFunctionRecord,
+    topics: Option<&TopicIndex>,
+) -> FunctionHistory {
+    let Some(topics) = topics else {
+        return history;
+    };
+    let intro = record
+        .introduction_date
+        .zip(record.introduction_message.as_deref());
+    let modifications = record
+        .modifications
+        .iter()
+        .map(|m| (m.date, m.message.as_str()));
+    history.activity.topic_fixes = topics.related_fixes(intro.into_iter().chain(modifications));
     history
 }
 

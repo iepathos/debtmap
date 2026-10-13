@@ -234,6 +234,9 @@ pub mod format {
                 c.proven_llm_edits
             )
             .unwrap();
+            if let Some(cross) = crate::llm::cross_scope_text(c) {
+                writeln!(out, "- Cross-scope fallout: {cross}").unwrap();
+            }
         }
         if !llm.actions.is_empty() {
             writeln!(out, "- Actions:").unwrap();
