@@ -4,7 +4,6 @@ use super::{
 };
 use crate::analysis::multi_pass::MultiPassResult;
 use serde_json;
-use serde_yaml;
 
 /// Diagnostic report generator
 pub struct DiagnosticReporter {
@@ -96,7 +95,7 @@ impl DiagnosticReporter {
     }
 
     fn format_yaml(&self, report: &DiagnosticReport) -> String {
-        serde_yaml::to_string(report)
+        serde_saphyr::to_string(report)
             .unwrap_or_else(|e| format!("Failed to serialize report to YAML: {}", e))
     }
 
