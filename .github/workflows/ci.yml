@@ -38,6 +38,9 @@ jobs:
 
     - name: Set up mbx build cache
       uses: jdx/mr-boxington-action@47ce49b32025d93a7a2f4570815afaa2b7092240 # v1.7.2
+      with:
+        cache-key: ${{ runner.os }}-${{ runner.arch }}-mbx-ci-${{ github.job }}-${{ hashFiles('rust-toolchain.toml') }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: ${{ runner.os }}-${{ runner.arch }}-mbx-ci-${{ github.job }}-${{ hashFiles('rust-toolchain.toml') }}-
 
     - name: Install cargo-nextest
       uses: taiki-e/install-action@v2.87.14
@@ -97,6 +100,9 @@ jobs:
 
     - name: Set up mbx build cache
       uses: jdx/mr-boxington-action@47ce49b32025d93a7a2f4570815afaa2b7092240 # v1.7.2
+      with:
+        cache-key: ${{ runner.os }}-${{ runner.arch }}-mbx-ci-${{ github.job }}-${{ hashFiles('rust-toolchain.toml') }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: ${{ runner.os }}-${{ runner.arch }}-mbx-ci-${{ github.job }}-${{ hashFiles('rust-toolchain.toml') }}-
 
     - name: Install cargo-nextest
       uses: taiki-e/install-action@v2.87.14
@@ -165,6 +171,9 @@ jobs:
 
     - name: Set up mbx build cache
       uses: jdx/mr-boxington-action@47ce49b32025d93a7a2f4570815afaa2b7092240 # v1.7.2
+      with:
+        cache-key: ${{ runner.os }}-${{ runner.arch }}-mbx-ci-${{ github.job }}-${{ hashFiles('rust-toolchain.toml') }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: ${{ runner.os }}-${{ runner.arch }}-mbx-ci-${{ github.job }}-${{ hashFiles('rust-toolchain.toml') }}-
 
     - name: Install SARIF tools
       run: cargo install clippy-sarif sarif-fmt --locked
@@ -198,6 +207,9 @@ jobs:
 
     - name: Set up mbx build cache
       uses: jdx/mr-boxington-action@47ce49b32025d93a7a2f4570815afaa2b7092240 # v1.7.2
+      with:
+        cache-key: ${{ runner.os }}-${{ runner.arch }}-mbx-ci-${{ github.job }}-${{ hashFiles('rust-toolchain.toml') }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: ${{ runner.os }}-${{ runner.arch }}-mbx-ci-${{ github.job }}-${{ hashFiles('rust-toolchain.toml') }}-
 
     - name: Install cargo-hack
       uses: taiki-e/install-action@cargo-hack
@@ -221,6 +233,8 @@ jobs:
     - name: Set up mbx build cache
       uses: jdx/mr-boxington-action@47ce49b32025d93a7a2f4570815afaa2b7092240 # v1.7.2
       with:
+        cache-key: ${{ runner.os }}-${{ runner.arch }}-mbx-ci-${{ github.job }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: ${{ runner.os }}-${{ runner.arch }}-mbx-ci-${{ github.job }}-
         toolchain: stable
 
     - name: Generate minimal lockfile
