@@ -1,5 +1,6 @@
 //! EVM-relevant state and purity effect analysis for Solidity functions.
 
+use crate::analyzers::syntax_tree::walk_nodes;
 use std::collections::{HashMap, HashSet};
 
 use tree_sitter::Node;
