@@ -1,5 +1,5 @@
 use crate::analyzers::go::parser::node_text;
-use crate::analyzers::syntax_tree::children;
+use crate::analyzers::go::walk::{Scope, Visitor, walk};
 use crate::core::PurityLevel;
 use tree_sitter::Node;
 
@@ -10,38 +10,49 @@ pub struct GoPurity {
     pub patterns: Vec<String>,
 }
 
-pub fn analyze_purity(node: Node, source: &str) -> GoPurity {
-    let patterns = impurity_patterns(node, source);
+pub fn analyze_purity(body: Node, source: &str) -> GoPurity {
+    let mut purity = PurityVisitor::new(source);
+    walk(body, Some(body), &mut [&mut purity]);
+    purity.finish()
+}
 
-    if patterns.is_empty() {
-        GoPurity {
-            level: PurityLevel::StrictlyPure,
-            confidence: 0.8,
-            patterns,
+/// Collects impurity patterns from a function body.
+pub struct PurityVisitor<'s> {
+    source: &'s str,
+    patterns: Vec<String>,
+}
+
+impl<'s> PurityVisitor<'s> {
+    pub fn new(source: &'s str) -> Self {
+        Self {
+            source,
+            patterns: Vec::new(),
         }
-    } else {
+    }
+
+    pub fn finish(mut self) -> GoPurity {
+        self.patterns.sort();
+        self.patterns.dedup();
+        let (level, confidence) = if self.patterns.is_empty() {
+            (PurityLevel::StrictlyPure, 0.8)
+        } else {
+            (PurityLevel::Impure, 0.75)
+        };
         GoPurity {
-            level: PurityLevel::Impure,
-            confidence: 0.75,
-            patterns,
+            level,
+            confidence,
+            patterns: self.patterns,
         }
     }
 }
 
-fn impurity_patterns(node: Node, source: &str) -> Vec<String> {
-    if is_nested_callable(node) {
-        return Vec::new();
+impl<'t> Visitor<'t> for PurityVisitor<'_> {
+    fn enter(&mut self, node: Node<'t>, scope: Scope) {
+        if scope.own_body() {
+            self.patterns
+                .extend(node_impurity_patterns(node, self.source));
+        }
     }
-
-    let mut patterns = node_impurity_patterns(node, source);
-    patterns.extend(
-        children(node)
-            .into_iter()
-            .flat_map(|child| impurity_patterns(child, source)),
-    );
-    patterns.sort();
-    patterns.dedup();
-    patterns
 }
 
 fn node_impurity_patterns(node: Node, source: &str) -> Vec<String> {
@@ -86,13 +97,6 @@ fn mutates_external_target(node: Node, source: &str) -> bool {
         .map(|left| node_text(&left, source))
         .map(|text| text.contains('.') || text.contains('[') || text.contains('*'))
         .unwrap_or(false)
-}
-
-fn is_nested_callable(node: Node) -> bool {
-    matches!(
-        node.kind(),
-        "func_literal" | "function_declaration" | "method_declaration"
-    )
 }
 
 #[cfg(test)]

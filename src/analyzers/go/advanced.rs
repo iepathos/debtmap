@@ -1,5 +1,6 @@
 use crate::analyzers::go::parser::node_text;
-use crate::analyzers::syntax_tree::children;
+use crate::analyzers::go::walk::is_nested_callable;
+use crate::analyzers::go::walk::{Scope, Visitor, walk};
 use tree_sitter::Node;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -16,29 +17,63 @@ pub fn detect_advanced_signals(
     is_test: bool,
     package_variables: &[String],
 ) -> GoAdvancedSignals {
-    let mut signals = collect_signals(body, source, function_name, is_test, package_variables);
-    add_repetitive_error_handling(body, source, &mut signals);
-    normalize_signals(signals)
+    let mut signals = SignalVisitor::new(source, function_name, is_test, package_variables);
+    walk(body, Some(body), &mut [&mut signals]);
+    signals.finish()
 }
 
-fn collect_signals(
-    node: Node,
-    source: &str,
-    function_name: &str,
+/// Collects advisory signals from a function body.
+pub struct SignalVisitor<'a> {
+    source: &'a str,
+    function_name: &'a str,
     is_test: bool,
-    package_variables: &[String],
-) -> GoAdvancedSignals {
-    if is_nested_callable(node) {
-        return GoAdvancedSignals::default();
+    package_variables: &'a [String],
+    signals: GoAdvancedSignals,
+    error_returns: u32,
+}
+
+impl<'a> SignalVisitor<'a> {
+    pub fn new(
+        source: &'a str,
+        function_name: &'a str,
+        is_test: bool,
+        package_variables: &'a [String],
+    ) -> Self {
+        Self {
+            source,
+            function_name,
+            is_test,
+            package_variables,
+            signals: GoAdvancedSignals::default(),
+            error_returns: 0,
+        }
     }
 
-    children(node)
-        .into_iter()
-        .map(|child| collect_signals(child, source, function_name, is_test, package_variables))
-        .fold(
-            node_signals(node, source, function_name, is_test, package_variables),
-            merge_signals,
-        )
+    pub fn finish(mut self) -> GoAdvancedSignals {
+        if self.error_returns >= 3 {
+            self.signals
+                .patterns
+                .push("repetitive-error-handling".to_string());
+        }
+        normalize_signals(self.signals)
+    }
+}
+
+impl<'t> Visitor<'t> for SignalVisitor<'_> {
+    fn enter(&mut self, node: Node<'t>, scope: Scope) {
+        if !scope.own_body() {
+            return;
+        }
+        let own = node_signals(
+            node,
+            self.source,
+            self.function_name,
+            self.is_test,
+            self.package_variables,
+        );
+        self.signals = merge_signals(std::mem::take(&mut self.signals), own);
+        self.error_returns += u32::from(is_error_return_branch(node, self.source));
+    }
 }
 
 fn node_signals(
@@ -109,27 +144,6 @@ fn call_signals(node: Node, source: &str, function_name: &str, is_test: bool) ->
     }
 }
 
-fn add_repetitive_error_handling(body: Node, source: &str, signals: &mut GoAdvancedSignals) {
-    if count_error_return_branches(body, source) >= 3 {
-        signals
-            .patterns
-            .push("repetitive-error-handling".to_string());
-    }
-}
-
-fn count_error_return_branches(node: Node, source: &str) -> u32 {
-    if is_nested_callable(node) {
-        return 0;
-    }
-
-    let current = u32::from(is_error_return_branch(node, source));
-    current
-        + children(node)
-            .into_iter()
-            .map(|child| count_error_return_branches(child, source))
-            .sum::<u32>()
-}
-
 fn is_error_return_branch(node: Node, source: &str) -> bool {
     if node.kind() != "if_statement" {
         return false;
@@ -184,13 +198,6 @@ fn has_loop_ancestor(node: Node) -> bool {
 
 fn is_loop_node(node: Node) -> bool {
     node.kind() == "for_statement"
-}
-
-fn is_nested_callable(node: Node) -> bool {
-    matches!(
-        node.kind(),
-        "func_literal" | "function_declaration" | "method_declaration"
-    )
 }
 
 fn pattern(name: &str) -> GoAdvancedSignals {

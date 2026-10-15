@@ -12,5 +12,6 @@ pub mod parser;
 pub mod purity;
 pub mod types;
 pub mod visitor;
+pub mod walk;
 
 pub use analyzer::GoAnalyzer;
