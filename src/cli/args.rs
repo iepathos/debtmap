@@ -220,6 +220,10 @@ pub enum Commands {
         #[arg(long = "jobs", short = 'j', default_value = "0", env = "DEBTMAP_JOBS")]
         jobs: usize,
 
+        /// Megabytes of Rust source whose syntax trees stay parsed between call graph passes (0 = reparse)
+        #[arg(long = "parse-cache-mb", default_value_t = crate::core::parsing::DEFAULT_PARSE_CACHE_MB, env = "DEBTMAP_PARSE_CACHE_MB")]
+        parse_cache_mb: usize,
+
         /// Disable multi-pass analysis (use single-pass for performance)
         #[arg(long = "no-multi-pass")]
         no_multi_pass: bool,
@@ -389,6 +393,10 @@ pub enum Commands {
         /// Environment variable DEBTMAP_JOBS can also be used to set this value.
         #[arg(long = "jobs", short = 'j', default_value = "0", env = "DEBTMAP_JOBS")]
         jobs: usize,
+
+        /// Megabytes of Rust source whose syntax trees stay parsed between call graph passes (0 = reparse)
+        #[arg(long = "parse-cache-mb", default_value_t = crate::core::parsing::DEFAULT_PARSE_CACHE_MB, env = "DEBTMAP_PARSE_CACHE_MB")]
+        parse_cache_mb: usize,
 
         /// Show detailed module split recommendations for god objects and large files.
         /// This experimental feature suggests how to decompose large files into

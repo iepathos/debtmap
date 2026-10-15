@@ -3,6 +3,7 @@
 use crate::core::Language;
 use crate::extraction::{ExtractedFileData, ExtractedFunctionData};
 use crate::priority::call_graph::{CallGraph, FunctionId};
+use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
@@ -26,6 +27,7 @@ pub(crate) fn extract_with_enhancement(
         super::workspace::extract_sources(&source_snapshots(extracted), |batch| {
             enhancement::collect(&mut builder, batch);
         });
+    let available = available.into_iter().collect();
     enhancement::finish(builder, remap_graph(graph, extracted), available)
 }
 
@@ -45,13 +47,14 @@ fn source_snapshots(extracted: &HashMap<PathBuf, ExtractedFileData>) -> Vec<(Pat
 
 fn remap_graph(graph: CallGraph, extracted: &HashMap<PathBuf, ExtractedFileData>) -> CallGraph {
     let counts = legacy_source_counts(&graph);
-    let functions: HashMap<_, _> = graph
-        .get_all_functions()
-        .map(|id| (id.clone(), extracted_function(id, extracted, &counts)))
+    let ids: Vec<_> = graph.get_all_functions().collect();
+    let functions: HashMap<_, _> = ids
+        .par_iter()
+        .map(|id| ((*id).clone(), extracted_function(id, extracted, &counts)))
         .collect();
-    let identities: HashMap<_, _> = graph
-        .get_all_functions()
-        .map(|id| (id.clone(), extracted_identity(id, functions[id])))
+    let identities: HashMap<_, _> = ids
+        .par_iter()
+        .map(|id| ((*id).clone(), extracted_identity(id, functions[*id])))
         .collect();
     let identity = |id: &FunctionId| identities.get(id).cloned().unwrap_or_else(|| id.clone());
     let mut remapped = CallGraph::new();
@@ -78,6 +81,7 @@ fn remap_graph(graph: CallGraph, extracted: &HashMap<PathBuf, ExtractedFileData>
     for (id, assessment) in graph.effect_assessments() {
         remapped.record_effect_assessment(identity(id), assessment.remap_identities(identity));
     }
+    crate::utils::drop_in_background(graph);
     remapped
 }
 
