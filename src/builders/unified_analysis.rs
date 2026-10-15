@@ -270,7 +270,7 @@ fn build_extracted_call_graph(
 ) -> (HashSet<FunctionId>, HashSet<FunctionId>) {
     info!("Building call graph from extracted data (spec 214)");
     let (graph, exclusions, fn_pointers) =
-        parallel_call_graph::build_call_graph_from_extracted(call_graph.clone(), extracted);
+        parallel_call_graph::build_call_graph_from_extracted(std::mem::take(call_graph), extracted);
     *call_graph = graph;
     (exclusions, fn_pointers)
 }
@@ -1052,7 +1052,7 @@ fn build_call_graph_with_progress(
     let (graph, exclusions, used_funcs) =
         parallel_call_graph::build_call_graph_parallel_with_files(
             project_path,
-            call_graph.clone(),
+            std::mem::take(call_graph),
             thread_count,
             rust_files,
             |progress| {

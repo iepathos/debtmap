@@ -926,7 +926,7 @@ impl ParallelUnifiedAnalysisBuilder {
         data_flow_graph: DataFlowGraph,
         _file_data: &[(FileDebtItem, Vec<FunctionMetrics>)],
     ) -> UnifiedAnalysis {
-        let mut unified = UnifiedAnalysis::new((*self.call_graph).clone());
+        let mut unified = UnifiedAnalysis::new(Arc::clone(&self.call_graph));
         unified.data_flow_graph = data_flow_graph;
         register_analyzed_files(&mut unified, &self.line_count_index);
         unified
