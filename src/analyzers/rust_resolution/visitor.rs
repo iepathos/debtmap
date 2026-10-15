@@ -371,7 +371,11 @@ impl Body<'_> {
     fn visit_closure(&mut self, closure: &syn::ExprClosure) {
         // Preserve reachability without merging construction-time body effects.
         let before_bindings = self.bindings.clone();
-        let before_assessment = self.assessment.clone();
+        // Nested visits only extend the assessment, never read it, so start empty.
+        let before_assessment = std::mem::replace(
+            &mut self.assessment,
+            crate::analysis::effect_evidence::EffectAssessment::complete(),
+        );
         let before_mode = self.reachability_only;
         self.reachability_only = true;
         self.bindings.push();
@@ -385,7 +389,10 @@ impl Body<'_> {
     }
 
     fn visit_lazy_expression(&mut self, expr: &Expr) {
-        let assessment = self.assessment.clone();
+        let assessment = std::mem::replace(
+            &mut self.assessment,
+            crate::analysis::effect_evidence::EffectAssessment::complete(),
+        );
         let bindings = self.bindings.clone();
         let previous = self.reachability_only;
         self.reachability_only = true;

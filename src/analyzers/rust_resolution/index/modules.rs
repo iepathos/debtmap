@@ -27,7 +27,7 @@ impl WorkspaceIndex {
             });
             self.roots
                 .entry(file.clone())
-                .or_insert_with(|| HashSet::from([file]));
+                .or_insert_with(|| HashSet::from_iter([file]));
         }
     }
 

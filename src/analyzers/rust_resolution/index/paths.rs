@@ -7,20 +7,31 @@ mod conflicts;
 #[path = "path_namespaces.rs"]
 mod namespaces;
 
-#[derive(Clone, Copy)]
-enum Namespace {
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub(super) enum Namespace {
     Type,
     Value,
 }
 
 impl WorkspaceIndex {
     pub(super) fn same_workspace(&self, left: &Path, right: &Path) -> bool {
-        left == right
-            || self
-                .workspace_membership
-                .get(left)
-                .zip(self.workspace_membership.get(right))
-                .is_some_and(|(left, right)| left == right)
+        self.workspace_peer(left)(right, self.workspace_of(right))
+    }
+
+    pub(super) fn workspace_of(&self, file: &Path) -> Option<usize> {
+        self.workspace_membership.get(file).copied()
+    }
+
+    /// Checks candidates, given their file and workspace, against `file`.
+    pub(super) fn workspace_peer<'a>(
+        &self,
+        file: &'a Path,
+    ) -> impl Fn(&Path, Option<usize>) -> bool + 'a {
+        let id = self.workspace_of(file);
+        move |other, other_id| match id {
+            Some(id) => other_id == Some(id),
+            None => file == other,
+        }
     }
 
     pub(super) fn resolve_paths(&self, path: &[String], context: &Context) -> Vec<Vec<String>> {
@@ -41,10 +52,17 @@ impl WorkspaceIndex {
         context: &Context,
         namespace: Namespace,
     ) -> Vec<Vec<String>> {
-        self.resolve_namespace_paths(path, context, 0, namespace)
+        let key = (path.to_vec(), context.clone(), namespace);
+        if let Some(paths) = self.resolved_paths.get(&key) {
+            return paths.clone();
+        }
+        let paths: Vec<_> = self
+            .resolve_namespace_paths(path, context, 0, namespace)
             .iter()
             .flat_map(|path| self.expand_reexports(path, context, 0, namespace))
-            .collect()
+            .collect();
+        self.resolved_paths.insert(key, paths.clone());
+        paths
     }
 
     fn resolve_namespace_paths(

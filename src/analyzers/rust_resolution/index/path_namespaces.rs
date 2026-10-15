@@ -25,10 +25,14 @@ impl WorkspaceIndex {
             .flatten()
             .copied()
             .collect();
+        let peer = self.workspace_peer(&context.file);
         let mut candidates: Vec<_> = positions
             .into_iter()
             .filter(|position| {
-                self.same_workspace(&context.file, &self.declarations[*position].id.file)
+                peer(
+                    &self.declarations[*position].id.file,
+                    self.declaration_workspaces[*position],
+                )
             })
             .collect();
         candidates.sort_by(|left, right| {
@@ -47,19 +51,23 @@ impl WorkspaceIndex {
     ) -> bool {
         match namespace {
             Namespace::Type => {
+                let peer = self.workspace_peer(&context.file);
                 self.type_paths
                     .get(path)
                     .into_iter()
                     .flatten()
                     .any(|position| {
-                        self.same_workspace(&context.file, &self.declarations[*position].id.file)
+                        peer(
+                            &self.declarations[*position].id.file,
+                            self.declaration_workspaces[*position],
+                        )
                     })
                     || self
                         .module_files
                         .get(path)
                         .into_iter()
                         .flatten()
-                        .any(|file| self.same_workspace(&context.file, file))
+                        .any(|file| peer(file, self.workspace_of(file)))
             }
             Namespace::Value => self.has_value_binding(path, context),
         }

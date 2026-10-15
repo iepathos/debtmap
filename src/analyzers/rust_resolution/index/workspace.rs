@@ -45,6 +45,7 @@ impl DeclarationCollector {
         self.index.index_module_files();
         self.index.index_declarations();
         self.index.finish_callables();
+        self.index.resolved_paths.clear();
         self.index
     }
 }
@@ -103,6 +104,11 @@ impl WorkspaceIndex {
     fn finish_callables(&mut self) {
         // Free names must be available during namespace-aware owner expansion.
         self.callables.sort_by(|left, right| left.id.cmp(&right.id));
+        self.callable_workspaces = self
+            .callables
+            .iter()
+            .map(|call| self.workspace_of(&call.context.file))
+            .collect();
         self.index_callable_names();
         let resolved: Vec<_> = self
             .callables

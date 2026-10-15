@@ -45,9 +45,9 @@ mod tests;
 mod values;
 
 use adjustments::*;
+use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use helpers::*;
 use matching::*;
-use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 const EXPANSION_LIMIT: usize = 32;
@@ -165,6 +165,9 @@ pub struct WorkspaceIndex {
     contexts: HashMap<PathBuf, Vec<Context>>,
     roots: HashMap<PathBuf, HashSet<PathBuf>>,
     workspace_membership: HashMap<PathBuf, usize>,
+    /// Workspace of each declaration and callable, by position.
+    declaration_workspaces: Vec<Option<usize>>,
+    callable_workspaces: Vec<Option<usize>>,
     type_paths: HashMap<Vec<String>, Vec<usize>>,
     declaration_positions: HashMap<DeclarationId, usize>,
     callable_names: HashMap<String, Vec<usize>>,
@@ -172,7 +175,15 @@ pub struct WorkspaceIndex {
     callable_positions: HashMap<PathBuf, HashMap<(usize, Option<usize>), usize>>,
     imports_context: HashMap<Context, Vec<usize>>,
     imports_module: HashMap<Vec<String>, Vec<usize>>,
+    /// Memoized path resolution; only valid once the index is no longer mutated.
+    resolved_paths: ResolvedPaths,
 }
+
+type ResolvedPaths = dashmap::DashMap<
+    (Vec<String>, Context, paths::Namespace),
+    Vec<Vec<String>>,
+    foldhash::fast::RandomState,
+>;
 
 impl WorkspaceIndex {
     pub fn build(files: &[(PathBuf, syn::File)]) -> Self {

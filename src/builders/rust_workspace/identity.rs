@@ -9,23 +9,30 @@ pub(crate) fn merge(base: CallGraph, source: CallGraph) -> CallGraph {
     if base.is_empty() {
         return source;
     }
-    if source
-        .get_all_functions()
-        .all(|id| base.nodes.contains_key(id))
-    {
-        // Fresh cached extraction already shares exact identities with metrics.
-        // Preserve metric precedence without rebuilding two complete graph maps.
+    let (source_ids, base_ids) = renamed_identities(&base, &source);
+    if source_ids.is_empty() && base_ids.is_empty() {
+        // Identities already agree; preserve metric precedence without rebuilding the graphs.
         let mut graph = source;
         graph.merge(base);
         return graph;
     }
-    let candidates = base_definitions(&base);
-    let source_definitions = definitions_without_columns(&source);
-    let base_definitions = definitions_without_columns(&base);
+    let mut graph = remap(source, &source_ids);
+    // Metric values replace source-only zero placeholders; evidence is merged.
+    graph.merge(remap(base, &base_ids));
+    graph
+}
+
+type Renames = HashMap<FunctionId, FunctionId>;
+
+/// Identities of source and base functions that must change to align them.
+fn renamed_identities(base: &CallGraph, source: &CallGraph) -> (Renames, Renames) {
+    let candidates = base_definitions(base);
+    let source_definitions = definitions_without_columns(source);
+    let base_definitions = definitions_without_columns(base);
     let mut base_ids = HashMap::new();
     let source_ids = source
         .get_all_functions()
-        .map(|id| {
+        .filter_map(|id| {
             let canonical = match candidates.get(&key(id)).map(Vec::as_slice) {
                 Some([candidate]) => candidate.clone(),
                 _ => legacy_identity(id, &source_definitions, &base_definitions)
@@ -36,13 +43,10 @@ pub(crate) fn merge(base: CallGraph, source: CallGraph) -> CallGraph {
                     })
                     .unwrap_or_else(|| id.clone()),
             };
-            (id.clone(), canonical)
+            (canonical != *id).then(|| (id.clone(), canonical))
         })
         .collect();
-    let mut graph = remap(source, &source_ids);
-    // Metric values replace source-only zero placeholders; evidence is merged.
-    graph.merge(remap(base, &base_ids));
-    graph
+    (source_ids, base_ids)
 }
 
 fn definitions_without_columns(graph: &CallGraph) -> HashMap<DefinitionKey, Vec<FunctionId>> {
