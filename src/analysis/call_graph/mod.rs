@@ -73,6 +73,25 @@ impl Default for AnalysisConfig {
     }
 }
 
+/// Enhancement facts of one file, computed without shared builder state.
+pub(crate) struct FileEnhancements {
+    traits: trait_registry::visitor::TraitVisitorResult,
+    pointers: function_pointer::FunctionPointerVisitor,
+    patterns: Vec<FrameworkPattern>,
+    module: cross_module::ModuleFileFacts,
+}
+
+impl FileEnhancements {
+    pub(crate) fn of(path: &Path, ast: &File) -> Self {
+        Self {
+            traits: TraitRegistry::file_facts(path, ast),
+            pointers: FunctionPointerTracker::file_facts(path, ast),
+            patterns: FrameworkPatternDetector::new().file_facts(path, ast),
+            module: CrossModuleTracker::new().file_facts(path, ast),
+        }
+    }
+}
+
 /// Builder for Rust-specific call graph analysis
 pub struct RustCallGraphBuilder {
     config: AnalysisConfig,
@@ -182,6 +201,30 @@ impl RustCallGraphBuilder {
                 .collect_workspace(workspace_files)?;
         }
         Ok(self)
+    }
+
+    /// Add one file's enhancement facts, as the `analyze_*` phases would for that file.
+    pub(crate) fn apply_file_enhancements(&mut self, facts: FileEnhancements) {
+        let config = &self.config;
+        let graph = &mut self.enhanced_graph;
+        if config.enable_trait_analysis {
+            self.finalized = false;
+            graph.trait_registry.merge_visitor_result(facts.traits);
+        }
+        if config.enable_function_pointer_tracking {
+            self.finalized = false;
+            graph
+                .function_pointer_tracker
+                .apply_file_facts(facts.pointers);
+        }
+        if config.enable_framework_patterns {
+            self.finalized = false;
+            graph.framework_patterns.apply_file_facts(facts.patterns);
+        }
+        if config.enable_cross_module_analysis {
+            self.finalized = false;
+            graph.cross_module_tracker.apply_file_facts(facts.module);
+        }
     }
 
     /// Finalize collected enhancements. Repeated calls without new input are inert.

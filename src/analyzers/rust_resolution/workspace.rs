@@ -9,6 +9,7 @@ use super::{
     body::Body,
     index::{DeclarationCollector, WorkspaceIndex},
 };
+use crate::analysis::call_graph::FileEnhancements;
 use crate::priority::call_graph::CallGraph;
 use foldhash::{HashSet, HashSetExt};
 use std::{
@@ -28,13 +29,17 @@ const QUEUE_CHUNK: usize = 8;
 const WORKER_STACK_SIZE: usize = 16 * 1024 * 1024;
 pub(crate) type ParsedFile = (PathBuf, syn::File);
 type Source = (PathBuf, String);
-type Declarations = (DeclarationCollector, HashSet<PathBuf>);
+type Declarations = (
+    DeclarationCollector,
+    HashSet<PathBuf>,
+    Vec<FileEnhancements>,
+);
 
 /// Capture declarations first; each body sees the same complete immutable index.
+/// Enhancement facts of the parsed files are returned in source order.
 pub(crate) fn extract_sources(
     sources: &[Source],
-    mut on_batch: impl FnMut(&[ParsedFile]),
-) -> (CallGraph, HashSet<PathBuf>) {
+) -> (CallGraph, HashSet<PathBuf>, Vec<FileEnhancements>) {
     let known: HashSet<_> = sources.iter().map(|(file, _)| file.clone()).collect();
     let parts = partitions(sources, rayon::current_num_threads());
     let budget = crate::core::parsing::parse_cache_bytes() / parts.len().max(1);
@@ -55,12 +60,11 @@ pub(crate) fn extract_sources(
         let declarations = workers
             .iter()
             .filter_map(|worker| worker.declarations.recv().ok());
-        let (index, available) = merge_declarations(&known, declarations);
+        let (index, available, enhancements) = merge_declarations(&known, declarations);
         let index = Arc::new(index);
         for worker in &workers {
             let _ = worker.index.send(Arc::clone(&index));
         }
-        for_each_parsed_batch(sources, &mut on_batch);
         let mut parts: Vec<_> = workers.into_iter().flat_map(Worker::join).collect();
         parts.sort_by_key(|(start, _)| *start);
         let graph = parts
@@ -70,7 +74,7 @@ pub(crate) fn extract_sources(
                 graph
             });
         super::report_counts(&graph);
-        (graph, available)
+        (graph, available, enhancements)
     })
 }
 
@@ -222,14 +226,20 @@ fn collect_partition(
 ) -> (Declarations, Vec<ParsedFile>) {
     let mut collector = DeclarationCollector::new(known.clone());
     let mut available = HashSet::new();
+    let mut enhancements = Vec::new();
     let mut collect = |parsed: &[ParsedFile]| {
         available.extend(parsed.iter().map(|(file, _)| file.clone()));
+        enhancements.extend(
+            parsed
+                .iter()
+                .map(|(file, ast)| FileEnhancements::of(file, ast)),
+        );
         collector.collect(parsed);
     };
     for_each_parsed_batch(reparsed, &mut collect);
     let retained = parse_batch(retained);
     collect(&retained);
-    ((collector, available), retained)
+    ((collector, available, enhancements), retained)
 }
 
 /// Cached trees first, then shared chunks; graphs carry only edges, uncertainty and effects.
@@ -266,16 +276,21 @@ fn take_resolutions(graph: &mut CallGraph) -> CallGraph {
 fn merge_declarations(
     known: &HashSet<PathBuf>,
     parts: impl Iterator<Item = Declarations>,
-) -> (WorkspaceIndex, HashSet<PathBuf>) {
-    let (collector, available) = parts.fold(
-        (DeclarationCollector::new(known.clone()), HashSet::new()),
-        |(mut collector, mut available), (part, files)| {
+) -> (WorkspaceIndex, HashSet<PathBuf>, Vec<FileEnhancements>) {
+    let (collector, available, enhancements) = parts.fold(
+        (
+            DeclarationCollector::new(known.clone()),
+            HashSet::new(),
+            Vec::new(),
+        ),
+        |(mut collector, mut available, mut enhancements), (part, files, facts)| {
             collector.absorb(part);
             available.extend(files);
-            (collector, available)
+            enhancements.extend(facts);
+            (collector, available, enhancements)
         },
     );
-    (collector.finish(), available)
+    (collector.finish(), available, enhancements)
 }
 
 fn for_each_parsed_batch(sources: &[Source], mut visit: impl FnMut(&[ParsedFile])) {
@@ -394,7 +409,7 @@ mod tests {
         };
         let run = |threads, cache_mb| {
             crate::core::parsing::set_parse_cache_mb(cache_mb);
-            let graph = pool(threads).install(|| extract_sources(&files, |_| {}).0);
+            let graph = pool(threads).install(|| extract_sources(&files).0);
             let mut nodes: Vec<_> = graph.get_all_functions().cloned().collect();
             nodes.sort();
             format!(

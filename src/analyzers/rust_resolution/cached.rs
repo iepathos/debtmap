@@ -23,10 +23,11 @@ pub(crate) fn extract_with_enhancement(
     extracted: &HashMap<PathBuf, ExtractedFileData>,
 ) -> EnhancedExtraction {
     let mut builder = crate::analysis::call_graph::RustCallGraphBuilder::new();
-    let (graph, available) =
-        super::workspace::extract_sources(&source_snapshots(extracted), |batch| {
-            enhancement::collect(&mut builder, batch);
-        });
+    let (graph, available, enhancements) =
+        super::workspace::extract_sources(&source_snapshots(extracted));
+    enhancements
+        .into_iter()
+        .for_each(|facts| builder.apply_file_enhancements(facts));
     let available = available.into_iter().collect();
     enhancement::finish(builder, remap_graph(graph, extracted), available)
 }

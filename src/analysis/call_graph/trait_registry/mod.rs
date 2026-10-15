@@ -83,15 +83,17 @@ impl TraitRegistry {
 
     /// Analyze a file for trait definitions and implementations
     pub fn analyze_file(&mut self, file_path: &Path, ast: &File) -> Result<()> {
-        let visitor = TraitVisitor::new(file_path.to_path_buf());
-        let result = visitor.visit_and_extract(ast);
-
-        self.merge_visitor_result(result);
+        self.merge_visitor_result(Self::file_facts(file_path, ast));
         Ok(())
     }
 
+    /// Trait facts of one file, independent of facts from other files.
+    pub(crate) fn file_facts(file_path: &Path, ast: &File) -> visitor::TraitVisitorResult {
+        TraitVisitor::new(file_path.to_path_buf()).visit_and_extract(ast)
+    }
+
     /// Merge visitor results into registry state
-    fn merge_visitor_result(&mut self, result: visitor::TraitVisitorResult) {
+    pub(crate) fn merge_visitor_result(&mut self, result: visitor::TraitVisitorResult) {
         debug_assert!(
             result.trait_method_calls.is_empty(),
             "Trait calls require shared workspace facts"

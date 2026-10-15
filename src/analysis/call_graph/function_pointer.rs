@@ -100,9 +100,19 @@ impl FunctionPointerTracker {
 
     /// Analyze a file for function pointers and closures
     pub fn analyze_file(&mut self, file_path: &Path, ast: &File) -> Result<()> {
+        self.apply_file_facts(Self::file_facts(file_path, ast));
+        Ok(())
+    }
+
+    /// Pointer facts of one file, independent of facts from other files.
+    pub(crate) fn file_facts(file_path: &Path, ast: &File) -> FunctionPointerVisitor {
         let mut visitor = FunctionPointerVisitor::new(file_path.to_path_buf());
         visitor.visit_file(ast);
+        visitor
+    }
 
+    /// Add one file's pointer facts.
+    pub(crate) fn apply_file_facts(&mut self, visitor: FunctionPointerVisitor) {
         // Add discovered closures
         for closure in visitor.closures {
             let closure_id = closure.closure_id.clone();
@@ -141,8 +151,6 @@ impl FunctionPointerTracker {
             }
             self.hof_calls.push(hof_call);
         }
-
-        Ok(())
     }
 
     /// Get all function pointer calls that need resolution
@@ -221,7 +229,7 @@ pub struct FunctionPointerStatistics {
 }
 
 /// Visitor for extracting function pointer and closure information
-struct FunctionPointerVisitor {
+pub(crate) struct FunctionPointerVisitor {
     file_path: std::path::PathBuf,
     closures: Vec<ClosureInfo>,
     function_pointers: Vec<FunctionPointerInfo>,

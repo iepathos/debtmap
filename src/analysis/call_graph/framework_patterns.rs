@@ -119,11 +119,21 @@ impl FrameworkPatternDetector {
 
     /// Analyze a file for framework patterns
     pub fn analyze_file(&mut self, file_path: &Path, ast: &File) -> Result<()> {
+        let patterns = self.file_facts(file_path, ast);
+        self.apply_file_facts(patterns);
+        Ok(())
+    }
+
+    /// Patterns of one file, independent of patterns from other files.
+    pub(crate) fn file_facts(&self, file_path: &Path, ast: &File) -> Vec<FrameworkPattern> {
         let mut visitor = PatternVisitor::new(file_path.to_path_buf(), &self.config);
         visitor.visit_file(ast);
+        visitor.patterns
+    }
 
-        // Add discovered patterns
-        for pattern in visitor.patterns {
+    /// Add one file's patterns.
+    pub(crate) fn apply_file_facts(&mut self, patterns: Vec<FrameworkPattern>) {
+        for pattern in patterns {
             if let Some(func_id) = &pattern.function_id {
                 // Update function to patterns mapping
                 self.function_to_patterns
@@ -134,8 +144,6 @@ impl FrameworkPatternDetector {
 
             self.detected_patterns.push(pattern);
         }
-
-        Ok(())
     }
 
     pub(crate) fn canonicalize_definitions(
