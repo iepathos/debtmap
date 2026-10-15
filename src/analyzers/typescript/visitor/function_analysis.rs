@@ -21,36 +21,95 @@ pub fn extract_functions(
     ast: &TypeScriptAst,
     enable_functional_analysis: bool,
 ) -> Vec<JsFunctionMetrics> {
-    let mut functions = Vec::new();
-    let root = ast.tree.root_node();
-
-    extract_functions_recursive(
-        &root,
-        ast,
-        &mut functions,
-        false,
-        None,
-        enable_functional_analysis,
-    );
+    let mut functions: Vec<_> = find_functions(ast)
+        .into_iter()
+        .map(|found| with_body_metrics(found, ast))
+        .collect();
 
     if enable_functional_analysis {
-        annotate_functional_chains(&root, ast, &mut functions);
+        annotate_functional_chains(&ast.tree.root_node(), ast, &mut functions);
     }
 
-    // Sort functions for deterministic analysis order (Spec 214 fix)
-    functions.sort_by(|a, b| a.line.cmp(&b.line).then_with(|| a.name.cmp(&b.name)));
+    sorted(functions)
+}
 
+/// Functions with only their names, kinds, export flags, lengths and
+/// cyclomatic complexity: much cheaper than [`extract_functions`].
+pub fn extract_function_outlines(ast: &TypeScriptAst) -> Vec<JsFunctionMetrics> {
+    sorted(
+        find_functions(ast)
+            .into_iter()
+            .map(|found| found.metrics)
+            .collect(),
+    )
+}
+
+// Sort functions for deterministic analysis order (Spec 214 fix)
+fn sorted(mut functions: Vec<JsFunctionMetrics>) -> Vec<JsFunctionMetrics> {
+    functions.sort_by(|a, b| a.line.cmp(&b.line).then_with(|| a.name.cmp(&b.name)));
     functions
 }
 
-/// Recursively extract functions from AST nodes
-fn extract_functions_recursive(
-    node: &Node,
+/// A function found in the tree, before its body-wide metrics are computed.
+struct Found<'t> {
+    metrics: JsFunctionMetrics,
+    node: Node<'t>,
+    body: Option<Node<'t>>,
+}
+
+fn find_functions(ast: &TypeScriptAst) -> Vec<Found<'_>> {
+    let mut functions = Vec::new();
+    extract_functions_recursive(&ast.tree.root_node(), ast, &mut functions, false, None);
+    functions
+}
+
+fn found<'t>(
+    mut metrics: JsFunctionMetrics,
+    node: Node<'t>,
+    body: Option<Node<'t>>,
     ast: &TypeScriptAst,
-    functions: &mut Vec<JsFunctionMetrics>,
+) -> Found<'t> {
+    if let Some(body) = body {
+        metrics.cyclomatic = calculate_cyclomatic_complexity(&body, &ast.source);
+        metrics.length = count_function_lines(&node, &ast.source);
+    }
+    Found {
+        metrics,
+        node,
+        body,
+    }
+}
+
+fn with_body_metrics(found: Found<'_>, ast: &TypeScriptAst) -> JsFunctionMetrics {
+    let Found {
+        mut metrics,
+        node,
+        body,
+    } = found;
+    if let Some(body) = body {
+        metrics.cognitive = calculate_cognitive_complexity(&body, &ast.source);
+        metrics.nesting = calculate_nesting_depth(&body);
+        metrics.nested_functions = summarize_nested_functions(&body, &ast.source);
+        metrics.entropy_score = Some(calculate_entropy(
+            &body,
+            &ast.source,
+            &EntropyConfig::default(),
+        ));
+    }
+    let purity = TypeScriptPurityAnalyzer::analyze_function(&node, &ast.source);
+    metrics.purity_level = Some(purity.level);
+    metrics.purity_confidence = Some(purity.confidence);
+    metrics.impurity_reasons = purity.reasons.iter().map(|r| r.to_string()).collect();
+    metrics
+}
+
+/// Recursively extract functions from AST nodes
+fn extract_functions_recursive<'t>(
+    node: &Node<'t>,
+    ast: &TypeScriptAst,
+    functions: &mut Vec<Found<'t>>,
     in_class: bool,
     class_name: Option<&str>,
-    enable_functional_analysis: bool,
 ) {
     let mut cursor = node.walk();
 
@@ -85,13 +144,7 @@ fn extract_functions_recursive(
             // Class declarations
             "class_declaration" | "class" => {
                 let name = get_class_name(&child, ast);
-                extract_class_methods(
-                    &child,
-                    ast,
-                    functions,
-                    name.as_deref(),
-                    enable_functional_analysis,
-                );
+                extract_class_methods(&child, ast, functions, name.as_deref());
             }
 
             // Arrow functions at module level (rare but possible)
@@ -110,30 +163,21 @@ fn extract_functions_recursive(
 
             // Continue recursion for other nodes
             _ => {
-                extract_functions_recursive(
-                    &child,
-                    ast,
-                    functions,
-                    in_class,
-                    class_name,
-                    enable_functional_analysis,
-                );
+                extract_functions_recursive(&child, ast, functions, in_class, class_name);
             }
         }
     }
 }
 
 /// Analyze a function declaration node
-fn analyze_function_declaration(
-    node: &Node,
+fn analyze_function_declaration<'t>(
+    node: &Node<'t>,
     ast: &TypeScriptAst,
     _in_class: bool,
     _class_name: Option<&str>,
-) -> Option<JsFunctionMetrics> {
+) -> Option<Found<'t>> {
     let name = get_function_name(node, ast)?;
-    let line = node_line(node);
     let body = get_function_body(node)?;
-
     let is_async = has_async_modifier(node);
     let kind = if is_async {
         FunctionKind::Async
@@ -141,37 +185,17 @@ fn analyze_function_declaration(
         FunctionKind::Declaration
     };
 
-    let mut metrics = JsFunctionMetrics::new(name.clone(), ast.path.clone(), line, kind);
-
-    metrics.cyclomatic = calculate_cyclomatic_complexity(&body, &ast.source);
-    metrics.cognitive = calculate_cognitive_complexity(&body, &ast.source);
-    metrics.nesting = calculate_nesting_depth(&body);
-    metrics.nested_functions = summarize_nested_functions(&body, &ast.source);
-    metrics.length = count_function_lines(node, &ast.source);
+    let mut metrics = JsFunctionMetrics::new(name.clone(), ast.path.clone(), node_line(node), kind);
     metrics.is_async = is_async;
     metrics.is_test = is_test_function(&name);
     metrics.parameter_count = count_parameters(node);
-    metrics.entropy_score = Some(calculate_entropy(
-        &body,
-        &ast.source,
-        &EntropyConfig::default(),
-    ));
-
-    // Purity analysis
-    let purity = TypeScriptPurityAnalyzer::analyze_function(node, &ast.source);
-    metrics.purity_level = Some(purity.level);
-    metrics.purity_confidence = Some(purity.confidence);
-    metrics.impurity_reasons = purity.reasons.iter().map(|r| r.to_string()).collect();
-
-    Some(metrics)
+    Some(found(metrics, *node, Some(body), ast))
 }
 
 /// Analyze a generator function declaration
-fn analyze_generator_function(node: &Node, ast: &TypeScriptAst) -> Option<JsFunctionMetrics> {
+fn analyze_generator_function<'t>(node: &Node<'t>, ast: &TypeScriptAst) -> Option<Found<'t>> {
     let name = get_function_name(node, ast)?;
-    let line = node_line(node);
     let body = get_function_body(node)?;
-
     let is_async = has_async_modifier(node);
     let kind = if is_async {
         FunctionKind::AsyncGenerator
@@ -179,129 +203,63 @@ fn analyze_generator_function(node: &Node, ast: &TypeScriptAst) -> Option<JsFunc
         FunctionKind::Generator
     };
 
-    let mut metrics = JsFunctionMetrics::new(name.clone(), ast.path.clone(), line, kind);
-
-    metrics.cyclomatic = calculate_cyclomatic_complexity(&body, &ast.source);
-    metrics.cognitive = calculate_cognitive_complexity(&body, &ast.source);
-    metrics.nesting = calculate_nesting_depth(&body);
-    metrics.nested_functions = summarize_nested_functions(&body, &ast.source);
-    metrics.length = count_function_lines(node, &ast.source);
+    let mut metrics = JsFunctionMetrics::new(name.clone(), ast.path.clone(), node_line(node), kind);
     metrics.is_async = is_async;
     metrics.is_test = is_test_function(&name);
     metrics.parameter_count = count_parameters(node);
-    metrics.entropy_score = Some(calculate_entropy(
-        &body,
-        &ast.source,
-        &EntropyConfig::default(),
-    ));
-
-    // Purity analysis
-    let purity = TypeScriptPurityAnalyzer::analyze_function(node, &ast.source);
-    metrics.purity_level = Some(purity.level);
-    metrics.purity_confidence = Some(purity.confidence);
-    metrics.impurity_reasons = purity.reasons.iter().map(|r| r.to_string()).collect();
-
-    Some(metrics)
+    Some(found(metrics, *node, Some(body), ast))
 }
 
 /// Analyze an arrow function
-fn analyze_arrow_function(
-    node: &Node,
+fn analyze_arrow_function<'t>(
+    node: &Node<'t>,
     ast: &TypeScriptAst,
     name: Option<String>,
     is_exported: bool,
-) -> Option<JsFunctionMetrics> {
-    let line = node_line(node);
+) -> Option<Found<'t>> {
     let func_name = name.unwrap_or_else(|| "<anonymous>".to_string());
+    // Arrow functions may have expression body or block body
+    let body = node.child_by_field_name("body")?;
 
     let mut metrics = JsFunctionMetrics::new(
         func_name.clone(),
         ast.path.clone(),
-        line,
+        node_line(node),
         FunctionKind::Arrow,
     );
-
-    // Arrow functions may have expression body or block body
-    let body_node = node.child_by_field_name("body")?;
-
-    metrics.cyclomatic = calculate_cyclomatic_complexity(&body_node, &ast.source);
-    metrics.cognitive = calculate_cognitive_complexity(&body_node, &ast.source);
-    metrics.nesting = calculate_nesting_depth(&body_node);
-    metrics.nested_functions = summarize_nested_functions(&body_node, &ast.source);
-    metrics.length = count_function_lines(node, &ast.source);
     metrics.is_async = has_async_modifier(node);
     metrics.is_test = is_test_function(&func_name);
     metrics.is_exported = is_exported;
     metrics.parameter_count = count_arrow_parameters(node);
-    metrics.entropy_score = Some(calculate_entropy(
-        &body_node,
-        &ast.source,
-        &EntropyConfig::default(),
-    ));
-
-    // Purity analysis
-    let purity = TypeScriptPurityAnalyzer::analyze_function(node, &ast.source);
-    metrics.purity_level = Some(purity.level);
-    metrics.purity_confidence = Some(purity.confidence);
-    metrics.impurity_reasons = purity.reasons.iter().map(|r| r.to_string()).collect();
-
-    Some(metrics)
+    Some(found(metrics, *node, Some(body), ast))
 }
 
 /// Analyze a method definition (in class or object)
-fn analyze_method_definition(
-    node: &Node,
+fn analyze_method_definition<'t>(
+    node: &Node<'t>,
     ast: &TypeScriptAst,
     in_class: bool,
     class_name: Option<&str>,
-) -> Option<JsFunctionMetrics> {
+) -> Option<Found<'t>> {
     let name = get_method_name(node, ast)?;
-    let line = node_line(node);
-
+    let full_name = match class_name {
+        Some(cn) => format!("{}::{}", cn, name),
+        None => name.clone(),
+    };
     let kind = determine_method_kind(node, ast, in_class);
 
-    let mut metrics = JsFunctionMetrics::new(
-        if let Some(cn) = class_name {
-            format!("{}::{}", cn, name)
-        } else {
-            name.clone()
-        },
-        ast.path.clone(),
-        line,
-        kind,
-    );
-
-    if let Some(body) = get_method_body(node) {
-        metrics.cyclomatic = calculate_cyclomatic_complexity(&body, &ast.source);
-        metrics.cognitive = calculate_cognitive_complexity(&body, &ast.source);
-        metrics.nesting = calculate_nesting_depth(&body);
-        metrics.nested_functions = summarize_nested_functions(&body, &ast.source);
-        metrics.length = count_function_lines(node, &ast.source);
-        metrics.entropy_score = Some(calculate_entropy(
-            &body,
-            &ast.source,
-            &EntropyConfig::default(),
-        ));
-    }
-
+    let mut metrics = JsFunctionMetrics::new(full_name, ast.path.clone(), node_line(node), kind);
     metrics.is_async = has_async_modifier(node);
     metrics.is_test = is_test_function(&name);
     metrics.parameter_count = count_method_parameters(node);
-
-    // Purity analysis
-    let purity = TypeScriptPurityAnalyzer::analyze_function(node, &ast.source);
-    metrics.purity_level = Some(purity.level);
-    metrics.purity_confidence = Some(purity.confidence);
-    metrics.impurity_reasons = purity.reasons.iter().map(|r| r.to_string()).collect();
-
-    Some(metrics)
+    Some(found(metrics, *node, get_method_body(node), ast))
 }
 
 /// Extract functions from variable declarations
-fn extract_variable_functions(
-    node: &Node,
+fn extract_variable_functions<'t>(
+    node: &Node<'t>,
     ast: &TypeScriptAst,
-    functions: &mut Vec<JsFunctionMetrics>,
+    functions: &mut Vec<Found<'t>>,
 ) {
     let mut cursor = node.walk();
 
@@ -312,101 +270,72 @@ fn extract_variable_functions(
             let name = node_text(&name_node, &ast.source).to_string();
 
             if let Some(value_node) = child.child_by_field_name("value") {
-                match value_node.kind() {
-                    "arrow_function" => {
-                        if let Some(metrics) =
-                            analyze_arrow_function(&value_node, ast, Some(name), false)
-                        {
-                            functions.push(metrics);
-                        }
-                    }
+                let function = match value_node.kind() {
+                    "arrow_function" => analyze_arrow_function(&value_node, ast, Some(name), false),
                     "function_expression" | "function" => {
-                        if let Some(metrics) =
-                            analyze_function_expression(&value_node, ast, Some(name))
-                        {
-                            functions.push(metrics);
-                        }
+                        analyze_function_expression(&value_node, ast, Some(name))
                     }
-                    _ => {}
-                }
+                    _ => None,
+                };
+                functions.extend(function);
             }
         }
     }
 }
 
 /// Analyze a function expression
-fn analyze_function_expression(
-    node: &Node,
+fn analyze_function_expression<'t>(
+    node: &Node<'t>,
     ast: &TypeScriptAst,
     name: Option<String>,
-) -> Option<JsFunctionMetrics> {
-    let line = node_line(node);
+) -> Option<Found<'t>> {
     let func_name = name.unwrap_or_else(|| {
         // Check for inline name: const foo = function bar() {}
         get_function_name(node, ast).unwrap_or_else(|| "<anonymous>".to_string())
     });
-
     let body = get_function_body(node)?;
     let is_async = has_async_modifier(node);
-
     let kind = if is_async {
         FunctionKind::Async
     } else {
         FunctionKind::Expression
     };
 
-    let mut metrics = JsFunctionMetrics::new(func_name.clone(), ast.path.clone(), line, kind);
-
-    metrics.cyclomatic = calculate_cyclomatic_complexity(&body, &ast.source);
-    metrics.cognitive = calculate_cognitive_complexity(&body, &ast.source);
-    metrics.nesting = calculate_nesting_depth(&body);
-    metrics.nested_functions = summarize_nested_functions(&body, &ast.source);
-    metrics.length = count_function_lines(node, &ast.source);
+    let mut metrics =
+        JsFunctionMetrics::new(func_name.clone(), ast.path.clone(), node_line(node), kind);
     metrics.is_async = is_async;
     metrics.is_test = is_test_function(&func_name);
     metrics.parameter_count = count_parameters(node);
-    metrics.entropy_score = Some(calculate_entropy(
-        &body,
-        &ast.source,
-        &EntropyConfig::default(),
-    ));
-
-    // Purity analysis
-    let purity = TypeScriptPurityAnalyzer::analyze_function(node, &ast.source);
-    metrics.purity_level = Some(purity.level);
-    metrics.purity_confidence = Some(purity.confidence);
-    metrics.impurity_reasons = purity.reasons.iter().map(|r| r.to_string()).collect();
-
-    Some(metrics)
+    Some(found(metrics, *node, Some(body), ast))
 }
 
 /// Extract functions from export statements
-fn extract_export_functions(
-    node: &Node,
+fn extract_export_functions<'t>(
+    node: &Node<'t>,
     ast: &TypeScriptAst,
-    functions: &mut Vec<JsFunctionMetrics>,
+    functions: &mut Vec<Found<'t>>,
 ) {
     let mut cursor = node.walk();
 
     for child in node.children(&mut cursor) {
         match child.kind() {
             "function_declaration" => {
-                if let Some(mut metrics) = analyze_function_declaration(&child, ast, false, None) {
-                    metrics.is_exported = true;
-                    functions.push(metrics);
+                if let Some(mut function) = analyze_function_declaration(&child, ast, false, None) {
+                    function.metrics.is_exported = true;
+                    functions.push(function);
                 }
             }
             "lexical_declaration" | "variable_declaration" => {
                 let len_before = functions.len();
                 extract_variable_functions(&child, ast, functions);
                 // Mark newly added functions as exported
-                for func in functions.iter_mut().skip(len_before) {
-                    func.is_exported = true;
+                for function in functions.iter_mut().skip(len_before) {
+                    function.metrics.is_exported = true;
                 }
             }
             "class_declaration" | "class" => {
                 let name = get_class_name(&child, ast);
-                extract_class_methods(&child, ast, functions, name.as_deref(), true);
+                extract_class_methods(&child, ast, functions, name.as_deref());
             }
             _ => {}
         }
@@ -414,12 +343,11 @@ fn extract_export_functions(
 }
 
 /// Extract methods from a class
-fn extract_class_methods(
-    node: &Node,
+fn extract_class_methods<'t>(
+    node: &Node<'t>,
     ast: &TypeScriptAst,
-    functions: &mut Vec<JsFunctionMetrics>,
+    functions: &mut Vec<Found<'t>>,
     class_name: Option<&str>,
-    _enable_functional_analysis: bool,
 ) {
     // Find class body
     let body = node
@@ -432,10 +360,7 @@ fn extract_class_methods(
         for child in body.children(&mut cursor) {
             match child.kind() {
                 "method_definition" => {
-                    if let Some(metrics) = analyze_method_definition(&child, ast, true, class_name)
-                    {
-                        functions.push(metrics);
-                    }
+                    functions.extend(analyze_method_definition(&child, ast, true, class_name));
                 }
                 "public_field_definition" | "field_definition" => {
                     // Check if field has function value
@@ -498,10 +423,10 @@ const transform = (items) => items.filter(x => x > 0).map(x => x * 2);
 }
 
 /// Extract functions from class field definitions
-fn extract_field_functions(
-    node: &Node,
+fn extract_field_functions<'t>(
+    node: &Node<'t>,
     ast: &TypeScriptAst,
-    functions: &mut Vec<JsFunctionMetrics>,
+    functions: &mut Vec<Found<'t>>,
     class_name: Option<&str>,
 ) {
     if let Some(value) = node.child_by_field_name("value")
@@ -513,9 +438,9 @@ fn extract_field_functions(
 
         let full_name = field_full_name(class_name, name.as_deref());
 
-        if let Some(mut metrics) = analyze_arrow_function(&value, ast, Some(full_name), false) {
-            metrics.kind = FunctionKind::Method;
-            functions.push(metrics);
+        if let Some(mut function) = analyze_arrow_function(&value, ast, Some(full_name), false) {
+            function.metrics.kind = FunctionKind::Method;
+            functions.push(function);
         }
     }
 }
@@ -545,11 +470,11 @@ fn get_method_name(node: &Node, ast: &TypeScriptAst) -> Option<String> {
         .map(|n| node_text(&n, &ast.source).to_string())
 }
 
-fn get_function_body<'a>(node: &'a Node<'a>) -> Option<Node<'a>> {
+fn get_function_body<'t>(node: &Node<'t>) -> Option<Node<'t>> {
     node.child_by_field_name("body")
 }
 
-fn get_method_body<'a>(node: &'a Node<'a>) -> Option<Node<'a>> {
+fn get_method_body<'t>(node: &Node<'t>) -> Option<Node<'t>> {
     node.child_by_field_name("body")
 }
 
