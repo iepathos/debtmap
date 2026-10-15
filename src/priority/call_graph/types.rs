@@ -1,9 +1,10 @@
 //! Core types and data structures for call graph representation
 
-use crate::collections::{HashMap, HashSet, Vector};
+use crate::collections::Vector;
 use crate::core::Language;
+use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use serde::{Deserialize, Deserializer, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Component, Path, PathBuf};
 
 /// Stable cross-language function identity. Source line is intentionally absent.
@@ -18,7 +19,7 @@ pub struct CanonicalSymbolKey {
 }
 
 /// Unique identifier for a function in the codebase
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FunctionId {
     pub file: PathBuf,
     pub name: String,
@@ -32,9 +33,12 @@ pub struct FunctionId {
 
 impl Ord for FunctionId {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.file
-            .cmp(&other.file)
-            .then_with(|| self.line.cmp(&other.line))
+        let file = if self.file.as_os_str() == other.file.as_os_str() {
+            std::cmp::Ordering::Equal
+        } else {
+            self.file.cmp(&other.file)
+        };
+        file.then_with(|| self.line.cmp(&other.line))
             .then_with(|| self.column.cmp(&other.column))
             .then_with(|| self.name.cmp(&other.name))
             .then_with(|| self.module_path.cmp(&other.module_path))
@@ -44,6 +48,18 @@ impl Ord for FunctionId {
 impl PartialOrd for FunctionId {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
+    }
+}
+
+/// Hashes only the file name: hashing a whole `Path` parses every component,
+/// and equal paths always share their last component.
+impl std::hash::Hash for FunctionId {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.file.file_name().hash(state);
+        self.name.hash(state);
+        self.line.hash(state);
+        self.column.hash(state);
+        self.module_path.hash(state);
     }
 }
 
@@ -125,9 +141,19 @@ impl FunctionId {
 
     /// Canonicalize file path for consistent matching
     pub fn canonicalize_path(path: &Path) -> PathBuf {
-        // Try to canonicalize the path, but if it fails (e.g., file doesn't exist),
-        // just use the path as-is
-        path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
+        // Only successes are cached, so a file created later still canonicalizes.
+        static CANONICAL: once_cell::sync::Lazy<dashmap::DashMap<PathBuf, PathBuf>> =
+            once_cell::sync::Lazy::new(dashmap::DashMap::new);
+        if let Some(canonical) = CANONICAL.get(path) {
+            return canonical.clone();
+        }
+        match path.canonicalize() {
+            Ok(canonical) => {
+                CANONICAL.insert(path.to_path_buf(), canonical.clone());
+                canonical
+            }
+            Err(_) => path.to_path_buf(),
+        }
     }
 }
 
@@ -293,7 +319,7 @@ pub struct CallGraph {
     #[serde(default)]
     pub(crate) edge_evidence: Vector<CallEdgeEvidence>,
     #[serde(default)]
-    pub(crate) uncertain_calls: Vector<UncertainCall>,
+    pub(crate) uncertain_calls: BTreeSet<UncertainCall>,
     #[serde(default, with = "function_id_btree_map")]
     pub(crate) effect_assessments:
         BTreeMap<FunctionId, crate::analysis::effect_evidence::EffectAssessment>,
@@ -314,9 +340,9 @@ pub struct CallGraph {
 
     // Fuzzy matching indexes (not serialized - rebuilt on load)
     #[serde(skip)]
-    pub(crate) fuzzy_index: std::collections::HashMap<FuzzyFunctionKey, Vec<FunctionId>>,
+    pub(crate) fuzzy_index: HashMap<FuzzyFunctionKey, Vec<FunctionId>>,
     #[serde(skip)]
-    pub(crate) name_index: std::collections::HashMap<String, Vec<FunctionId>>,
+    pub(crate) name_index: HashMap<String, Vec<FunctionId>>,
 }
 
 #[derive(Deserialize)]
@@ -429,10 +455,7 @@ mod function_id_map {
         Legacy(StdHashMap<String, V>),
     }
 
-    pub fn serialize<S, V>(
-        map: &crate::collections::HashMap<FunctionId, V>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
+    pub fn serialize<S, V>(map: &HashMap<FunctionId, V>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
         V: Serialize,
@@ -440,9 +463,7 @@ mod function_id_map {
         map.iter().collect::<Vec<_>>().serialize(serializer)
     }
 
-    pub fn deserialize<'de, D, V>(
-        deserializer: D,
-    ) -> Result<crate::collections::HashMap<FunctionId, V>, D::Error>
+    pub fn deserialize<'de, D, V>(deserializer: D) -> Result<HashMap<FunctionId, V>, D::Error>
     where
         D: Deserializer<'de>,
         V: Deserialize<'de>,
@@ -457,9 +478,7 @@ mod function_id_map {
         }
     }
 
-    fn deserialize_legacy<V>(
-        entries: StdHashMap<String, V>,
-    ) -> crate::collections::HashMap<FunctionId, V> {
+    fn deserialize_legacy<V>(entries: StdHashMap<String, V>) -> HashMap<FunctionId, V> {
         entries
             .into_iter()
             .filter_map(|(key, value)| legacy_function_id(&key).map(|id| (id, value)))
@@ -515,7 +534,7 @@ impl CallGraph {
             nodes: HashMap::new(),
             edges: Vector::new(),
             edge_evidence: Vector::new(),
-            uncertain_calls: Vector::new(),
+            uncertain_calls: BTreeSet::new(),
             effect_assessments: BTreeMap::new(),
             effect_assessments_propagated: false,
             possible_caller_index: HashMap::new(),
@@ -524,8 +543,8 @@ impl CallGraph {
             evidence_set: HashSet::new(),
             caller_index: HashMap::new(),
             callee_index: HashMap::new(),
-            fuzzy_index: std::collections::HashMap::new(),
-            name_index: std::collections::HashMap::new(),
+            fuzzy_index: HashMap::new(),
+            name_index: HashMap::new(),
         }
     }
 

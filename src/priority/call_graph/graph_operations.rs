@@ -4,7 +4,8 @@ use super::types::{
     CallEdgeEvidence, CallEdgeProvenance, CallGraph, CallType, FunctionCall, FunctionId,
     FunctionNode, ResolutionOutcome,
 };
-use crate::collections::{HashMap, HashSet, Vector};
+use crate::collections::{HashSet, Vector};
+use foldhash::HashMap;
 use std::path::PathBuf;
 
 impl CallGraph {
