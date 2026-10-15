@@ -129,6 +129,7 @@ fn test_analysis_results_contains_file_contexts() {
     file_contexts.insert(prod_file.clone(), FileContext::Production);
 
     let results = AnalysisResults {
+        js_facts: Default::default(),
         project_path: PathBuf::from("."),
         timestamp: chrono::Utc::now(),
         complexity: debtmap::core::ComplexityReport {

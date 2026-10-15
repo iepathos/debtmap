@@ -5,10 +5,15 @@
 use super::debt::create_debt_items;
 use super::dependencies::extract_dependencies;
 use super::metrics::{build_file_metrics, calculate_total_complexity};
+use super::project_call_graph::ModuleCallFacts;
 use super::visitor::analyze_ast;
+use super::visitor::class_analysis::extract_classes;
+use crate::analyzers::file_analyzer::js_ts_god_object;
 use crate::complexity::threshold_manager::ComplexityThresholds;
 use crate::core::FileMetrics;
 use crate::core::ast::TypeScriptAst;
+use crate::organization::god_object::GodObjectAnalysis;
+use std::sync::Arc;
 
 /// Analyze a TypeScript/JavaScript file and return file metrics
 pub fn analyze_typescript_file(
@@ -58,15 +63,34 @@ pub fn analyze_typescript_file(
         );
     }
 
-    build_file_metrics(
-        ast.path.clone(),
-        ast.language_variant,
-        analysis_result.functions,
-        complexity_metrics,
-        debt_items,
-        dependencies,
-        total_lines,
-    )
+    let facts = JsFileFacts {
+        call_graph: ModuleCallFacts::from_ast(ast),
+        god_object: js_ts_god_object(
+            &ast.path,
+            &ast.source,
+            &analysis_result.js_functions,
+            extract_classes(ast).len(),
+        ),
+    };
+    FileMetrics {
+        js_facts: Some(Arc::new(facts)),
+        ..build_file_metrics(
+            ast.path.clone(),
+            ast.language_variant,
+            analysis_result.functions,
+            complexity_metrics,
+            debt_items,
+            dependencies,
+            total_lines,
+        )
+    }
+}
+
+/// Facts later phases need from a JS/TS file, extracted while its tree is parsed.
+#[derive(Debug)]
+pub struct JsFileFacts {
+    pub(crate) call_graph: ModuleCallFacts,
+    pub(crate) god_object: Option<GodObjectAnalysis>,
 }
 
 #[cfg(test)]

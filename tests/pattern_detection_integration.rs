@@ -20,6 +20,7 @@ use tempfile::TempDir;
 /// Helper to create a test FileMetrics with classes
 fn create_test_file_metrics() -> FileMetrics {
     FileMetrics {
+        js_facts: None,
         path: PathBuf::from("test.py"),
         language: Language::Python,
         complexity: ComplexityMetrics::default(),
@@ -268,6 +269,7 @@ fn test_pattern_detection_respects_confidence_threshold() {
 fn test_dependency_injection_pattern_detection() {
     let detector = PatternDetector::new();
     let file_metrics = FileMetrics {
+        js_facts: None,
         path: PathBuf::from("service.py"),
         language: Language::Python,
         complexity: ComplexityMetrics::default(),

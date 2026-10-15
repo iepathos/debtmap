@@ -158,6 +158,7 @@ pub fn perform_unified_analysis_with_options(
         parallel: options.parallel,
         jobs: options.jobs,
         extracted_data: options.extracted_data,
+        js_facts: options.results.js_facts.clone(),
         reference_time: options.reference_time,
     });
     result.suppression_audit = result
@@ -296,6 +297,7 @@ fn process_js_ts_call_graph(
         project_path,
         call_graph,
         Some(&js_ts_files),
+        &results.js_facts,
     ) {
         warn!("Failed to process TypeScript call graph: {}", e);
     }
@@ -445,6 +447,10 @@ struct DebtScoringOptions<'a> {
     jobs: usize,
     extracted_data:
         Option<std::collections::HashMap<PathBuf, crate::extraction::ExtractedFileData>>,
+    js_facts: std::collections::HashMap<
+        PathBuf,
+        std::sync::Arc<crate::analyzers::typescript::orchestration::JsFileFacts>,
+    >,
     reference_time: chrono::DateTime<chrono::Utc>,
 }
 
@@ -472,6 +478,7 @@ fn run_debt_scoring_stage(options: DebtScoringOptions<'_>) -> UnifiedAnalysis {
             options.parallel,
             options.jobs,
             options.extracted_data,
+            options.js_facts,
             options.reference_time,
         );
         debug!(
@@ -520,6 +527,7 @@ pub fn create_unified_analysis_with_exclusions(
         false,
         0,
         None, // Compatibility path uses metric facts without hidden source I/O
+        Default::default(),
         reference_time,
     )
 }
@@ -547,6 +555,10 @@ fn create_unified_analysis_with_exclusions_and_timing(
     extracted_data: Option<
         std::collections::HashMap<PathBuf, crate::extraction::ExtractedFileData>,
     >,
+    js_facts: std::collections::HashMap<
+        PathBuf,
+        std::sync::Arc<crate::analyzers::typescript::orchestration::JsFileFacts>,
+    >,
     reference_time: chrono::DateTime<chrono::Utc>,
 ) -> UnifiedAnalysis {
     create_scheduled_analysis(
@@ -564,6 +576,7 @@ fn create_unified_analysis_with_exclusions_and_timing(
         risk_analyzer,
         project_path,
         extracted_data,
+        js_facts,
         reference_time,
     )
 }
@@ -585,6 +598,10 @@ fn create_scheduled_analysis(
     project_path: &Path,
     extracted_data: Option<
         std::collections::HashMap<PathBuf, crate::extraction::ExtractedFileData>,
+    >,
+    js_facts: std::collections::HashMap<
+        PathBuf,
+        std::sync::Arc<crate::analyzers::typescript::orchestration::JsFileFacts>,
     >,
     reference_time: chrono::DateTime<chrono::Utc>,
 ) -> UnifiedAnalysis {
@@ -612,6 +629,7 @@ fn create_scheduled_analysis(
             risk_analyzer,
             project_path,
             extracted_data,
+            js_facts,
             options,
         )
     })
@@ -655,6 +673,10 @@ fn execute_parallel_analysis(
     extracted_data: Option<
         std::collections::HashMap<PathBuf, crate::extraction::ExtractedFileData>,
     >,
+    js_facts: std::collections::HashMap<
+        PathBuf,
+        std::sync::Arc<crate::analyzers::typescript::orchestration::JsFileFacts>,
+    >,
     options: parallel_unified_analysis::ParallelUnifiedAnalysisOptions,
 ) -> UnifiedAnalysis {
     use parallel_unified_analysis::ParallelUnifiedAnalysisBuilder;
@@ -667,6 +689,7 @@ fn execute_parallel_analysis(
     if let Some(extracted) = extracted_data {
         builder = builder.with_extracted_data(extracted);
     }
+    builder = builder.with_js_facts(js_facts);
 
     if let Some(analyzer) = risk_analyzer {
         builder = builder.with_risk_analyzer(analyzer);

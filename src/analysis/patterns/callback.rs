@@ -212,6 +212,7 @@ mod tests {
 
     fn create_test_file_metrics_with_functions(functions: Vec<FunctionMetrics>) -> FileMetrics {
         FileMetrics {
+            js_facts: None,
             path: PathBuf::from("test.py"),
             language: Language::Python,
             complexity: ComplexityMetrics {

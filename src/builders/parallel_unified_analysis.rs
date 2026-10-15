@@ -1,3 +1,4 @@
+use crate::analyzers::typescript::orchestration::JsFileFacts;
 use crate::debt::suppression_audit::SuppressionAudit;
 use crate::{
     builders::unified_analysis_phases::phases::scoring::{
@@ -260,6 +261,7 @@ pub struct ParallelUnifiedAnalysisBuilder {
     /// Pre-extracted file data from unified extraction phase (spec 213).
     /// When present, avoids re-parsing files during analysis.
     extracted_data: Option<Arc<HashMap<PathBuf, ExtractedFileData>>>,
+    js_facts: HashMap<PathBuf, Arc<JsFileFacts>>,
 }
 
 impl ParallelUnifiedAnalysisBuilder {
@@ -276,6 +278,7 @@ impl ParallelUnifiedAnalysisBuilder {
             suppression_audit: SuppressionAudit::default(),
             analysis_policy: AnalysisPolicy::from_config(crate::config::get_config()),
             extracted_data: None,
+            js_facts: HashMap::new(),
         }
     }
 
@@ -291,6 +294,12 @@ impl ParallelUnifiedAnalysisBuilder {
     /// analysis without re-parsing files. This prevents proc-macro2 SourceMap overflow.
     pub fn with_extracted_data(mut self, extracted: HashMap<PathBuf, ExtractedFileData>) -> Self {
         self.extracted_data = Some(Arc::new(extracted));
+        self
+    }
+
+    /// Reuse JS/TS facts gathered while files were parsed.
+    pub fn with_js_facts(mut self, js_facts: HashMap<PathBuf, Arc<JsFileFacts>>) -> Self {
+        self.js_facts = js_facts;
         self
     }
 
@@ -846,6 +855,7 @@ impl ParallelUnifiedAnalysisBuilder {
                 crate::builders::unified_analysis_phases::phases::file_analysis::FileAnalysisFacts {
                     content: file_content,
                     extracted,
+                    js: self.js_facts.get(file_path).map(Arc::as_ref),
                     line_count: self.line_count_index.get(file_path).copied(),
                 },
                 coverage_data,

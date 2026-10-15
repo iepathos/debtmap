@@ -101,6 +101,7 @@ impl Analyzer for PythonAnalyzer {
                     Err(e) => {
                         debug!(error = %e, "Failed to extract Python file data");
                         FileMetrics {
+                            js_facts: None,
                             path: py_ast.path.clone(),
                             language: Language::Python,
                             complexity: ComplexityMetrics::default(),
@@ -119,6 +120,7 @@ impl Analyzer for PythonAnalyzer {
                 }
             }
             _ => FileMetrics {
+                js_facts: None,
                 path: PathBuf::new(),
                 language: Language::Python,
                 complexity: ComplexityMetrics::default(),

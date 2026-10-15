@@ -10,6 +10,7 @@ use std::path::PathBuf;
 // Helper function to create test metrics
 fn create_test_metrics_simple() -> FileMetrics {
     FileMetrics {
+        js_facts: None,
         path: PathBuf::from("test.rs"),
         language: Language::Rust,
         complexity: ComplexityMetrics {
@@ -58,6 +59,7 @@ fn create_test_metrics_simple() -> FileMetrics {
 
 fn create_test_metrics_complex() -> FileMetrics {
     FileMetrics {
+        js_facts: None,
         path: PathBuf::from("complex.rs"),
         language: Language::Rust,
         complexity: ComplexityMetrics {

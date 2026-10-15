@@ -34,6 +34,7 @@ end_of_record
 
     // Create analysis results with test functions
     let results = AnalysisResults {
+        js_facts: Default::default(),
         project_path: temp_dir.path().to_path_buf(),
         timestamp: Utc::now(),
         complexity: ComplexityReport {
@@ -110,6 +111,7 @@ fn test_analyze_risk_with_coverage_invalid_lcov_path() {
     let non_existent_lcov = temp_dir.path().join("missing.lcov");
 
     let results = AnalysisResults {
+        js_facts: Default::default(),
         project_path: temp_dir.path().to_path_buf(),
         timestamp: Utc::now(),
         complexity: ComplexityReport {
@@ -189,6 +191,7 @@ fn test_analyze_risk_without_coverage() {
     let temp_dir = TempDir::new().unwrap();
 
     let results = AnalysisResults {
+        js_facts: Default::default(),
         project_path: temp_dir.path().to_path_buf(),
         timestamp: Utc::now(),
         complexity: ComplexityReport {
@@ -281,6 +284,7 @@ end_of_record
     fs::write(&lcov_path, lcov_content).unwrap();
 
     let results = AnalysisResults {
+        js_facts: Default::default(),
         project_path: temp_dir.path().to_path_buf(),
         timestamp: Utc::now(),
         complexity: ComplexityReport {

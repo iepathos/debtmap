@@ -282,6 +282,7 @@ fn test_pattern_matching_for_different_languages() {
 
     // Create dummy file metrics for testing
     let file_metrics = debtmap::core::FileMetrics {
+        js_facts: None,
         path: std::path::PathBuf::from("test.rs"),
         language: debtmap::core::Language::Rust,
         complexity: debtmap::core::ComplexityMetrics::default(),

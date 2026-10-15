@@ -247,6 +247,7 @@ mod tests {
             .collect();
 
         AnalysisResults {
+            js_facts: Default::default(),
             project_path: PathBuf::from("/test"),
             timestamp: Utc::now(),
             complexity: ComplexityReport {

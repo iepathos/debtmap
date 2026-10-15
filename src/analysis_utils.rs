@@ -531,6 +531,7 @@ mod tests {
     fn test_extract_all_functions_multiple_files() {
         let file_metrics = vec![
             FileMetrics {
+                js_facts: None,
                 path: PathBuf::from("file1.rs"),
                 language: Language::Rust,
                 complexity: ComplexityMetrics {
@@ -576,6 +577,7 @@ mod tests {
                 classes: None,
             },
             FileMetrics {
+                js_facts: None,
                 path: PathBuf::from("file2.rs"),
                 language: Language::Rust,
                 complexity: ComplexityMetrics {
@@ -673,6 +675,7 @@ mod tests {
     #[test]
     fn test_create_dependency_report_with_dependencies() {
         let file_metrics = vec![FileMetrics {
+            js_facts: None,
             path: PathBuf::from("src/main.rs"),
             language: Language::Rust,
             complexity: ComplexityMetrics::default(),

@@ -120,6 +120,7 @@ pub fn to_file_metrics(extracted: &ExtractedFileData) -> FileMetrics {
     let total_cognitive: u32 = extracted.functions.iter().map(|f| f.cognitive).sum();
 
     FileMetrics {
+        js_facts: None,
         path: extracted.path.clone(),
         language: Language::from_path(&extracted.path),
         complexity: ComplexityMetrics {

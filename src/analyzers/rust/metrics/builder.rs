@@ -30,6 +30,7 @@ pub fn build_file_metrics(
         total_lines,
     );
     FileMetrics {
+        js_facts: None,
         path,
         language: Language::Rust,
         complexity: ComplexityMetrics {

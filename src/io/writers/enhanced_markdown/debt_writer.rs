@@ -244,6 +244,7 @@ mod tests {
 
     fn create_test_results_with_debt() -> AnalysisResults {
         AnalysisResults {
+            js_facts: Default::default(),
             project_path: PathBuf::from("/test"),
             timestamp: Utc::now(),
             complexity: ComplexityReport {

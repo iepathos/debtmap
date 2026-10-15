@@ -6,6 +6,7 @@
 use crate::analysis::FileContext;
 use crate::analyzers::FileAnalyzer;
 use crate::analyzers::file_analyzer::UnifiedFileAnalyzer;
+use crate::analyzers::typescript::orchestration::JsFileFacts;
 use crate::core::{FunctionMetrics, Language};
 use crate::extraction::ExtractedFileData;
 use crate::priority::file_metrics::{FileDebtItem, FileDebtMetrics};
@@ -88,6 +89,7 @@ pub struct ProcessedFileData {
 pub struct FileAnalysisFacts<'a> {
     pub content: Option<&'a str>,
     pub extracted: Option<&'a ExtractedFileData>,
+    pub js: Option<&'a JsFileFacts>,
     pub line_count: Option<usize>,
 }
 
@@ -107,8 +109,13 @@ pub fn process_file_metrics(
     if let Some(content) = file_content {
         file_metrics = enhance_metrics_with_line_count(file_metrics, content.lines().count());
         if !no_god_object {
-            file_metrics.god_object_analysis =
-                detect_god_object_from_content(&file_analyzer, &file_path, content, &file_metrics);
+            file_metrics.god_object_analysis = detect_god_object_from_content(
+                &file_analyzer,
+                &file_path,
+                content,
+                &file_metrics,
+                None,
+            );
         }
     }
     build_processed_file_data(file_path, functions, file_metrics, project_root)
@@ -172,6 +179,7 @@ fn apply_file_facts(
             file_analyzer,
             file_path,
             content,
+            facts.js,
             no_god_object,
             file_metrics,
         );
@@ -206,13 +214,16 @@ fn apply_content_facts(
     file_analyzer: &UnifiedFileAnalyzer,
     file_path: &Path,
     content: &str,
+    js: Option<&JsFileFacts>,
     no_god_object: bool,
     file_metrics: &mut FileDebtMetrics,
 ) {
     *file_metrics = enhance_metrics_with_line_count(file_metrics.clone(), content.lines().count());
     apply_content_classification(file_path, content, file_metrics);
     file_metrics.god_object_analysis = (!no_god_object)
-        .then(|| detect_god_object_from_content(file_analyzer, file_path, content, file_metrics))
+        .then(|| {
+            detect_god_object_from_content(file_analyzer, file_path, content, file_metrics, js)
+        })
         .flatten();
 }
 
@@ -240,15 +251,21 @@ fn detect_god_object_from_content(
     file_path: &Path,
     content: &str,
     file_metrics: &FileDebtMetrics,
+    js: Option<&JsFileFacts>,
 ) -> Option<crate::organization::GodObjectAnalysis> {
     let actual_line_count = content.lines().count();
 
-    // Get analysis from file analyzer
-    let mut god_analysis = file_analyzer
-        .analyze_file(file_path, content)
-        .ok()
-        .and_then(|m| m.god_object_analysis)
-        .or_else(|| file_metrics.god_object_analysis.clone());
+    let analyzed = match js {
+        Some(js) => js
+            .god_object
+            .clone()
+            .or_else(|| file_analyzer.analyze_god_object_simple(content).0),
+        None => file_analyzer
+            .analyze_file(file_path, content)
+            .ok()
+            .and_then(|m| m.god_object_analysis),
+    };
+    let mut god_analysis = analyzed.or_else(|| file_metrics.god_object_analysis.clone());
 
     // Apply size-based god object detection
     if actual_line_count > 2000 || file_metrics.function_count > 50 {

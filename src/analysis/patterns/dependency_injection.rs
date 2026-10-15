@@ -607,6 +607,7 @@ mod tests {
     fn test_detect_constructor_injection() {
         let recognizer = DependencyInjectionRecognizer::new();
         let file_metrics = FileMetrics {
+            js_facts: None,
             path: PathBuf::from("services.py"),
             language: Language::Python,
             complexity: ComplexityMetrics::default(),
@@ -630,6 +631,7 @@ mod tests {
     fn test_detect_decorator_injection() {
         let recognizer = DependencyInjectionRecognizer::new();
         let file_metrics = FileMetrics {
+            js_facts: None,
             path: PathBuf::from("services.py"),
             language: Language::Python,
             complexity: ComplexityMetrics::default(),
@@ -653,6 +655,7 @@ mod tests {
     fn test_is_function_used_by_pattern() {
         let recognizer = DependencyInjectionRecognizer::new();
         let file_metrics = FileMetrics {
+            js_facts: None,
             path: PathBuf::from("services.py"),
             language: Language::Python,
             complexity: ComplexityMetrics::default(),

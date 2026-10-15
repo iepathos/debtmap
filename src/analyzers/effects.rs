@@ -246,6 +246,7 @@ mod tests {
     fn test_project_analysis_result_from_metrics() {
         let metrics = vec![
             FileMetrics {
+                js_facts: None,
                 path: PathBuf::from("a.rs"),
                 language: Language::Rust,
                 complexity: crate::core::ComplexityMetrics::default(),
@@ -258,6 +259,7 @@ mod tests {
                 classes: None,
             },
             FileMetrics {
+                js_facts: None,
                 path: PathBuf::from("b.rs"),
                 language: Language::Rust,
                 complexity: crate::core::ComplexityMetrics::default(),

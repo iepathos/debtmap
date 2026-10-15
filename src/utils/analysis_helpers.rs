@@ -37,6 +37,7 @@ pub fn analyze_project(
     let dependencies = create_dependency_report(&file_metrics);
 
     Ok(AnalysisResults {
+        js_facts: Default::default(),
         project_path: path,
         timestamp: Utc::now(),
         complexity: complexity_report,

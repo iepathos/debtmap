@@ -38,6 +38,9 @@ pub struct AnalysisResults {
     pub duplications: Vec<DuplicationBlock>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub file_contexts: HashMap<PathBuf, crate::analysis::FileContext>,
+    #[serde(skip)]
+    pub js_facts:
+        HashMap<PathBuf, std::sync::Arc<crate::analyzers::typescript::orchestration::JsFileFacts>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -420,6 +423,9 @@ pub struct FileMetrics {
     pub module_scope: Option<ast::ModuleScopeAnalysis>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub classes: Option<Vec<ast::ClassDef>>,
+    /// JS/TS facts reused by later phases instead of reparsing the file.
+    #[serde(skip)]
+    pub js_facts: Option<std::sync::Arc<crate::analyzers::typescript::orchestration::JsFileFacts>>,
 }
 
 impl FileMetrics {

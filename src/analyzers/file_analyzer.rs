@@ -1,7 +1,8 @@
 use crate::analyzers::FileAnalyzer;
 use crate::analyzers::typescript::parser::{detect_variant, parse_source};
+use crate::analyzers::typescript::types::JsFunctionMetrics;
 use crate::analyzers::typescript::visitor::class_analysis::extract_classes;
-use crate::analyzers::typescript::visitor::function_analysis::extract_functions;
+use crate::analyzers::typescript::visitor::function_analysis::extract_function_outlines;
 use crate::core::FunctionMetrics;
 use crate::extraction::{ExtractedFileData, UnifiedFileExtractor};
 use crate::organization::god_object::classifier::group_methods_by_responsibility;
@@ -129,9 +130,23 @@ fn analyze_js_ts_god_object(path: &Path, content: &str) -> Option<GodObjectAnaly
         return None;
     }
 
-    let language = crate::core::Language::from_path(path);
     let ast = parse_source(content, path, detect_variant(path)).ok()?;
-    let functions = extract_functions(&ast, true);
+    js_ts_god_object(
+        path,
+        content,
+        &extract_function_outlines(&ast),
+        extract_classes(&ast).len(),
+    )
+}
+
+/// God object analysis of a parsed JS/TS file from its functions and class count.
+pub(crate) fn js_ts_god_object(
+    path: &Path,
+    content: &str,
+    functions: &[JsFunctionMetrics],
+    class_count: usize,
+) -> Option<GodObjectAnalysis> {
+    let language = crate::core::Language::from_path(path);
     let production_functions: Vec<_> = functions.iter().filter(|func| !func.is_test).collect();
     let function_count = production_functions.len();
     let total_lines = content.lines().count();
@@ -162,7 +177,6 @@ fn analyze_js_ts_god_object(path: &Path, content: &str) -> Option<GodObjectAnaly
     } else {
         complexity_sum as f64 / function_count as f64
     };
-    let class_count = extract_classes(&ast).len();
     let thresholds = GodObjectThresholds::default();
     let responsibility_count = responsibilities.len();
     let god_object_score = calculate_god_object_score_weighted(
@@ -216,7 +230,7 @@ fn analyze_js_ts_god_object(path: &Path, content: &str) -> Option<GodObjectAnaly
         struct_name: None,
         struct_line: None,
         struct_location: None,
-        visibility_breakdown: Some(build_js_visibility_breakdown(&functions)),
+        visibility_breakdown: Some(build_js_visibility_breakdown(functions)),
         domain_count: responsibility_count,
         domain_diversity: if function_count == 0 {
             0.0
@@ -307,7 +321,7 @@ impl UnifiedFileAnalyzer {
     /// Simple heuristics-based god object detection for non-Rust files or fallback.
     ///
     /// Uses shared heuristics from `organization::god_object::heuristics` (Spec 212).
-    fn analyze_god_object_simple(
+    pub(crate) fn analyze_god_object_simple(
         &self,
         content: &str,
     ) -> (

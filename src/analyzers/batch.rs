@@ -253,6 +253,7 @@ fn filter_file_result(
 
 fn excluded_file_result(path: &Path, content: &str) -> FileAnalysisResult {
     let metrics = FileMetrics {
+        js_facts: None,
         path: path.to_path_buf(),
         language: Language::from_path(path),
         complexity: Default::default(),
@@ -1128,6 +1129,7 @@ mod tests {
     fn test_file_analysis_result_new() {
         let path = PathBuf::from("test.rs");
         let metrics = FileMetrics {
+            js_facts: None,
             path: path.clone(),
             language: Language::Rust,
             complexity: Default::default(),
@@ -1150,6 +1152,7 @@ mod tests {
     fn test_file_analysis_result_with_timing() {
         let path = PathBuf::from("test.rs");
         let metrics = FileMetrics {
+            js_facts: None,
             path: path.clone(),
             language: Language::Rust,
             complexity: Default::default(),

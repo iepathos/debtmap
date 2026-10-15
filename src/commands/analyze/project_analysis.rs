@@ -474,6 +474,10 @@ fn build_analysis_results(
         dependencies,
         duplications,
         file_contexts,
+        js_facts: file_metrics
+            .iter()
+            .filter_map(|m| Some((m.path.clone(), m.js_facts.clone()?)))
+            .collect(),
     }
 }
 
