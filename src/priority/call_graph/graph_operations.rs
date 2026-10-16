@@ -158,6 +158,7 @@ impl CallGraph {
 
         if self.edge_set.insert(call.clone()) {
             self.edges.push(call);
+            self.invalidate_caller_file_counts();
         }
         if self.evidence_set.insert(evidence.clone()) {
             self.edge_evidence.push(evidence);

@@ -6,6 +6,8 @@ use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Component, Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
+use std::sync::{Arc, RwLock};
 
 /// Stable cross-language function identity. Source line is intentionally absent.
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -346,6 +348,22 @@ pub struct CallGraph {
     /// Sorted function ids. Built on first read and cleared when a new id is inserted.
     #[serde(skip)]
     ordered_ids: OrderedFunctionIds,
+    /// Internal and external call counts keyed by caller file.
+    #[serde(skip)]
+    caller_file_counts: CallerFileCallCounts,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct FileCallCounts {
+    internal: usize,
+    external: usize,
+}
+
+/// Built on first read. `ready` skips the lock while the cache is empty.
+#[derive(Debug)]
+struct CallerFileCallCounts {
+    ready: AtomicBool,
+    counts: RwLock<Option<Arc<HashMap<PathBuf, FileCallCounts>>>>,
 }
 
 /// Shared sorted ids. Readers during parallel analysis only hold `&CallGraph`.
@@ -366,6 +384,29 @@ impl Clone for OrderedFunctionIds {
 impl Default for OrderedFunctionIds {
     fn default() -> Self {
         Self(std::sync::RwLock::new(None))
+    }
+}
+
+impl Clone for CallerFileCallCounts {
+    fn clone(&self) -> Self {
+        let counts = self
+            .counts
+            .read()
+            .unwrap_or_else(|error| error.into_inner())
+            .clone();
+        Self {
+            ready: AtomicBool::new(counts.is_some()),
+            counts: RwLock::new(counts),
+        }
+    }
+}
+
+impl Default for CallerFileCallCounts {
+    fn default() -> Self {
+        Self {
+            ready: AtomicBool::new(false),
+            counts: RwLock::new(None),
+        }
     }
 }
 
@@ -570,6 +611,71 @@ impl CallGraph {
             fuzzy_index: HashMap::new(),
             name_index: HashMap::new(),
             ordered_ids: OrderedFunctionIds::default(),
+            caller_file_counts: CallerFileCallCounts::default(),
+        }
+    }
+
+    /// Calls whose caller is in `file`: `(internal, external)`.
+    pub(crate) fn calls_from_file(&self, file: &Path) -> (usize, usize) {
+        self.caller_file_call_counts()
+            .get(file)
+            .map(|counts| (counts.internal, counts.external))
+            .unwrap_or((0, 0))
+    }
+
+    fn caller_file_call_counts(&self) -> Arc<HashMap<PathBuf, FileCallCounts>> {
+        if let Some(counts) = self.cached_caller_file_counts() {
+            return counts;
+        }
+        self.store_caller_file_counts()
+    }
+
+    fn cached_caller_file_counts(&self) -> Option<Arc<HashMap<PathBuf, FileCallCounts>>> {
+        self.caller_file_counts
+            .ready
+            .load(AtomicOrdering::Relaxed)
+            .then(|| {
+                self.caller_file_counts
+                    .counts
+                    .read()
+                    .unwrap_or_else(|error| error.into_inner())
+                    .as_ref()
+                    .cloned()
+            })
+            .flatten()
+    }
+
+    fn store_caller_file_counts(&self) -> Arc<HashMap<PathBuf, FileCallCounts>> {
+        let counts = Arc::new(count_calls_by_caller_file(&self.edges));
+        let mut guard = self
+            .caller_file_counts
+            .counts
+            .write()
+            .unwrap_or_else(|error| error.into_inner());
+        if let Some(existing) = guard.as_ref() {
+            self.caller_file_counts
+                .ready
+                .store(true, AtomicOrdering::Relaxed);
+            return Arc::clone(existing);
+        }
+        *guard = Some(Arc::clone(&counts));
+        self.caller_file_counts
+            .ready
+            .store(true, AtomicOrdering::Relaxed);
+        counts
+    }
+
+    pub(crate) fn invalidate_caller_file_counts(&mut self) {
+        if self
+            .caller_file_counts
+            .ready
+            .swap(false, AtomicOrdering::Relaxed)
+        {
+            *self
+                .caller_file_counts
+                .counts
+                .write()
+                .unwrap_or_else(|error| error.into_inner()) = None;
         }
     }
 
@@ -630,6 +736,22 @@ impl CallGraph {
         for candidates in self.name_index.values_mut() {
             candidates.sort();
         }
+    }
+}
+
+fn count_calls_by_caller_file(edges: &Vector<FunctionCall>) -> HashMap<PathBuf, FileCallCounts> {
+    edges.iter().fold(HashMap::new(), |mut counts, call| {
+        record_caller_file(&mut counts, call);
+        counts
+    })
+}
+
+fn record_caller_file(counts: &mut HashMap<PathBuf, FileCallCounts>, call: &FunctionCall) {
+    let entry = counts.entry(call.caller.file.clone()).or_default();
+    if call.caller.file == call.callee.file {
+        entry.internal += 1;
+    } else {
+        entry.external += 1;
     }
 }
 
