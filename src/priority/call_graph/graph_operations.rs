@@ -6,7 +6,16 @@ use super::types::{
 };
 use crate::collections::{HashSet, Vector};
 use foldhash::HashMap;
-use std::path::PathBuf;
+use std::cmp::Ordering;
+use std::path::{Path, PathBuf};
+
+fn file_ord(left: &Path, right: &Path) -> Ordering {
+    if left.as_os_str() == right.as_os_str() {
+        Ordering::Equal
+    } else {
+        left.cmp(right)
+    }
+}
 
 impl CallGraph {
     pub fn merge(&mut self, other: CallGraph) {
@@ -103,6 +112,7 @@ impl CallGraph {
         if self.nodes.insert(id.clone(), node).is_some() {
             return;
         }
+        self.invalidate_ordered_function_ids();
 
         // Populate fuzzy index (name + file)
         let fuzzy_key = id.fuzzy_key();
@@ -275,11 +285,24 @@ impl CallGraph {
         self.get_callers(func_id).len()
     }
 
-    /// Get all functions in the graph
+    /// Get all functions in the graph, in `FunctionId` order.
     pub fn get_all_functions(&self) -> impl Iterator<Item = &FunctionId> {
-        let mut funcs: Vec<&FunctionId> = self.nodes.keys().collect();
-        funcs.sort();
+        let ordered = self.ordered_function_ids();
+        let mut funcs = Vec::with_capacity(ordered.len());
+        for id in ordered.iter() {
+            if let Some((key, _)) = self.nodes.get_key_value(id) {
+                funcs.push(key);
+            }
+        }
         funcs.into_iter()
+    }
+
+    /// Functions in `file`, in the same order as [`Self::get_all_functions`].
+    pub(crate) fn ids_in_file(&self, file: &Path) -> Vec<FunctionId> {
+        let ids = self.ordered_function_ids();
+        let start = ids.partition_point(|id| file_ord(&id.file, file).is_lt());
+        let end = ids.partition_point(|id| file_ord(&id.file, file).is_le());
+        ids[start..end].to_vec()
     }
 
     /// Get function info
@@ -877,6 +900,48 @@ mod evidence_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn functions_in_file_follows_sorted_order_and_includes_new_ids() {
+        let mut graph = CallGraph::new();
+        for (file, name, line) in [
+            ("src/a.rs", "later", 2),
+            ("src/b.rs", "other", 1),
+            ("src/a.rs", "early", 1),
+        ] {
+            graph.add_function(
+                FunctionId::new(PathBuf::from(file), name.into(), line),
+                false,
+                false,
+                1,
+                1,
+            );
+        }
+
+        let file = PathBuf::from("src/a.rs");
+        let scanned: Vec<_> = graph
+            .get_all_functions()
+            .filter(|id| id.file == file)
+            .cloned()
+            .collect();
+        assert_eq!(graph.ids_in_file(&file), scanned);
+        assert_eq!(
+            scanned
+                .iter()
+                .map(|id| id.name.as_str())
+                .collect::<Vec<_>>(),
+            ["early", "later"]
+        );
+
+        graph.add_function(
+            FunctionId::new(file.clone(), "added".into(), 3),
+            false,
+            false,
+            1,
+            1,
+        );
+        assert!(graph.ids_in_file(&file).iter().any(|id| id.name == "added"));
+    }
 
     #[test]
     fn test_exact_lookup() {

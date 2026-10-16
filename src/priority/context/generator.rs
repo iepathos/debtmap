@@ -116,9 +116,9 @@ fn collect_scope_function_ids(item: &UnifiedDebtItem, call_graph: &CallGraph) ->
                 {
                     let prefix = format!("{}::", struct_name);
                     let scope: Vec<FunctionId> = call_graph
-                        .get_all_functions()
-                        .filter(|f| f.file == item.location.file && f.name.starts_with(&prefix))
-                        .cloned()
+                        .ids_in_file(&item.location.file)
+                        .into_iter()
+                        .filter(|f| f.name.starts_with(&prefix))
                         .collect();
                     if !scope.is_empty() {
                         return scope;
@@ -127,11 +127,7 @@ fn collect_scope_function_ids(item: &UnifiedDebtItem, call_graph: &CallGraph) ->
                 fallback_single_function_id(item)
             }
             DetectionType::GodFile | DetectionType::GodModule => {
-                let scope: Vec<FunctionId> = call_graph
-                    .get_all_functions()
-                    .filter(|f| f.file == item.location.file)
-                    .cloned()
-                    .collect();
+                let scope = call_graph.ids_in_file(&item.location.file);
                 if scope.is_empty() {
                     fallback_single_function_id(item)
                 } else {

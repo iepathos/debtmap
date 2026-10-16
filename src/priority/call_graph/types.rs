@@ -343,6 +343,30 @@ pub struct CallGraph {
     pub(crate) fuzzy_index: HashMap<FuzzyFunctionKey, Vec<FunctionId>>,
     #[serde(skip)]
     pub(crate) name_index: HashMap<String, Vec<FunctionId>>,
+    /// Sorted function ids. Built on first read and cleared when a new id is inserted.
+    #[serde(skip)]
+    ordered_ids: OrderedFunctionIds,
+}
+
+/// Shared sorted ids. Readers during parallel analysis only hold `&CallGraph`.
+#[derive(Debug)]
+struct OrderedFunctionIds(std::sync::RwLock<Option<std::sync::Arc<Vec<FunctionId>>>>);
+
+impl Clone for OrderedFunctionIds {
+    fn clone(&self) -> Self {
+        let ids = self
+            .0
+            .read()
+            .unwrap_or_else(|error| error.into_inner())
+            .clone();
+        Self(std::sync::RwLock::new(ids))
+    }
+}
+
+impl Default for OrderedFunctionIds {
+    fn default() -> Self {
+        Self(std::sync::RwLock::new(None))
+    }
 }
 
 #[derive(Deserialize)]
@@ -545,7 +569,48 @@ impl CallGraph {
             callee_index: HashMap::new(),
             fuzzy_index: HashMap::new(),
             name_index: HashMap::new(),
+            ordered_ids: OrderedFunctionIds::default(),
         }
+    }
+
+    pub(crate) fn ordered_function_ids(&self) -> std::sync::Arc<Vec<FunctionId>> {
+        if let Some(ids) = self.cached_function_ids() {
+            return ids;
+        }
+        self.store_ordered_function_ids()
+    }
+
+    fn cached_function_ids(&self) -> Option<std::sync::Arc<Vec<FunctionId>>> {
+        self.ordered_ids
+            .0
+            .read()
+            .unwrap_or_else(|error| error.into_inner())
+            .as_ref()
+            .cloned()
+    }
+
+    fn store_ordered_function_ids(&self) -> std::sync::Arc<Vec<FunctionId>> {
+        let mut guard = self
+            .ordered_ids
+            .0
+            .write()
+            .unwrap_or_else(|error| error.into_inner());
+        if let Some(ids) = guard.as_ref() {
+            return std::sync::Arc::clone(ids);
+        }
+        let mut ids: Vec<_> = self.nodes.keys().cloned().collect();
+        ids.sort();
+        let ids = std::sync::Arc::new(ids);
+        *guard = Some(std::sync::Arc::clone(&ids));
+        ids
+    }
+
+    pub(crate) fn invalidate_ordered_function_ids(&mut self) {
+        *self
+            .ordered_ids
+            .0
+            .write()
+            .unwrap_or_else(|error| error.into_inner()) = None;
     }
 
     fn rebuild_lookup_indexes(&mut self) {
