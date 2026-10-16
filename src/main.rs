@@ -27,13 +27,29 @@ fn extract_jobs(command: &Commands) -> usize {
     }
 }
 
-fn extract_parse_cache_mb(command: &Commands) -> usize {
-    match command {
-        Commands::Analyze { parse_cache_mb, .. } | Commands::Validate { parse_cache_mb, .. } => {
-            *parse_cache_mb
+fn apply_cache_budgets(command: &Commands) {
+    let (parse_cache_mb, resolution_cache_mb, canonical_cache_mb) = match command {
+        Commands::Analyze {
+            parse_cache_mb,
+            resolution_cache_mb,
+            canonical_cache_mb,
+            ..
         }
-        _ => debtmap::core::parsing::DEFAULT_PARSE_CACHE_MB,
-    }
+        | Commands::Validate {
+            parse_cache_mb,
+            resolution_cache_mb,
+            canonical_cache_mb,
+            ..
+        } => (*parse_cache_mb, *resolution_cache_mb, *canonical_cache_mb),
+        _ => (
+            debtmap::core::parsing::DEFAULT_PARSE_CACHE_MB,
+            debtmap::analyzers::DEFAULT_RESOLUTION_CACHE_MB,
+            debtmap::priority::call_graph::DEFAULT_CANONICAL_CACHE_MB,
+        ),
+    };
+    debtmap::core::parsing::set_parse_cache_mb(parse_cache_mb);
+    debtmap::analyzers::set_resolution_cache_mb(resolution_cache_mb);
+    debtmap::priority::call_graph::set_canonical_cache_mb(canonical_cache_mb);
 }
 
 /// Parse CLI arguments, supporting ARGUMENTS environment variable for backward compatibility.
@@ -125,7 +141,7 @@ fn main_inner() -> Result<()> {
 
     // Configure rayon only after all process-environment setup is complete.
     configure_thread_pool(get_worker_count(extract_jobs(&cli.command)));
-    debtmap::core::parsing::set_parse_cache_mb(extract_parse_cache_mb(&cli.command));
+    apply_cache_budgets(&cli.command);
 
     // Create the dependency injection container once at startup
     let _container = Arc::new(create_app_container()?);

@@ -49,6 +49,7 @@ use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use helpers::*;
 use matching::*;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 const EXPANSION_LIMIT: usize = 32;
 pub type Substitutions = HashMap<String, TypeFact>;
@@ -196,6 +197,29 @@ type ReexportKey = (
 );
 
 type ReexportPaths = dashmap::DashMap<ReexportKey, Vec<Vec<String>>, foldhash::fast::RandomState>;
+
+/// Megabytes of resolved Rust paths and reexport expansions retained per process.
+pub const DEFAULT_RESOLUTION_CACHE_MB: usize = 256;
+
+static RESOLUTION_BUDGET: AtomicUsize = AtomicUsize::new(DEFAULT_RESOLUTION_CACHE_MB << 20);
+static RESOLUTION_USED: AtomicUsize = AtomicUsize::new(0);
+
+/// Cap the Rust resolution memos. `0` recomputes every lookup.
+pub fn set_resolution_cache_mb(megabytes: usize) {
+    RESOLUTION_BUDGET.store(megabytes.saturating_mul(1 << 20), Ordering::Relaxed);
+    RESOLUTION_USED.store(0, Ordering::Relaxed);
+}
+
+pub(super) fn reserve_resolution_cache(bytes: usize) -> bool {
+    let budget = RESOLUTION_BUDGET.load(Ordering::Relaxed);
+    budget > 0
+        && RESOLUTION_USED
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |used| {
+                let next = used.saturating_add(bytes);
+                (next <= budget).then_some(next)
+            })
+            .is_ok()
+}
 
 impl WorkspaceIndex {
     pub fn build(files: &[(PathBuf, syn::File)]) -> Self {

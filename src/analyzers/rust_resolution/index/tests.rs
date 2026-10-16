@@ -426,3 +426,24 @@ fn unrelated_glob_leaves_a_missing_name_unqualified() {
     let index = index("mod other { pub struct Unrelated; } use other::*;");
     assert!(matches!(fact(&index, "Missing"), TypeFact::Unknown(_)));
 }
+
+#[test]
+fn resolution_cache_obeys_its_byte_budget() {
+    let path = vec!["Ty".to_string()];
+    set_resolution_cache_mb(0);
+    let disabled = index("struct Ty;");
+    let _ = disabled.resolve_paths(&path, &root(&disabled));
+    assert!(disabled.resolved_paths.is_empty());
+    assert!(disabled.reexports.is_empty());
+
+    RESOLUTION_BUDGET.store(1, Ordering::Relaxed);
+    RESOLUTION_USED.store(0, Ordering::Relaxed);
+    let tiny = index("struct Ty;");
+    let _ = tiny.resolve_paths(&path, &root(&tiny));
+    assert!(tiny.resolved_paths.is_empty());
+
+    set_resolution_cache_mb(DEFAULT_RESOLUTION_CACHE_MB);
+    let cached = index("struct Ty;");
+    let _ = cached.resolve_paths(&path, &root(&cached));
+    assert!(!cached.resolved_paths.is_empty());
+}

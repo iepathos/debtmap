@@ -6,7 +6,7 @@ use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Component, Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering as AtomicOrdering};
 use std::sync::{Arc, RwLock};
 
 /// Stable cross-language function identity. Source line is intentionally absent.
@@ -141,22 +141,59 @@ impl FunctionId {
         base_name.trim().to_string()
     }
 
-    /// Canonicalize file path for consistent matching
+    /// Canonicalize file path for consistent matching.
+    ///
+    /// Successful lookups are cached for every analyzed language. Failures stay
+    /// uncached so a path created later can still resolve.
     pub fn canonicalize_path(path: &Path) -> PathBuf {
-        // Only successes are cached, so a file created later still canonicalizes.
-        static CANONICAL: once_cell::sync::Lazy<dashmap::DashMap<PathBuf, PathBuf>> =
-            once_cell::sync::Lazy::new(dashmap::DashMap::new);
         if let Some(canonical) = CANONICAL.get(path) {
             return canonical.clone();
         }
         match path.canonicalize() {
             Ok(canonical) => {
-                CANONICAL.insert(path.to_path_buf(), canonical.clone());
+                remember_canonical(path, &canonical);
                 canonical
             }
             Err(_) => path.to_path_buf(),
         }
     }
+}
+
+/// Megabytes of successfully canonicalized paths retained for every language.
+pub const DEFAULT_CANONICAL_CACHE_MB: usize = 64;
+
+static CANONICAL: once_cell::sync::Lazy<dashmap::DashMap<PathBuf, PathBuf>> =
+    once_cell::sync::Lazy::new(dashmap::DashMap::new);
+static CANONICAL_BUDGET: AtomicUsize = AtomicUsize::new(DEFAULT_CANONICAL_CACHE_MB << 20);
+static CANONICAL_USED: AtomicUsize = AtomicUsize::new(0);
+
+/// Cap cached canonical paths. `0` canonicalizes on every lookup.
+pub fn set_canonical_cache_mb(megabytes: usize) {
+    CANONICAL_BUDGET.store(megabytes.saturating_mul(1 << 20), AtomicOrdering::Relaxed);
+    CANONICAL_USED.store(0, AtomicOrdering::Relaxed);
+    CANONICAL.clear();
+}
+
+fn remember_canonical(path: &Path, canonical: &Path) {
+    let cost = path_bytes(path).saturating_add(path_bytes(canonical));
+    if reserve_canonical(cost) {
+        CANONICAL.insert(path.to_path_buf(), canonical.to_path_buf());
+    }
+}
+
+fn path_bytes(path: &Path) -> usize {
+    path.as_os_str().len()
+}
+
+fn reserve_canonical(cost: usize) -> bool {
+    let budget = CANONICAL_BUDGET.load(AtomicOrdering::Relaxed);
+    budget > 0
+        && CANONICAL_USED
+            .fetch_update(AtomicOrdering::Relaxed, AtomicOrdering::Relaxed, |used| {
+                let next = used.saturating_add(cost);
+                (next <= budget).then_some(next)
+            })
+            .is_ok()
 }
 
 fn split_owner(language: Language, qualified_name: &str) -> (Option<String>, String) {
@@ -831,6 +868,26 @@ mod tests {
         assert_eq!(first.canonical_symbol(), moved.canonical_symbol());
         assert_eq!(first.canonical_symbol().owner.as_deref(), Some("Worker"));
         assert_eq!(first.canonical_symbol().name, "run");
+    }
+
+    #[test]
+    fn canonical_cache_respects_its_byte_budget() {
+        let path = std::env::current_dir().expect("working directory");
+        let resolved = path.canonicalize().expect("current directory exists");
+
+        set_canonical_cache_mb(0);
+        assert_eq!(FunctionId::canonicalize_path(&path), resolved);
+        assert!(!CANONICAL.contains_key(&path));
+
+        CANONICAL_BUDGET.store(1, AtomicOrdering::Relaxed);
+        CANONICAL_USED.store(0, AtomicOrdering::Relaxed);
+        CANONICAL.clear();
+        assert_eq!(FunctionId::canonicalize_path(&path), resolved);
+        assert!(!CANONICAL.contains_key(&path));
+
+        set_canonical_cache_mb(DEFAULT_CANONICAL_CACHE_MB);
+        assert_eq!(FunctionId::canonicalize_path(&path), resolved);
+        assert!(CANONICAL.contains_key(&path));
     }
 
     #[test]

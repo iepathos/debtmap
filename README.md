@@ -187,6 +187,18 @@ Quick links:
 
 Debtmap includes built-in profiling to identify performance bottlenecks.
 
+### Memory budgets
+
+`analyze` and `validate` accept cache budgets in megabytes. `0` disables that cache. Each flag also has an environment variable of the same name with a `DEBTMAP_` prefix and underscores, such as `DEBTMAP_PARSE_CACHE_MB`.
+
+| Flag | Default | Languages | What it stores |
+| --- | --- | --- | --- |
+| `--parse-cache-mb` | 64 | Rust | Syntax trees kept between call-graph passes |
+| `--resolution-cache-mb` | 256 | Rust | Resolved paths and reexport expansions |
+| `--canonical-cache-mb` | 64 | Rust, Python, JavaScript, TypeScript, Go, Solidity | Successful path canonicalization |
+
+Rust is the only language that keeps syntax trees and a resolution index between passes. Canonical paths are shared by every language debtmap analyzes.
+
 ### Built-in Timing
 
 ```bash

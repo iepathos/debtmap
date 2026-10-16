@@ -332,3 +332,4 @@ mod tests {
 }
 
 pub(crate) mod rust_resolution;
+pub use rust_resolution::index::{DEFAULT_RESOLUTION_CACHE_MB, set_resolution_cache_mb};

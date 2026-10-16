@@ -34,6 +34,21 @@ impl Walk {
     }
 }
 
+fn resolved_entry_bytes(path: &[String], context: &Context, paths: &[Vec<String>]) -> usize {
+    string_bytes(path)
+        .saturating_add(context.file.as_os_str().len())
+        .saturating_add(string_bytes(&context.module))
+        .saturating_add(paths.iter().map(|path| string_bytes(path)).sum())
+}
+
+fn reexport_entry_bytes(path: &[String], paths: &[Vec<String>]) -> usize {
+    string_bytes(path).saturating_add(paths.iter().map(|path| string_bytes(path)).sum())
+}
+
+fn string_bytes(segments: &[String]) -> usize {
+    segments.iter().map(String::len).sum()
+}
+
 fn segment_namespace(position: usize, len: usize, namespace: Namespace) -> Namespace {
     if position + 1 < len {
         Namespace::Type
@@ -90,7 +105,9 @@ impl WorkspaceIndex {
             .iter()
             .flat_map(|path| self.expand_reexports(path, context, 0, namespace))
             .collect();
-        self.resolved_paths.insert(key, paths.clone());
+        if reserve_resolution_cache(resolved_entry_bytes(path, context, &paths)) {
+            self.resolved_paths.insert(key, paths.clone());
+        }
         paths
     }
 
@@ -264,7 +281,7 @@ impl WorkspaceIndex {
         stack.push(path.to_vec());
         let walk = self.expand_step(path, context, depth, namespace, stack);
         stack.pop();
-        if walk.complete {
+        if walk.complete && reserve_resolution_cache(reexport_entry_bytes(path, &walk.paths)) {
             self.reexports.insert(key, walk.paths.clone());
         }
         walk

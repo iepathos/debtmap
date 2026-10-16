@@ -98,6 +98,8 @@ pub fn extract_analyze_params(
         profile: _,
         profile_output: _,
         parse_cache_mb: _,
+        resolution_cache_mb: _,
+        canonical_cache_mb: _,
     } = command
     {
         // Build configuration groups using pure builder functions

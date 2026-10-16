@@ -26,8 +26,9 @@ mod uncertainty_tests;
 pub(crate) use types::FunctionNode;
 pub use types::{
     CallEdgeEvidence, CallEdgeProvenance, CallGraph, CallSite, CallType, CanonicalSymbolKey,
-    ExactFunctionKey, FunctionCall, FunctionId, FuzzyFunctionKey, MatchStrategy, ResolutionOutcome,
-    SimpleFunctionKey, UncertainCall, UncertaintyReason,
+    DEFAULT_CANONICAL_CACHE_MB, ExactFunctionKey, FunctionCall, FunctionId, FuzzyFunctionKey,
+    MatchStrategy, ResolutionOutcome, SimpleFunctionKey, UncertainCall, UncertaintyReason,
+    set_canonical_cache_mb,
 };
 
 // Re-export commonly used functions from CallGraph
