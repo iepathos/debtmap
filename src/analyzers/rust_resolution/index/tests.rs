@@ -388,3 +388,41 @@ fn generic_trait_arguments_exclude_incompatible_explicit_impls_without_guessing(
     assert!(!dotted.justified);
     assert_eq!(dotted.candidates.len(), 1);
 }
+
+#[test]
+fn glob_follows_a_named_reexport_and_ignores_an_unrelated_glob() {
+    let index = index(
+        "mod inner { pub struct Ty; impl Ty { pub fn run(&self) {} } }
+         mod mid { pub use super::inner::Ty; }
+         mod other { pub struct Unrelated; }
+         use mid::*;
+         use other::*;",
+    );
+    let lookup = index.lookup_methods(&fact(&index, "Ty"), "run", &root(&index));
+    assert!(lookup.justified);
+    assert_eq!(lookup.candidates[0].id.name, "inner::Ty::run");
+}
+
+#[test]
+fn glob_imports_an_exported_submodule() {
+    let index = index(
+        "mod ty { pub mod context { pub struct Ty; impl Ty { pub fn run(&self) {} } } }
+         mod user { use super::ty::*; }",
+    );
+    let module = ["user".to_string()];
+    let context = index.context(Path::new("src/lib.rs"), &module);
+    let receiver = index.type_from_syn(
+        &syn::parse_str("context::Ty").expect("valid type"),
+        &context,
+        &Substitutions::new(),
+    );
+    let lookup = index.lookup_methods(&receiver, "run", &context);
+    assert!(lookup.justified);
+    assert_eq!(lookup.candidates[0].id.name, "ty::context::Ty::run");
+}
+
+#[test]
+fn unrelated_glob_leaves_a_missing_name_unqualified() {
+    let index = index("mod other { pub struct Unrelated; } use other::*;");
+    assert!(matches!(fact(&index, "Missing"), TypeFact::Unknown(_)));
+}

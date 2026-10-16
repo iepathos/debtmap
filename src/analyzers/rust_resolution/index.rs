@@ -177,6 +177,8 @@ pub struct WorkspaceIndex {
     imports_module: HashMap<Vec<String>, Vec<usize>>,
     /// Memoized path resolution; only valid once the index is no longer mutated.
     resolved_paths: ResolvedPaths,
+    /// Reexport expansions shared by every file in one workspace.
+    reexports: ReexportPaths,
 }
 
 type ResolvedPaths = dashmap::DashMap<
@@ -184,6 +186,16 @@ type ResolvedPaths = dashmap::DashMap<
     Vec<Vec<String>>,
     foldhash::fast::RandomState,
 >;
+
+type ReexportKey = (
+    Vec<String>,
+    Option<usize>,
+    Option<PathBuf>,
+    paths::Namespace,
+    u8,
+);
+
+type ReexportPaths = dashmap::DashMap<ReexportKey, Vec<Vec<String>>, foldhash::fast::RandomState>;
 
 impl WorkspaceIndex {
     pub fn build(files: &[(PathBuf, syn::File)]) -> Self {
