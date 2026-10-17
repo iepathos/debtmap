@@ -354,6 +354,7 @@ pub mod extraction;
 pub mod extraction_patterns;
 pub mod formatting;
 pub mod io;
+pub mod llm;
 pub mod metrics;
 pub mod observability;
 pub mod organization;

@@ -10,6 +10,7 @@
 //! - **diagnose-coverage**: Debug coverage calculation for specific files
 //! - **explain-coverage**: Explain how coverage scores are calculated
 //! - **init**: Initialize a new debtmap configuration file
+//! - **llm-models**: List LLM model profiles for the editability estimate
 //! - **validate**: Validate codebase against configured thresholds
 //! - **validate-improvement**: Verify that changes improved debt metrics
 //!
@@ -22,6 +23,7 @@ pub mod config;
 pub mod diagnose_coverage;
 pub mod explain_coverage;
 pub mod init;
+pub mod llm_models;
 pub mod state;
 pub mod validate;
 pub mod validate_improvement;

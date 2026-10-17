@@ -278,6 +278,19 @@ pub enum Commands {
         #[arg(long = "validate-call-graph")]
         validate_call_graph: bool,
 
+        /// Estimate per-model LLM editability for each function (heuristic)
+        #[arg(long = "llm-editability", help_heading = "LLM Editability")]
+        llm_editability: bool,
+
+        /// LLM models to evaluate: profile ids or aliases, comma-separated.
+        /// Implies --llm-editability. Run `debtmap llm-models` to list them.
+        #[arg(
+            long = "llm-models",
+            value_delimiter = ',',
+            help_heading = "LLM Editability"
+        )]
+        llm_models: Option<Vec<String>>,
+
         /// Enable profiling to identify performance bottlenecks (Spec 001).
         /// Outputs timing breakdown for each analysis phase when complete.
         #[arg(long = "profile", help_heading = "Profiling Options")]
@@ -465,6 +478,9 @@ pub enum Commands {
         #[arg(long, default_value = "text")]
         format: String,
     },
+
+    /// List LLM model profiles for the editability estimate (built-in and configured)
+    LlmModels,
 
     /// Explain coverage detection for a specific function (debugging tool)
     ExplainCoverage {

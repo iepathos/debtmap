@@ -93,6 +93,12 @@ pub enum FormattedSection {
         percentage: f64,
         level: CoverageLevel,
         details: Option<String>,
+        crap: Option<f64>,
+    },
+    /// LLM editability summary and the most impactful fix
+    LlmEditability {
+        summary: String,
+        top_action: Option<String>,
     },
     /// Dependency information
     Dependencies {
