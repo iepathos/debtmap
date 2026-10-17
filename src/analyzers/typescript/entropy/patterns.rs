@@ -6,6 +6,7 @@
 //! - Method chains: `.map()`, `.filter()`, `.forEach()` sequences
 //! - Try-catch blocks with similar error handling
 
+use crate::analyzers::syntax_tree::node_text;
 use crate::complexity::entropy_core::PatternMetrics;
 use std::collections::HashMap;
 use tree_sitter::Node;
@@ -296,13 +297,6 @@ fn categorize_statement_structure(node: &Node, source: &str) -> String {
     } else {
         "complex".to_string()
     }
-}
-
-/// Extract text from a tree-sitter node
-fn node_text<'a>(node: &Node, source: &'a str) -> &'a str {
-    let start = node.start_byte();
-    let end = node.end_byte();
-    &source[start..end]
 }
 
 #[cfg(test)]

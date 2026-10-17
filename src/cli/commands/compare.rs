@@ -121,7 +121,7 @@ fn json_to_analysis(json: DebtmapJsonInput) -> UnifiedAnalysis {
         }
     }
 
-    let call_graph = CallGraph::new();
+    let call_graph = std::sync::Arc::new(CallGraph::new());
 
     UnifiedAnalysis {
         items,
@@ -130,7 +130,7 @@ fn json_to_analysis(json: DebtmapJsonInput) -> UnifiedAnalysis {
         total_debt_score: json.total_debt_score,
         debt_density: json.debt_density,
         total_lines_of_code: json.total_lines_of_code,
-        call_graph: call_graph.clone(),
+        call_graph: std::sync::Arc::clone(&call_graph),
         data_flow_graph: crate::data_flow::DataFlowGraph::from_call_graph(call_graph),
         overall_coverage: json.overall_coverage,
         has_coverage_data: json.overall_coverage.is_some(),

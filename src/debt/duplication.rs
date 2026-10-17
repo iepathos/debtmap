@@ -30,7 +30,10 @@ pub fn detect_duplication(
 }
 
 fn extract_project_chunks(files: &[(PathBuf, String)], chunk_size: usize) -> Vec<SimilarityChunk> {
-    let mut chunks: Vec<_> = files
+    // Chunks come out in line order per file, so ordering files orders all chunks.
+    let mut files: Vec<_> = files.iter().collect();
+    files.sort_by(|left, right| left.0.cmp(&right.0));
+    files
         .par_iter()
         .flat_map_iter(|(path, content)| {
             extract_chunks(content, chunk_size)
@@ -46,15 +49,7 @@ fn extract_project_chunks(files: &[(PathBuf, String)], chunk_size: usize) -> Vec
                     )
                 })
         })
-        .collect();
-    chunks.sort_by(|left, right| {
-        left.location
-            .file
-            .cmp(&right.location.file)
-            .then(left.location.start_line.cmp(&right.location.start_line))
-            .then(left.location.end_line.cmp(&right.location.end_line))
-    });
-    chunks
+        .collect()
 }
 
 fn extract_chunks(content: &str, chunk_size: usize) -> Vec<(usize, String)> {
@@ -64,21 +59,20 @@ fn extract_chunks(content: &str, chunk_size: usize) -> Vec<(usize, String)> {
         return Vec::new();
     }
 
-    (0..=lines.len() - chunk_size)
-        .map(|i| {
-            let chunk = lines[i..i + chunk_size].join("\n");
-            (i + 1, normalize_chunk(&chunk))
+    let normalized: Vec<_> = lines.iter().map(|line| normalize_line(line)).collect();
+    normalized
+        .windows(chunk_size)
+        .enumerate()
+        .map(|(i, window)| {
+            let kept: Vec<_> = window.iter().flatten().copied().collect();
+            (i + 1, kept.join("\n"))
         })
         .collect()
 }
 
-fn normalize_chunk(chunk: &str) -> String {
-    chunk
-        .lines()
-        .map(|line| line.trim())
-        .filter(|line| !line.is_empty() && !line.starts_with("//") && !line.starts_with('#'))
-        .collect::<Vec<_>>()
-        .join("\n")
+fn normalize_line(line: &str) -> Option<&str> {
+    let line = line.trim();
+    (!line.is_empty() && !line.starts_with("//") && !line.starts_with('#')).then_some(line)
 }
 
 pub fn calculate_similarity(chunk1: &str, chunk2: &str) -> f64 {
