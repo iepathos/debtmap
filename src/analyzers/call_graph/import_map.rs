@@ -337,7 +337,7 @@ mod tests {
         let resolved = map.resolve_import(&file, "HashMap");
         assert!(resolved.is_some());
         let paths = resolved.unwrap();
-        assert!(paths.contains(&"foldhash::HashMap".to_string()));
+        assert!(paths.contains(&"std::collections::HashMap".to_string()));
     }
 
     #[test]
