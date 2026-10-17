@@ -2,6 +2,7 @@
 #![allow(dead_code)]
 
 pub mod analysis_helpers;
+pub mod git_fixture;
 pub mod subprocess_converter;
 
 use std::path::PathBuf;

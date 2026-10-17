@@ -143,6 +143,7 @@ fn test_function_item_required_fields_and_ranges() {
         context: None,
         git_history: None,
         contextual_risk: None,
+        llm_editability: None,
     };
 
     // Serialize to JSON
@@ -319,6 +320,7 @@ fn test_priority_matches_score_thresholds() {
             context: None,
             git_history: None,
             contextual_risk: None,
+            llm_editability: None,
         }));
 
         let json_str = serde_json::to_string(&item).expect("Serialization failed");
@@ -384,6 +386,7 @@ fn test_no_floating_point_noise_in_serialized_output() {
         context: None,
         git_history: None,
         contextual_risk: None,
+        llm_editability: None,
     };
 
     let json_str = serde_json::to_string(&item).expect("Serialization failed");
@@ -489,6 +492,7 @@ fn test_unified_debt_item_tagged_serialization() {
         context: None,
         git_history: None,
         contextual_risk: None,
+        llm_editability: None,
     }));
 
     let json_str = serde_json::to_string(&function_item).expect("Serialization failed");

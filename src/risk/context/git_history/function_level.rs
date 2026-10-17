@@ -19,6 +19,7 @@
 //! - Pure functions for metrics calculation (easily testable)
 //! - I/O isolated to git2 wrapper calls
 
+use super::activity::{CommitActivity, commit_fact};
 use super::batched::is_bug_fix;
 use super::blame_cache::FileBlameCache;
 use super::git2_provider::{CommitStats, Git2Repository};
@@ -60,6 +61,8 @@ pub struct FunctionHistory {
     pub last_modified: Option<DateTime<Utc>>,
     /// When function was introduced
     pub introduced: Option<DateTime<Utc>>,
+    /// Compact commit facts for recent-churn analysis.
+    pub activity: CommitActivity,
 }
 
 impl FunctionHistory {
@@ -308,6 +311,13 @@ pub fn calculate_function_history_with_authors(
         authors,
         last_modified: modification_commits.iter().filter_map(|c| c.date).max(),
         introduced: introduction_date,
+        activity: CommitActivity {
+            commits: modification_commits
+                .iter()
+                .filter_map(|c| Some(commit_fact(&c.hash, c.date?, &c.message)))
+                .collect(),
+            ..Default::default()
+        },
     }
 }
 

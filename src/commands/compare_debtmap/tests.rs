@@ -103,6 +103,7 @@ fn create_function_item(
             branch_similarity: None,
             entropy_adjusted_cognitive: None,
             transitive_coverage: None,
+            crap: None,
         },
         debt_type: DebtType::ComplexityHotspot {
             cyclomatic: complexity,
@@ -125,6 +126,7 @@ fn create_function_item(
         context: None,
         git_history: None,
         contextual_risk: None,
+        llm_editability: None,
     }))
 }
 

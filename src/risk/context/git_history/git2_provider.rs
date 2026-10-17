@@ -505,6 +505,7 @@ pub fn commit_pickaxe_changes_pattern(
 pub struct FileFunctionRecord {
     pub introduction_oid: Option<git2::Oid>,
     pub introduction_date: Option<DateTime<Utc>>,
+    pub introduction_message: Option<String>,
     pub modifications: Vec<CommitStats>,
 }
 
@@ -519,7 +520,11 @@ struct CommitFunctionData {
     file_churn: HashMap<PathBuf, usize>,
     /// (file, function_name) → (added_count, removed_count, regex_matched)
     updates: HashMap<(PathBuf, String), (usize, usize, bool)>,
+    /// Sorted (path, old blob, new blob) for every file this commit changed.
+    blob_changes: Vec<BlobChange>,
 }
+
+type BlobChange = (PathBuf, Oid, Oid);
 
 /// File-level commit scan exported for building `BatchedGitHistory`.
 #[derive(Debug, Clone)]
@@ -534,6 +539,13 @@ pub struct FileCommitScan {
 pub struct RepoHistoryScan {
     pub functions: HashMap<(PathBuf, String), FileFunctionRecord>,
     pub file_scans: Vec<FileCommitScan>,
+    /// Dates of conventional `fix(scope):` commits across the repo, oldest first.
+    pub scope_fixes: HashMap<String, Vec<DateTime<Utc>>>,
+    /// Dates of scope-less conventional `fix:` commits per touched file, oldest first.
+    pub file_fixes: HashMap<PathBuf, Vec<DateTime<Utc>>>,
+    /// Reverting commit → reverted commit, for commits that exactly undo an
+    /// earlier commit's file changes, whatever their messages say.
+    pub content_reverts: HashMap<String, String>,
 }
 
 /// Compute per-function histories for many files via one repository-wide commit walk.
@@ -558,6 +570,9 @@ pub fn compute_repo_function_histories(
         return Ok(RepoHistoryScan {
             functions: HashMap::new(),
             file_scans: Vec::new(),
+            scope_fixes: HashMap::new(),
+            file_fixes: HashMap::new(),
+            content_reverts: HashMap::new(),
         });
     }
 
@@ -606,7 +621,58 @@ pub fn compute_repo_function_histories(
     Ok(RepoHistoryScan {
         functions: reduce_commit_data_to_records(file_targets, &commit_data),
         file_scans,
+        scope_fixes: fix_dates_by(&commit_data, |_, scope| scope.into_iter().collect()),
+        file_fixes: fix_dates_by(&commit_data, |d, scope| match scope {
+            Some(_) => Vec::new(),
+            None => d.file_churn.keys().cloned().collect(),
+        }),
+        content_reverts: match_content_reverts(
+            commit_data
+                .iter()
+                .map(|d| (d.oid, d.blob_changes.as_slice())),
+        ),
     })
+}
+
+/// Pairs each commit with the latest earlier commit whose changes it exactly
+/// inverts: same files, each restored to the blob it had before. Commits must
+/// be in chronological order.
+fn match_content_reverts<'a>(
+    commits: impl Iterator<Item = (Oid, &'a [BlobChange])>,
+) -> HashMap<String, String> {
+    let inverse = |changes: &[BlobChange]| -> Vec<BlobChange> {
+        changes
+            .iter()
+            .map(|(p, old, new)| (p.clone(), *new, *old))
+            .collect()
+    };
+    let (_, reverts) = commits.filter(|(_, changes)| !changes.is_empty()).fold(
+        (HashMap::<Vec<BlobChange>, Oid>::new(), HashMap::new()),
+        |(mut undo, mut reverts), (oid, changes)| {
+            if let Some(target) = undo.remove(changes) {
+                reverts.insert(oid.to_string(), target.to_string());
+            }
+            undo.insert(inverse(changes), oid);
+            (undo, reverts)
+        },
+    );
+    reverts
+}
+
+/// Dates of conventional fix commits grouped by the keys `keys` derives
+/// from each commit and its fix scope.
+fn fix_dates_by<K: std::hash::Hash + Eq>(
+    commit_data: &[CommitFunctionData],
+    keys: impl Fn(&CommitFunctionData, Option<String>) -> Vec<K>,
+) -> HashMap<K, Vec<DateTime<Utc>>> {
+    commit_data
+        .iter()
+        .filter_map(|d| Some((d, super::activity::conventional_fix_scope(&d.message)?)))
+        .flat_map(|(d, scope)| keys(d, scope).into_iter().map(|k| (k, d.date)))
+        .fold(HashMap::new(), |mut acc, (key, date)| {
+            acc.entry(key).or_default().push(date);
+            acc
+        })
 }
 
 type IntroPatternTable = HashMap<PathBuf, Vec<(String, String)>>;
@@ -671,6 +737,14 @@ fn process_commit_for_function_history(
     let parent_tree = parent.as_ref().and_then(|p| p.tree().ok());
     let tree = commit.tree()?;
     let diff = repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), None)?;
+    let mut blob_changes: Vec<BlobChange> = diff
+        .deltas()
+        .filter_map(|d| {
+            let path = d.new_file().path().or_else(|| d.old_file().path())?;
+            Some((path.to_path_buf(), d.old_file().id(), d.new_file().id()))
+        })
+        .collect();
+    blob_changes.sort();
 
     let mut per_file_added: HashMap<PathBuf, Vec<String>> = HashMap::new();
     let mut per_file_removed: HashMap<PathBuf, Vec<String>> = HashMap::new();
@@ -764,6 +838,7 @@ fn process_commit_for_function_history(
         author_email,
         file_churn,
         updates,
+        blob_changes,
     }))
 }
 
@@ -789,6 +864,7 @@ fn reduce_commit_data_to_records(
                 if added != removed {
                     record.introduction_oid = Some(data.oid);
                     record.introduction_date = Some(data.date);
+                    record.introduction_message = Some(data.message.clone());
                 }
             } else if *matched && record.introduction_oid != Some(data.oid) {
                 record.modifications.push(CommitStats {
@@ -926,6 +1002,28 @@ pub fn extract_authors_for_range(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn content_reverts_pair_exact_inverses_only() {
+        let oid = |n: u8| Oid::from_bytes(&[n; 20]).unwrap();
+        let change = |p: &str, a, b| (PathBuf::from(p), oid(a), oid(b));
+        let edit = [change("a.rs", 1, 2), change("b.rs", 3, 4)];
+        let partial_undo = [change("a.rs", 2, 1)];
+        let revert = [change("a.rs", 2, 1), change("b.rs", 4, 3)];
+        let commits = [
+            (oid(10), &edit[..]),
+            (oid(11), &partial_undo[..]),
+            (oid(12), &revert[..]),
+            (oid(13), &edit[..]),
+        ];
+        let reverts = match_content_reverts(commits.into_iter());
+        let pair = |a: u8, b: u8| (oid(a).to_string(), oid(b).to_string());
+        assert_eq!(
+            reverts,
+            HashMap::from([pair(12, 10), pair(13, 12)]),
+            "re-applying the edit reverts the revert"
+        );
+    }
     use std::process::Command;
     use tempfile::TempDir;
 

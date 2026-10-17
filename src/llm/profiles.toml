@@ -1,0 +1,257 @@
+# Built-in model profiles for the LLM editability estimate.
+#
+# The numbers are heuristic priors, not measurements. Override any field under
+# [llm_editability.profiles.<id>] or add custom profiles there.
+#
+# Tiers hold the full parameter set. Model families inherit a tier and set
+# provider, aliases, context sizes and any overrides. Family ids are
+# version-agnostic; aliases are case-insensitive globs matched against the names
+# users pass in `models` or `--llm-models`. When several aliases match, the most
+# specific one (most literal characters) wins.
+#
+# Model lineups change often: check aliases and context sizes against provider
+# documentation when updating this file.
+#
+# capability                Baseline logit; higher means stronger.
+# cost_tier                 Relative cost, 1 = cheapest. Recommendations pick the
+#                           cheapest model that clears its `feasible` threshold.
+# effective_context_tokens  Context the model reliably uses; larger functions
+#                           (with callee signatures) get the `human` verdict.
+# tolerance.<feature>       Value at which the feature counts as "half hard".
+# sensitivity.<feature>     Per-model multiplier on the feature's penalty.
+
+[tiers.frontier_reasoning]
+capability = 4.0
+cost_tier = 4
+context_window = 200000
+effective_context_tokens = 120000
+tolerance = { unit_tokens = 2000.0, context_tokens = 32000.0, reasoning = 70.0, ripple = 40.0, rework = 6.0 }
+sensitivity = { unit_tokens = 0.9, context_tokens = 0.9, reasoning = 0.9, ripple = 0.9, verification_gap = 0.9, side_effects = 0.9, rework = 0.9 }
+
+[tiers.frontier]
+capability = 3.5
+cost_tier = 3
+context_window = 200000
+effective_context_tokens = 100000
+tolerance = { unit_tokens = 1200.0, context_tokens = 16000.0, reasoning = 45.0, ripple = 25.0, rework = 5.0 }
+sensitivity = { unit_tokens = 1.0, context_tokens = 1.0, reasoning = 1.0, ripple = 1.0, verification_gap = 1.0, side_effects = 1.0, rework = 1.0 }
+
+[tiers.mid]
+capability = 3.0
+cost_tier = 2
+context_window = 128000
+effective_context_tokens = 48000
+tolerance = { unit_tokens = 600.0, context_tokens = 8000.0, reasoning = 25.0, ripple = 12.0, rework = 4.0 }
+sensitivity = { unit_tokens = 1.1, context_tokens = 1.1, reasoning = 1.1, ripple = 1.1, verification_gap = 1.1, side_effects = 1.1, rework = 1.1 }
+
+[tiers.small_local]
+capability = 2.5
+cost_tier = 1
+context_window = 32000
+effective_context_tokens = 12000
+tolerance = { unit_tokens = 300.0, context_tokens = 3000.0, reasoning = 12.0, ripple = 6.0, rework = 3.0 }
+sensitivity = { unit_tokens = 1.25, context_tokens = 1.25, reasoning = 1.25, ripple = 1.25, verification_gap = 1.25, side_effects = 1.25, rework = 1.25 }
+
+# --- Anthropic ---------------------------------------------------------------
+
+[models.claude-opus]
+provider = "anthropic"
+inherits = "tier:frontier_reasoning"
+aliases = ["claude-opus*", "claude-*-opus*", "opus"]
+context_window = 200000
+
+[models.claude-sonnet]
+provider = "anthropic"
+inherits = "tier:frontier"
+aliases = ["claude-sonnet*", "claude-*-sonnet*", "sonnet"]
+context_window = 200000
+capability = 3.7
+
+[models.claude-haiku]
+provider = "anthropic"
+inherits = "tier:mid"
+aliases = ["claude-haiku*", "claude-*-haiku*", "haiku"]
+context_window = 200000
+effective_context_tokens = 80000
+
+# --- OpenAI ------------------------------------------------------------------
+
+[models.gpt-frontier]
+provider = "openai"
+inherits = "tier:frontier"
+aliases = ["gpt-5*", "gpt-4.1*", "gpt-4o*", "chatgpt-*"]
+context_window = 400000
+capability = 3.7
+
+[models.gpt-mini]
+provider = "openai"
+inherits = "tier:mid"
+aliases = ["gpt-*-mini*", "gpt-*mini"]
+context_window = 400000
+effective_context_tokens = 80000
+
+[models.gpt-nano]
+provider = "openai"
+inherits = "tier:mid"
+aliases = ["gpt-*-nano*", "gpt-*nano"]
+context_window = 400000
+capability = 2.6
+cost_tier = 1
+
+[models.openai-reasoning]
+provider = "openai"
+inherits = "tier:frontier_reasoning"
+aliases = ["o1*", "o3*", "o4*", "gpt-*-pro*", "gpt-*codex*", "codex*"]
+context_window = 200000
+
+[models.openai-reasoning-mini]
+provider = "openai"
+inherits = "tier:mid"
+aliases = ["o*-mini*"]
+context_window = 200000
+tolerance = { reasoning = 35.0 }
+
+# --- Google ------------------------------------------------------------------
+
+[models.gemini-pro]
+provider = "google"
+inherits = "tier:frontier"
+aliases = ["gemini-*pro*"]
+context_window = 1048576
+effective_context_tokens = 200000
+tolerance = { context_tokens = 24000.0 }
+
+[models.gemini-flash]
+provider = "google"
+inherits = "tier:mid"
+aliases = ["gemini-*flash*"]
+context_window = 1048576
+effective_context_tokens = 120000
+cost_tier = 1
+
+[models.gemma]
+provider = "google"
+inherits = "tier:small_local"
+aliases = ["gemma*"]
+context_window = 128000
+effective_context_tokens = 24000
+
+# --- xAI ---------------------------------------------------------------------
+
+[models.grok]
+provider = "xai"
+inherits = "tier:frontier"
+aliases = ["grok", "grok-[0-9]*"]
+context_window = 256000
+
+[models.grok-code]
+provider = "xai"
+inherits = "tier:mid"
+aliases = ["grok-code*", "grok-*-code*"]
+context_window = 256000
+effective_context_tokens = 80000
+cost_tier = 1
+
+# --- Meta --------------------------------------------------------------------
+
+[models.llama-large]
+provider = "meta"
+inherits = "tier:mid"
+aliases = ["llama-4*", "*llama*70b*", "*llama*405b*"]
+context_window = 128000
+
+[models.llama-small]
+provider = "meta"
+inherits = "tier:small_local"
+aliases = ["*llama*-1b*", "*llama*-3b*", "*llama*-8b*", "*llama*-11b*"]
+context_window = 128000
+
+# --- Mistral -----------------------------------------------------------------
+
+[models.mistral-large]
+provider = "mistral"
+inherits = "tier:mid"
+aliases = ["mistral-large*", "mistral-medium*"]
+context_window = 128000
+capability = 3.1
+
+[models.codestral]
+provider = "mistral"
+inherits = "tier:mid"
+aliases = ["codestral*"]
+context_window = 256000
+
+[models.devstral]
+provider = "mistral"
+inherits = "tier:mid"
+aliases = ["devstral*"]
+context_window = 128000
+cost_tier = 1
+
+# --- Alibaba -----------------------------------------------------------------
+
+[models.qwen-coder-large]
+provider = "alibaba"
+inherits = "tier:mid"
+aliases = ["qwen*-coder", "qwen*-coder-plus*", "qwen*coder*480b*"]
+context_window = 256000
+effective_context_tokens = 80000
+capability = 3.2
+
+[models.qwen-coder-small]
+provider = "alibaba"
+inherits = "tier:small_local"
+aliases = ["qwen*coder*-1.5b*", "qwen*coder*-3b*", "qwen*coder*-7b*", "qwen*coder*-14b*", "qwen*coder*-30b*", "qwen*coder*-32b*"]
+context_window = 128000
+effective_context_tokens = 24000
+
+# --- DeepSeek ----------------------------------------------------------------
+
+[models.deepseek-chat]
+provider = "deepseek"
+inherits = "tier:mid"
+aliases = ["deepseek-chat*", "deepseek-v*", "deepseek-coder*"]
+context_window = 128000
+capability = 3.2
+
+[models.deepseek-reasoner]
+provider = "deepseek"
+inherits = "tier:frontier"
+aliases = ["deepseek-reasoner*", "deepseek-r*"]
+context_window = 128000
+effective_context_tokens = 64000
+cost_tier = 2
+
+# --- Moonshot ----------------------------------------------------------------
+
+[models.kimi]
+provider = "moonshot"
+inherits = "tier:mid"
+aliases = ["kimi*", "moonshot*"]
+context_window = 256000
+capability = 3.2
+
+# --- Zhipu -------------------------------------------------------------------
+
+[models.glm]
+provider = "zhipu"
+inherits = "tier:mid"
+aliases = ["glm*"]
+context_window = 128000
+
+# --- Microsoft ---------------------------------------------------------------
+
+[models.phi]
+provider = "microsoft"
+inherits = "tier:small_local"
+aliases = ["phi*"]
+context_window = 128000
+effective_context_tokens = 16000
+
+# --- Cursor ------------------------------------------------------------------
+
+[models.composer]
+provider = "cursor"
+inherits = "tier:frontier"
+aliases = ["composer*", "cursor-composer*"]
+context_window = 200000

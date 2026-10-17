@@ -131,6 +131,8 @@ mod tests {
             no_tui: false,
             quiet: false,
             show_filter_stats: false,
+            llm_editability: false,
+            llm_models: None,
             profile: false,
             profile_output: None,
         };

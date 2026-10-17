@@ -21,6 +21,7 @@ pub mod context;
 pub mod correlation;
 pub mod coverage_gap;
 pub mod coverage_index;
+pub mod crap;
 pub mod delegation;
 pub mod effects;
 pub mod evidence;
@@ -485,6 +486,7 @@ mod tests {
                     author_count: 3,
                     total_commits: 3,
                     bug_fix_count: 0,
+                    activity: Default::default(),
                 },
             })
         }

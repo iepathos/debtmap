@@ -37,6 +37,7 @@ pub fn build_page_lines(item: &UnifiedDebtItem, theme: &Theme, width: u16) -> Ve
                 author_count,
                 total_commits,
                 bug_fix_count,
+                ..
             } = &ctx.details
         {
             // Change Patterns section
@@ -296,6 +297,7 @@ mod tests {
                         author_count,
                         total_commits,
                         bug_fix_count,
+                        activity: Default::default(),
                     },
                 }],
                 explanation: "Test explanation".to_string(),

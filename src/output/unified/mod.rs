@@ -106,14 +106,16 @@ fn convert_items(
     items: &crate::collections::Vector<crate::priority::DebtItem>,
     include_scoring_details: bool,
     call_graph: &crate::priority::CallGraph,
+    include_v4_fields: bool,
 ) -> Vec<UnifiedDebtItemOutput> {
     items
         .iter()
         .map(|item| {
-            let output = UnifiedDebtItemOutput::from_debt_item_with_call_graph(
+            let output = UnifiedDebtItemOutput::from_debt_item_with_options(
                 item,
                 include_scoring_details,
                 Some(call_graph),
+                include_v4_fields,
             );
             output.assert_invariants();
             output
@@ -262,8 +264,21 @@ pub fn convert_to_unified_format(
     analysis: &crate::priority::UnifiedAnalysis,
     include_scoring_details: bool,
 ) -> UnifiedOutput {
+    convert_analysis(analysis, include_scoring_details, false)
+}
+
+fn convert_analysis(
+    analysis: &crate::priority::UnifiedAnalysis,
+    include_scoring_details: bool,
+    include_v4_fields: bool,
+) -> UnifiedOutput {
     let all_items = collect_all_items(analysis);
-    let unified_items = convert_items(&all_items, include_scoring_details, &analysis.call_graph);
+    let unified_items = convert_items(
+        &all_items,
+        include_scoring_details,
+        &analysis.call_graph,
+        include_v4_fields,
+    );
     let deduplicated = deduplicate_items(unified_items);
     let sorted_items = sort_by_score_descending(deduplicated);
     build_unified_output(sorted_items, analysis.total_lines_of_code, None)
@@ -275,7 +290,7 @@ pub fn convert_to_unified_format_with_receipt(
     include_scoring_details: bool,
     receipt: AnalysisReceipt,
 ) -> UnifiedOutput {
-    let mut output = convert_to_unified_format(analysis, include_scoring_details);
+    let mut output = convert_analysis(analysis, include_scoring_details, true);
     output.format_version = UNIFIED_FORMAT_VERSION.to_string();
     output.metadata.project_root = receipt.analysis_target.clone();
     finding_id::assign_finding_ids(&mut output.items, receipt.analysis_target.as_deref());
