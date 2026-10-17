@@ -169,7 +169,7 @@ pub mod format {
 
     /// Format coverage section (returns None if no coverage data)
     pub fn coverage(m: &FunctionMetricsOutput) -> Option<String> {
-        if m.coverage.is_none() && m.transitive_coverage.is_none() {
+        if m.coverage.is_none() && m.transitive_coverage.is_none() && m.crap.is_none() {
             return None;
         }
         let mut out = String::new();
@@ -1631,6 +1631,19 @@ mod tests {
             !markdown.contains("- Type: Function"),
             "GodObject debt items must not be mislabeled as Function:\n{markdown}"
         );
+    }
+
+    #[test]
+    fn coverage_renders_crap_without_percentages() {
+        use crate::output::unified::FunctionMetricsOutput;
+
+        let text = format::coverage(&FunctionMetricsOutput {
+            crap: Some(12.0),
+            ..FunctionMetricsOutput::default()
+        })
+        .expect("crap");
+
+        assert!(text.contains("CRAP: 12.0"), "{text}");
     }
 
     #[test]

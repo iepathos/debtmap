@@ -20,7 +20,7 @@ pub struct TopicIndex {
     tokenizer: DefaultTokenizer,
     since: DateTime<Utc>,
     min_similarity: f64,
-    fixes: Vec<(TopicFix, Terms)>,
+    fixes: Vec<(TopicFix, String, Terms)>,
     doc_freq: HashMap<String, usize>,
     docs: usize,
 }
@@ -52,6 +52,7 @@ impl TopicIndex {
                         date: s.date,
                         scope,
                     },
+                    s.message.clone(),
                     t.clone(),
                 )
             })
@@ -71,19 +72,11 @@ impl TopicIndex {
         &self,
         commits: impl IntoIterator<Item = (DateTime<Utc>, &'a str)>,
     ) -> Vec<TopicFix> {
-        let own: Vec<Terms> = commits
-            .into_iter()
-            .filter(|(date, _)| *date >= self.since)
-            .map(|(_, message)| terms(&self.tokenizer, message))
-            .filter(|t| !t.is_empty())
-            .collect();
+        let own = own_terms(self, commits);
         self.fixes
             .iter()
-            .filter(|(_, fix)| {
-                own.iter()
-                    .any(|t| self.similarity(t, fix) >= self.min_similarity)
-            })
-            .map(|(fix, _)| fix.clone())
+            .filter(|(fix, message, terms)| related_to(self, &own, fix, message, terms))
+            .map(|(fix, _, _)| fix.clone())
             .collect()
     }
 
@@ -98,6 +91,33 @@ impl TopicIndex {
         let df = self.doc_freq.get(term).copied().unwrap_or(0);
         ((1 + self.docs) as f64 / (1 + df) as f64).ln() + 1.0
     }
+}
+
+fn own_terms<'a>(
+    index: &TopicIndex,
+    commits: impl IntoIterator<Item = (DateTime<Utc>, &'a str)>,
+) -> Vec<(DateTime<Utc>, &'a str, Terms)> {
+    commits
+        .into_iter()
+        .filter(|(date, _)| *date >= index.since)
+        .filter_map(|(date, message)| {
+            let parsed = terms(&index.tokenizer, message);
+            (!parsed.is_empty()).then_some((date, message, parsed))
+        })
+        .collect()
+}
+
+fn related_to(
+    index: &TopicIndex,
+    own: &[(DateTime<Utc>, &str, Terms)],
+    fix: &TopicFix,
+    message: &str,
+    fix_terms: &Terms,
+) -> bool {
+    own.iter().any(|(date, own_message, own_terms)| {
+        (*date != fix.date || *own_message != message)
+            && index.similarity(own_terms, fix_terms) >= index.min_similarity
+    })
 }
 
 fn terms(tokenizer: &DefaultTokenizer, message: &str) -> Terms {
@@ -202,6 +222,13 @@ mod tests {
             index.related_fixes(own),
             vec![fix(1, None), fix(5, Some("lexer"))]
         );
+    }
+
+    #[test]
+    fn own_fix_is_not_reported_as_related() {
+        let scans = [scan(2, "fix: tokenizer drops tab characters")];
+        let own = [(scans[0].date, scans[0].message.as_str())];
+        assert!(index(&scans).related_fixes(own).is_empty());
     }
 
     #[test]

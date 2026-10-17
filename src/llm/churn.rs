@@ -93,10 +93,14 @@ impl Default for TopicConfig {
     }
 }
 
+const MAX_WINDOW_DAYS: u32 = 36_500;
+
 impl ChurnConfig {
     pub fn validate(&self) -> Result<(), String> {
-        if self.window_days == 0 {
-            return Err("llm_editability.churn.window_days must be > 0".into());
+        if self.window_days == 0 || self.window_days > MAX_WINDOW_DAYS {
+            return Err(format!(
+                "llm_editability.churn.window_days must be from 1 to {MAX_WINDOW_DAYS}"
+            ));
         }
         if self.proven_edit_bonus < 0.0 || self.proven_edit_tolerance <= 0.0 {
             return Err("llm_editability.churn: proven_edit_bonus must be >= 0 and \
@@ -276,7 +280,7 @@ pub fn summarize(
     now: DateTime<Utc>,
     window_days: u32,
 ) -> ChurnSummary {
-    let window = Duration::days(window_days.into());
+    let window = Duration::days(i64::from(window_days.min(MAX_WINDOW_DAYS)));
     let history = History {
         commits: &activity.commits,
         llm: activity
@@ -423,6 +427,11 @@ mod tests {
             ..Default::default()
         };
         assert!(zero_window.validate().is_err());
+        let huge_window = ChurnConfig {
+            window_days: u32::MAX,
+            ..Default::default()
+        };
+        assert!(huge_window.validate().is_err());
     }
 
     #[test]
