@@ -217,13 +217,13 @@ fn build_pattern_section(pattern_info: &Option<DetectedPattern>) -> Option<Forma
 fn build_coverage_section(
     coverage_info: &Option<super::context::CoverageInfo>,
 ) -> Option<FormattedSection> {
-    coverage_info
-        .as_ref()
-        .and_then(|info| info.coverage_percentage)
+    let info = coverage_info.as_ref()?;
+    info.coverage_percentage
         .map(|percentage| FormattedSection::Coverage {
             percentage,
             level: CoverageLevel::from_percentage(percentage),
             details: Some(format!("{:.1}%", percentage)),
+            crap: info.crap,
         })
 }
 

@@ -230,6 +230,10 @@
         },
         "transitive_coverage": {
           "$ref": "#/$defs/ratio"
+        },
+        "crap": {
+          "type": "number",
+          "minimum": 0
         }
       }
     },

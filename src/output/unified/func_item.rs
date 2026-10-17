@@ -11,7 +11,9 @@ use super::patterns::{extract_complexity_pattern, extract_pattern_data};
 use super::priority::Priority;
 #[cfg(debug_assertions)]
 use super::priority::assert_priority_invariants;
+use crate::config::get_crap_config;
 use crate::priority::{DebtType, FunctionRole, UnifiedDebtItem};
+use crate::risk::crap::crap_for_item;
 use serde::{Deserialize, Serialize};
 
 /// Function-level debt item in unified format
@@ -88,6 +90,14 @@ impl FunctionDebtItemOutput {
     pub fn assert_invariants(&self) {}
 
     pub fn from_function_item(item: &UnifiedDebtItem, include_scoring_details: bool) -> Self {
+        Self::from_function_item_with_v4(item, include_scoring_details, false)
+    }
+
+    pub(crate) fn from_function_item_with_v4(
+        item: &UnifiedDebtItem,
+        include_scoring_details: bool,
+        include_v4_fields: bool,
+    ) -> Self {
         // Apply rounding for clean output (spec 230)
         let rounded_score = round_score(item.unified_score.final_score);
         let complexity_pattern = extract_complexity_pattern(
@@ -154,6 +164,10 @@ impl FunctionDebtItemOutput {
                     .as_ref()
                     .map(|e| e.adjusted_complexity),
                 transitive_coverage,
+                crap: include_v4_fields
+                    .then(|| crap_for_item(item, get_crap_config().coverage_source))
+                    .flatten()
+                    .map(round_score),
             },
             debt_type: item.debt_type.clone(),
             function_role: item.function_role,
@@ -385,6 +399,9 @@ pub struct FunctionMetricsOutput {
     /// This fallback is an estimate, not evidence that this function executed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transitive_coverage: Option<f64>,
+    /// CRAP score (`cc² · (1 − cov)³ + cc`); omitted when no coverage data was provided.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub crap: Option<f64>,
 }
 
 /// Function impact metrics
@@ -665,6 +682,28 @@ mod tests {
         assert_eq!(item.score, deserialized.score);
         assert!(matches!(deserialized.priority, Priority::Medium));
         assert_eq!(item.metrics.coverage, deserialized.metrics.coverage);
+
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert!(!value["metrics"].as_object().unwrap().contains_key("crap"));
+    }
+
+    #[test]
+    fn test_crap_serializes_as_number_and_older_json_still_parses() {
+        let metrics = FunctionMetricsOutput {
+            crap: Some(52.3),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&metrics).unwrap();
+        assert_eq!(json["crap"], 52.3);
+
+        let legacy = serde_json::json!({
+            "cyclomatic_complexity": 1,
+            "cognitive_complexity": 1,
+            "length": 1,
+            "nesting_depth": 0
+        });
+        let parsed: FunctionMetricsOutput = serde_json::from_value(legacy).unwrap();
+        assert_eq!(parsed.crap, None);
     }
 
     #[test]

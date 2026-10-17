@@ -76,6 +76,7 @@ const ROOT_KEYS: &[&str] = &[
     "context_multipliers",
     "context_suggestion",
     "coverage_expectations",
+    "crap",
     "data_flow_scoring",
     "display",
     "entropy",

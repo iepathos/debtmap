@@ -236,6 +236,7 @@ pub fn merge_preset_with_config(preset: PresetLevel, config: DebtmapConfig) -> D
         context_suggestion: config
             .context_suggestion
             .or(preset_config.context_suggestion),
+        crap: config.crap.or(preset_config.crap),
     }
 }
 

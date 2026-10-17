@@ -21,6 +21,7 @@ pub mod context;
 pub mod correlation;
 pub mod coverage_gap;
 pub mod coverage_index;
+pub mod crap;
 pub mod delegation;
 pub mod effects;
 pub mod evidence;

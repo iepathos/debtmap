@@ -123,8 +123,11 @@ fn write_metric_section(writer: &mut dyn Write, section: &FormattedSection) -> i
         } => write_pattern_section(writer, pattern_type, icon, metrics, *confidence)?,
 
         FormattedSection::Coverage {
-            percentage, level, ..
-        } => write_coverage_section(writer, *percentage, level)?,
+            percentage,
+            level,
+            crap,
+            ..
+        } => write_coverage_section(writer, *percentage, level, *crap)?,
 
         FormattedSection::Dependencies {
             upstream,
@@ -320,6 +323,7 @@ fn write_coverage_section(
     writer: &mut dyn Write,
     percentage: f64,
     level: &CoverageLevel,
+    crap: Option<f64>,
 ) -> io::Result<()> {
     let status_tag = level.status_tag();
     let color = match level {
@@ -330,14 +334,17 @@ fn write_coverage_section(
         CoverageLevel::Excellent => Color::BrightGreen,
     };
 
-    writeln!(
+    write!(
         writer,
         "{} {} ({:.1}%)",
         "├─ COVERAGE:".bright_blue(),
         status_tag.color(color).bold(),
         percentage
     )?;
-    Ok(())
+    if let Some(crap) = crap {
+        write!(writer, " CRAP: {crap:.1}")?;
+    }
+    writeln!(writer)
 }
 
 /// Writes the dependencies section with upstream/downstream counts and caller/callee lists.
@@ -634,21 +641,24 @@ mod tests {
     #[test]
     fn test_write_coverage_section_untested() {
         let mut output = Vec::new();
-        super::write_coverage_section(&mut output, 0.0, &CoverageLevel::Untested).unwrap();
+        super::write_coverage_section(&mut output, 0.0, &CoverageLevel::Untested, Some(110.0))
+            .unwrap();
 
         let output_str = String::from_utf8(output).unwrap();
         assert!(output_str.contains("COVERAGE"));
         assert!(output_str.contains("0.0%"));
+        assert!(output_str.contains("CRAP: 110.0"));
     }
 
     #[test]
     fn test_write_coverage_section_good() {
         let mut output = Vec::new();
-        super::write_coverage_section(&mut output, 87.5, &CoverageLevel::Good).unwrap();
+        super::write_coverage_section(&mut output, 87.5, &CoverageLevel::Good, None).unwrap();
 
         let output_str = String::from_utf8(output).unwrap();
         assert!(output_str.contains("COVERAGE"));
         assert!(output_str.contains("87.5%"));
+        assert!(!output_str.contains("CRAP"));
     }
 
     #[test]

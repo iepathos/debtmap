@@ -152,6 +152,10 @@ pub struct DebtmapConfig {
     /// Context window suggestions configuration (spec 263)
     #[serde(default)]
     pub context_suggestion: Option<crate::priority::context::ContextConfig>,
+
+    /// CRAP metric configuration
+    #[serde(default)]
+    pub crap: Option<crate::risk::crap::CrapConfig>,
 }
 
 /// Advanced analysis settings for call graph and dead code detection (Spec 207).
