@@ -184,7 +184,7 @@ repos:
       - id: debtmap
 ```
 
-This runs `debtmap validate .` using the version pinned by `rev`. Configure thresholds in `.debtmap.toml` (`debtmap init`). The first install compiles Debtmap from source and needs a Rust toolchain.
+This runs `debtmap validate .` using the version pinned by `rev`. Configure thresholds in `.debtmap.toml` (`debtmap init`). The first install compiles Debtmap from source and needs a Rust toolchain. On Windows that build also needs Perl, because it vendors OpenSSL. Use `debtmap-system` when Perl is not installed.
 
 To use a `debtmap` binary already on your `PATH` instead of compiling from the pinned revision:
 

@@ -882,7 +882,7 @@ repos:
 
 This runs `debtmap validate .` and fails the commit when quality gates are exceeded. Thresholds come from `.debtmap.toml` (`debtmap init`) or from hook `args`.
 
-The `debtmap` hook compiles this repository at the pinned `rev` and requires a Rust toolchain. Use `debtmap-system` if `debtmap` is already installed on `PATH`:
+The `debtmap` hook compiles this repository at the pinned `rev` and requires a Rust toolchain. On Windows that build also needs Perl, because it vendors OpenSSL. Use `debtmap-system` if `debtmap` is already installed on `PATH`, or if Perl is not installed:
 
 ```yaml
       - id: debtmap-system
