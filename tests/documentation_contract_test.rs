@@ -39,11 +39,13 @@ fn public_docs_describe_current_language_and_output_contracts() {
         "TypeScript",
         "Go",
         "Solidity",
+        "Nix",
     ] {
         assert!(architecture.contains(language), "missing {language}");
     }
     assert!(architecture.contains("incomplete, deprecated, and fail closed"));
     assert!(architecture.contains("canonical CLI JSON contract is v4"));
     assert!(getting_started.contains("Solidity `.sol`"));
+    assert!(getting_started.contains("Nix `.nix`"));
     assert!(!architecture.contains("focused exclusively on Rust"));
 }

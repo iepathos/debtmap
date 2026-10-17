@@ -99,7 +99,7 @@ test-integration:
         --test rust_resolution_namespace_matrix --test rust_resolution_matrix_oracles \
         --test rust_resolution_matrix_invariants --test rust_resolution_matrix_assertions \
         --test recursive_dependency_metrics \
-        --test solidity_analyzer_tests --test suppression_tests --test token_classification_tests \
+        --test nix_analyzer_tests --test solidity_analyzer_tests --test suppression_tests --test token_classification_tests \
         --test validate_improvement_integration_test
 
 # Run tests with output

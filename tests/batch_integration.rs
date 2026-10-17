@@ -368,13 +368,21 @@ fn test_analysis_multiple_languages() {
             "main.go",
             "package main\n\nfunc goFn() { println(\"hello\") }",
         ),
+        ("module.nix", "{ f = x: if x then 1 else 0; }"),
     ];
     let (_temp_dir, paths) = create_test_project(&files);
 
     let config = DebtmapConfig::default();
     let results = run_effect(analyze_files_effect(paths), config).expect("Analysis should succeed");
 
-    assert_eq!(results.len(), 4, "Should analyze all 4 files");
+    assert_eq!(results.len(), 5, "Should analyze all 5 files");
+    let nix = results
+        .iter()
+        .find(|result| result.path.ends_with("module.nix"))
+        .expect("nix file");
+    assert_eq!(nix.metrics.language, debtmap::core::Language::Nix);
+    assert_eq!(nix.metrics.complexity.functions[0].name, "f");
+    assert_eq!(nix.metrics.complexity.functions[0].cyclomatic, 2);
 
     // Each file should have at least one function detected
     for result in &results {
@@ -413,6 +421,28 @@ func Serve(ctx context.Context, ok bool) error {
     assert_eq!(metrics.language, debtmap::core::Language::Go);
     assert_eq!(metrics.dependencies[0].name, "context");
     assert_eq!(metrics.complexity.functions[0].name, "Serve");
+    assert!(metrics.complexity.functions[0].cyclomatic > 1);
+}
+
+#[test]
+fn test_analysis_nix_file() {
+    let files = vec![(
+        "flake.nix",
+        r#"{
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs";
+  build = x: if x then 1 else 0;
+}
+"#,
+    )];
+    let (_temp_dir, paths) = create_test_project(&files);
+
+    let config = DebtmapConfig::default();
+    let results = run_effect(analyze_files_effect(paths), config).expect("Analysis should succeed");
+    let metrics = &results[0].metrics;
+
+    assert_eq!(metrics.language, debtmap::core::Language::Nix);
+    assert_eq!(metrics.dependencies[0].name, "github:NixOS/nixpkgs");
+    assert_eq!(metrics.complexity.functions[0].name, "build");
     assert!(metrics.complexity.functions[0].cyclomatic > 1);
 }
 
