@@ -141,7 +141,7 @@ impl RetryConfig {
 /// Retry delay strategy.
 ///
 /// Determines how the delay between retries changes with each attempt.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum RetryStrategy {
     /// Same delay between each retry.
@@ -149,15 +149,10 @@ pub enum RetryStrategy {
     /// Delay increases linearly: base * attempt.
     Linear,
     /// Delay doubles each attempt: base * 2^(attempt-1).
+    #[default]
     Exponential,
     /// Delay follows fibonacci sequence: base * fib(attempt).
     Fibonacci,
-}
-
-impl Default for RetryStrategy {
-    fn default() -> Self {
-        Self::Exponential
-    }
 }
 
 // Default value functions for serde

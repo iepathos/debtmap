@@ -46,7 +46,7 @@ use super::split_types::ModuleSplit;
 /// let class = MethodComplexityClass::Substantive;
 /// assert!((class.weight() - 1.0).abs() < f64::EPSILON);
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum MethodComplexityClass {
     /// Single-line field return: `fn get_x(&self) -> &X { &self.x }`
     TrivialAccessor,
@@ -57,6 +57,7 @@ pub enum MethodComplexityClass {
     /// Method that simply calls another method: `fn foo(&self) { self.inner.foo() }`
     Delegating,
     /// Actual business logic with control flow, multiple operations, etc.
+    #[default]
     Substantive,
 }
 
@@ -86,13 +87,6 @@ impl MethodComplexityClass {
             Self::Delegating => "delegating (single method call)",
             Self::Substantive => "substantive (business logic)",
         }
-    }
-}
-
-impl Default for MethodComplexityClass {
-    fn default() -> Self {
-        // Default to substantive (conservative - counts fully)
-        Self::Substantive
     }
 }
 
@@ -130,7 +124,7 @@ impl Default for MethodComplexityClass {
 /// let usage = MethodSelfUsage::InstanceMethod;
 /// assert!((usage.weight() - 1.0).abs() < f64::EPSILON);
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum MethodSelfUsage {
     /// No self parameter, stateless function
     /// Example: `fn helper(x: &str) -> bool { x.is_empty() }`
@@ -140,6 +134,7 @@ pub enum MethodSelfUsage {
     UnusedSelf,
     /// Has self parameter and uses instance state
     /// Example: `fn get_data(&self) -> &Data { &self.data }`
+    #[default]
     InstanceMethod,
 }
 
@@ -174,18 +169,11 @@ impl MethodSelfUsage {
     }
 }
 
-impl Default for MethodSelfUsage {
-    fn default() -> Self {
-        // Default to instance method (conservative - counts fully)
-        Self::InstanceMethod
-    }
-}
-
 /// Type of expression in a method's return statement.
 ///
 /// Used to help classify accessor methods. A method returning a direct field
 /// reference is more likely to be a trivial accessor than one with complex logic.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum ReturnExprType {
     /// Direct field access: `&self.field` or `self.field`
     FieldAccess,
@@ -194,13 +182,8 @@ pub enum ReturnExprType {
     /// Literal value: `true`, `false`, `0`, `"string"`, etc.
     Literal,
     /// Any other expression (complex logic)
+    #[default]
     Complex,
-}
-
-impl Default for ReturnExprType {
-    fn default() -> Self {
-        Self::Complex
-    }
 }
 
 /// Analysis results for a single method body.

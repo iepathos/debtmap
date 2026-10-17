@@ -47,7 +47,7 @@ use std::collections::HashMap;
 /// - Visitors have many required methods by design (AST traversal)
 /// - Serialization traits are often derived automatically
 /// - Standard traits are well-known boilerplate
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum TraitCategory {
     /// AST/tree visitor traits (syn::Visit, etc.)
     Visitor,
@@ -64,6 +64,7 @@ pub enum TraitCategory {
     /// Standard library traits (Clone, Default, Drop, etc.)
     Standard,
     /// Unknown or custom traits
+    #[default]
     Custom,
 }
 
@@ -98,12 +99,6 @@ impl TraitCategory {
             Self::Error => "error handling",
             Self::Custom => "custom trait",
         }
-    }
-}
-
-impl Default for TraitCategory {
-    fn default() -> Self {
-        Self::Custom
     }
 }
 
@@ -637,7 +632,7 @@ fn build_default_registry() -> KnownTraitRegistry {
 /// Classification of whether a method is trait-mandated or self-chosen.
 ///
 /// This is the primary output of trait-mandated method detection.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub enum MethodOrigin {
     /// Method is required by a trait implementation (cannot be extracted)
     TraitMandated {
@@ -647,6 +642,7 @@ pub enum MethodOrigin {
         category: TraitCategory,
     },
     /// Method is the author's design choice (potentially extractable)
+    #[default]
     SelfChosen,
 }
 
@@ -673,12 +669,6 @@ impl MethodOrigin {
     #[must_use]
     pub fn is_extractable(&self) -> bool {
         matches!(self, Self::SelfChosen)
-    }
-}
-
-impl Default for MethodOrigin {
-    fn default() -> Self {
-        Self::SelfChosen
     }
 }
 
