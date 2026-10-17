@@ -28,6 +28,10 @@ pub struct LanguagesConfig {
     /// Solidity-specific configuration
     #[serde(default)]
     pub solidity: Option<SolidityLanguageConfig>,
+
+    /// Nix-specific configuration
+    #[serde(default)]
+    pub nix: Option<StandardLanguageConfig>,
 }
 
 /// Language-specific feature configuration

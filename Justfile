@@ -99,7 +99,7 @@ test-integration:
         --test rust_resolution_namespace_matrix --test rust_resolution_matrix_oracles \
         --test rust_resolution_matrix_invariants --test rust_resolution_matrix_assertions \
         --test recursive_dependency_metrics \
-        --test solidity_analyzer_tests --test suppression_tests --test token_classification_tests \
+        --test nix_analyzer_tests --test solidity_analyzer_tests --test suppression_tests --test token_classification_tests \
         --test validate_improvement_integration_test
 
 # Run tests with output
@@ -201,6 +201,10 @@ test-slow:
         test_detects_rust_call_graph_scenario test_spec_130_god_class_vs_god_file_detection \
         test_context_aware_on_entire_codebase
     cargo nextest run --profile slow --run-ignored only --test ui_tests
+
+# Compare --jobs 1 and --jobs 2 reports on pinned open-source repositories (needs network)
+test-real-repos:
+    cargo nextest run --profile slow --run-ignored only --test real_repository_equivalence_test
 
 # Run bounded scale and timing tests
 test-stress:

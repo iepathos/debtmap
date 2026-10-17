@@ -42,53 +42,44 @@ pub fn calculate_file_cohesion(
     file_path: &Path,
     call_graph: &CallGraph,
 ) -> Option<FileCohesionResult> {
-    // Find all functions in this file
-    let file_functions: HashSet<String> = call_graph
-        .get_all_functions()
-        .filter(|func| func.file == file_path)
-        .map(|func| func.name.clone())
-        .collect();
-
-    let functions_count = file_functions.len();
-
-    // Only calculate cohesion if file has enough functions
+    let functions_count = distinct_names_in_file(call_graph, file_path);
     if functions_count < MIN_FUNCTIONS_FOR_COHESION {
         return None;
     }
+    let (internal_calls, external_calls) = call_graph.calls_from_file(file_path);
+    Some(cohesion_from_counts(
+        functions_count,
+        internal_calls,
+        external_calls,
+    ))
+}
 
-    let mut internal_calls = 0;
-    let mut external_calls = 0;
+fn distinct_names_in_file(call_graph: &CallGraph, file_path: &Path) -> usize {
+    call_graph
+        .ids_in_file(file_path)
+        .into_iter()
+        .map(|id| id.name)
+        .collect::<HashSet<_>>()
+        .len()
+}
 
-    // Analyze all function calls
-    for call in call_graph.get_all_calls() {
-        // Only consider calls FROM functions in this file
-        if call.caller.file != file_path {
-            continue;
-        }
-
-        // Check if the callee is in the same file (internal) or different file (external)
-        if call.callee.file == file_path {
-            internal_calls += 1;
-        } else {
-            external_calls += 1;
-        }
-    }
-
-    // Calculate cohesion score
+fn cohesion_from_counts(
+    functions_count: usize,
+    internal_calls: usize,
+    external_calls: usize,
+) -> FileCohesionResult {
     let total_calls = internal_calls + external_calls;
     let score = if total_calls == 0 {
-        // No calls - assume perfect cohesion (self-contained functions)
         1.0
     } else {
         internal_calls as f64 / total_calls as f64
     };
-
-    Some(FileCohesionResult {
+    FileCohesionResult {
         score,
         internal_calls,
         external_calls,
         functions_analyzed: functions_count,
-    })
+    }
 }
 
 /// Calculate cohesion score for a module split recommendation
@@ -486,5 +477,31 @@ mod tests {
         assert_eq!(r.score, 1.0);
         assert_eq!(r.internal_calls, 0);
         assert_eq!(r.external_calls, 0);
+    }
+
+    #[test]
+    fn file_cohesion_includes_calls_added_after_lookup() {
+        let mut graph = CallGraph::new();
+        let file = PathBuf::from("src/file_a.rs");
+        for (name, line) in [("func1", 1), ("func2", 10), ("func3", 20)] {
+            graph.add_function(
+                FunctionId::new(file.clone(), name.into(), line),
+                false,
+                false,
+                5,
+                20,
+            );
+        }
+        let before = calculate_file_cohesion(&file, &graph).expect("three functions");
+        assert_eq!(before.external_calls, 0);
+
+        graph.add_call(FunctionCall {
+            caller: FunctionId::new(file.clone(), "func1".into(), 1),
+            callee: FunctionId::new(PathBuf::from("src/file_b.rs"), "helper".into(), 1),
+            call_type: CallType::Direct,
+        });
+        let after = calculate_file_cohesion(&file, &graph).expect("three functions");
+        assert_eq!(after.internal_calls, 0);
+        assert_eq!(after.external_calls, 1);
     }
 }

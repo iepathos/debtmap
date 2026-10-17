@@ -210,10 +210,22 @@ fn validate_single_source_parseable(file: &FileContent) -> AnalysisValidation<Fi
         Language::JavaScript | Language::TypeScript => validate_js_ts_parseable(file),
         Language::Go => validate_go_parseable(file),
         Language::Solidity => validate_solidity_parseable(file),
+        Language::Nix => validate_nix_parseable(file),
         Language::Unknown => {
             // Unknown languages pass through - we can't validate them
             validation_success(file.clone())
         }
+    }
+}
+
+fn validate_nix_parseable(file: &FileContent) -> AnalysisValidation<FileContent> {
+    match crate::analyzers::nix::parser::parse_source(&file.content, &file.path) {
+        Ok(_) => validation_success(file.clone()),
+        Err(e) => validation_failure(AnalysisError::parse_with_context(
+            format!("Nix parse error: {}", e),
+            &file.path,
+            0,
+        )),
     }
 }
 

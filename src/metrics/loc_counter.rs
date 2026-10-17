@@ -49,6 +49,8 @@ pub enum LocLanguage {
     Go,
     /// Solidity: `//` and `/* */` comments
     Solidity,
+    /// Nix: `#` and `/* */` comments (`//` is the attrset update operator)
+    Nix,
     /// Unknown language - uses conservative comment detection
     #[default]
     Unknown,
@@ -64,6 +66,7 @@ impl LocLanguage {
             Some("ts") | Some("tsx") | Some("mts") | Some("cts") => Self::TypeScript,
             Some("go") => Self::Go,
             Some("sol") => Self::Solidity,
+            Some("nix") => Self::Nix,
             _ => Self::Unknown,
         }
     }
@@ -401,7 +404,7 @@ fn classify_line(trimmed: &str, state: &mut CommentState, language: LocLanguage)
 fn is_single_line_comment_start(trimmed: &str, language: LocLanguage) -> bool {
     // Rust/JS/TS line comments
     if trimmed.starts_with("//") {
-        return true;
+        return language != LocLanguage::Nix;
     }
 
     // Python comments (but not Rust attributes!)
@@ -414,7 +417,7 @@ fn is_single_line_comment_start(trimmed: &str, language: LocLanguage) -> bool {
                 // So we treat # as NOT a comment in Rust
                 false
             }
-            LocLanguage::Python => true,
+            LocLanguage::Python | LocLanguage::Nix => true,
             // For Unknown/JS/TS, # is not a standard comment marker
             _ => false,
         }
@@ -660,6 +663,15 @@ mod tests {
         let code = "# This is a Python comment\ndef foo():\n    pass";
         let count = counter.count_content_with_language(code, Some(LocLanguage::Python));
         assert_eq!(count.comment_lines, 1);
+        assert_eq!(count.code_lines, 2);
+    }
+
+    #[test]
+    fn test_nix_comments_and_update_operator() {
+        let counter = LocCounter::default();
+        let code = "# comment\n{ a = 1; }\n  // { b = 2; }\n/* block\n   comment */\n";
+        let count = counter.count_content_with_language(code, Some(LocLanguage::Nix));
+        assert_eq!(count.comment_lines, 3);
         assert_eq!(count.code_lines, 2);
     }
 

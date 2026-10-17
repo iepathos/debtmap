@@ -106,7 +106,7 @@ fn assert_impure_scoring(metric: &FunctionMetrics, graph: &CallGraph) {
 }
 
 fn assert_pipeline_consistency(metrics: &[FunctionMetrics], graph: &CallGraph) {
-    let data_flow = build_data_flow_graph(metrics, graph, None);
+    let data_flow = build_data_flow_graph(metrics, &std::sync::Arc::new(graph.clone()), None);
     for name in ["matches_pattern", "regex_match"] {
         let metric = method(metrics, name);
         assert_eq!(metric.is_pure, Some(false), "{name}");

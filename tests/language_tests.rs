@@ -64,6 +64,12 @@ fn test_parse_single_language_solidity() {
 }
 
 #[test]
+fn test_parse_single_language_nix() {
+    assert_eq!(parse_single_language("nix"), Some(Language::Nix));
+    assert_eq!(parse_single_language("NIX"), Some(Language::Nix));
+}
+
+#[test]
 fn test_parse_single_language_unknown() {
     assert_eq!(parse_single_language("java"), None);
     assert_eq!(parse_single_language("c++"), None);
@@ -104,11 +110,12 @@ fn test_parse_languages_empty_vec_returns_empty() {
 #[test]
 fn test_default_languages() {
     let defaults = default_languages();
-    assert_eq!(defaults.len(), 6);
+    assert_eq!(defaults.len(), 7);
     assert!(defaults.contains(&Language::Rust));
     assert!(defaults.contains(&Language::Python));
     assert!(defaults.contains(&Language::JavaScript));
     assert!(defaults.contains(&Language::TypeScript));
     assert!(defaults.contains(&Language::Go));
     assert!(defaults.contains(&Language::Solidity));
+    assert!(defaults.contains(&Language::Nix));
 }

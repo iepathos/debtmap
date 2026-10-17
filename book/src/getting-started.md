@@ -118,8 +118,8 @@ debtmap analyze .
 
 **What happens during analysis:**
 
-1. **File Discovery** - Debtmap scans your project for supported source files (Rust `.rs`, Python `.py`, JavaScript `.js`/`.jsx`, TypeScript `.ts`/`.tsx`, Go `.go`, Solidity `.sol`)
-2. **Parsing** - Each file is parsed into an Abstract Syntax Tree (AST) using `syn` for Rust and tree-sitter for Python, JavaScript, TypeScript, Go, and Solidity
+1. **File Discovery** - Debtmap scans your project for supported source files (Rust `.rs`, Python `.py`, JavaScript `.js`/`.jsx`, TypeScript `.ts`/`.tsx`, Go `.go`, Solidity `.sol`, Nix `.nix`)
+2. **Parsing** - Each file is parsed into an Abstract Syntax Tree (AST) using `syn` for Rust and tree-sitter for Python, JavaScript, TypeScript, Go, Solidity, and Nix
 3. **Metric Extraction** - Complexity, coverage gaps, and coupling are measured
 4. **Prioritization** - Results are ranked by severity (CRITICAL, HIGH, MEDIUM, LOW, MINIMAL)
 5. **Context Generation** - File ranges are attached to findings; coverage and git history are included only when explicitly supplied or enabled and successfully loaded

@@ -20,6 +20,7 @@ impl FileWalker {
                 Language::TypeScript,
                 Language::Go,
                 Language::Solidity,
+                Language::Nix,
             ],
             ignore_patterns: vec![],
         }

@@ -266,10 +266,10 @@ Specify which languages to analyze with the `enabled` array:
 
 ```toml
 [languages]
-enabled = ["rust", "python", "javascript", "typescript", "go", "solidity"]
+enabled = ["rust", "python", "javascript", "typescript", "go", "solidity", "nix"]
 ```
 
-The documented and implemented user-facing language set is Rust, Python, JavaScript, TypeScript, Go, and Solidity.
+The documented and implemented user-facing language set is Rust, Python, JavaScript, TypeScript, Go, Solidity, and Nix.
 
 ## Feature Defaults
 

@@ -219,6 +219,7 @@ impl CallGraph {
             evidence.call.callee = resolved_callee.clone();
             self.evidence_set.insert(evidence.clone());
         }
+        self.invalidate_caller_file_counts();
     }
 
     /// Resolve cross-file function calls using parallel processing
@@ -356,6 +357,7 @@ impl CallGraph {
         self.edges.dedup();
         self.edge_evidence.sort();
         self.edge_evidence.dedup();
+        self.invalidate_caller_file_counts();
     }
 }
 

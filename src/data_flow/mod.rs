@@ -26,7 +26,7 @@ use identity_serde::{function_id_serde, function_id_tuple_serde};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DataFlowGraph {
     /// The underlying call graph that tracks function relationships
-    call_graph: CallGraph,
+    call_graph: std::sync::Arc<CallGraph>,
     /// Variable dependencies within each function (function_id -> set of variables)
     #[serde(with = "function_id_serde")]
     variable_deps: HashMap<FunctionId, HashSet<String>>,
@@ -170,7 +170,7 @@ impl CfgAnalysisWithContext {
 impl DataFlowGraph {
     pub fn new() -> Self {
         Self {
-            call_graph: CallGraph::new(),
+            call_graph: Default::default(),
             variable_deps: HashMap::new(),
             data_transformations: HashMap::new(),
             io_operations: HashMap::new(),
@@ -182,9 +182,9 @@ impl DataFlowGraph {
     }
 
     /// Create a DataFlowGraph from an existing CallGraph
-    pub fn from_call_graph(call_graph: CallGraph) -> Self {
+    pub fn from_call_graph(call_graph: impl Into<std::sync::Arc<CallGraph>>) -> Self {
         Self {
-            call_graph,
+            call_graph: call_graph.into(),
             variable_deps: HashMap::new(),
             data_transformations: HashMap::new(),
             io_operations: HashMap::new(),
@@ -198,6 +198,10 @@ impl DataFlowGraph {
     /// Get the underlying call graph
     pub fn call_graph(&self) -> &CallGraph {
         &self.call_graph
+    }
+
+    pub fn shared_call_graph(&self) -> std::sync::Arc<CallGraph> {
+        std::sync::Arc::clone(&self.call_graph)
     }
 
     /// Get variable dependencies for a function

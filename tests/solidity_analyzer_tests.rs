@@ -57,7 +57,7 @@ fn test_language_parser_supports_solidity() {
 #[test]
 fn test_default_languages_include_solidity() {
     let defaults = default_languages();
-    assert_eq!(defaults.len(), 6);
+    assert_eq!(defaults.len(), 7);
     assert!(defaults.contains(&Language::Solidity));
 }
 

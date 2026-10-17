@@ -5,6 +5,7 @@
 use super::branches::analyze_branch_similarity;
 use super::patterns::detect_js_patterns;
 use super::token::{JsEntropyToken, extract_tokens_recursive};
+use crate::analyzers::syntax_tree::node_text;
 use crate::complexity::entropy_analysis::{calculate_repetition_score, calculate_weighted_entropy};
 use crate::complexity::entropy_core::{
     EntropyConfig, EntropyScore, LanguageEntropyAnalyzer, PatternMetrics,
@@ -258,12 +259,6 @@ pub fn generate_cache_key(node: &Node, source: &str) -> String {
     hasher.update(text.as_bytes());
     let result = hasher.finalize();
     format!("{:x}", result)
-}
-
-fn node_text<'a>(node: &Node, source: &'a str) -> &'a str {
-    let start = node.start_byte();
-    let end = node.end_byte();
-    &source[start..end]
 }
 
 #[cfg(test)]

@@ -1,4 +1,5 @@
 use crate::analyzers::go::parser::node_text;
+use crate::analyzers::syntax_tree::children;
 use tree_sitter::Node;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -213,11 +214,6 @@ fn normalize_signals(mut signals: GoAdvancedSignals) -> GoAdvancedSignals {
     signals.error_swallowing_patterns.sort();
     signals.error_swallowing_patterns.dedup();
     signals
-}
-
-fn children(node: Node) -> Vec<Node> {
-    let mut cursor = node.walk();
-    node.children(&mut cursor).collect()
 }
 
 #[cfg(test)]

@@ -9,3 +9,8 @@ pub use language_parser::*;
 pub use option_ext::*;
 pub use risk_analyzer::*;
 pub use validation_printer::*;
+
+/// Free a large value off the critical path; its destructor has no observable effects.
+pub fn drop_in_background<T: Send + 'static>(value: T) {
+    std::thread::spawn(move || drop(value));
+}

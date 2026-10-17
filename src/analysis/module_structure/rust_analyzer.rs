@@ -11,7 +11,7 @@
 //! All line numbers are 1-based, consistent with syn's conventions.
 
 use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 use std::path::Path;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
@@ -94,7 +94,7 @@ fn build_dependency_graph(
             .map(|dependency| (module_name.clone(), dependency.clone())),
     );
 
-    let edge_set: HashSet<(String, String)> =
+    let edge_set: BTreeSet<(String, String)> =
         edges.into_iter().filter(|(from, to)| from != to).collect();
     let edges: Vec<(String, String)> = edge_set.into_iter().collect();
 

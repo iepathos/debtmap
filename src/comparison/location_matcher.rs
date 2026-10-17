@@ -439,7 +439,7 @@ mod tests {
             total_debt_score: 50.0,
             debt_density: 0.0,
             total_lines_of_code: 1000,
-            call_graph: crate::priority::CallGraph::new(),
+            call_graph: Default::default(),
             data_flow_graph: crate::data_flow::DataFlowGraph::new(),
             overall_coverage: None,
             has_coverage_data: false,

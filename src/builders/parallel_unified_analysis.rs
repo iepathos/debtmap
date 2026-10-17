@@ -323,37 +323,30 @@ impl ParallelUnifiedAnalysisBuilder {
             .collect();
         paths.sort();
 
-        let read = |path: &PathBuf| (path.clone(), std::fs::read_to_string(path).ok());
+        let extracted = self.extracted_data.as_deref();
+        let read = |path: &PathBuf| read_file_facts(path, extracted);
         let facts: Vec<_> = if self.options.parallel {
             paths.par_iter().map(read).collect()
         } else {
             paths.iter().map(read).collect()
         };
-        for (path, content) in facts {
-            self.register_file_facts(path, content);
+        for facts in facts {
+            self.register_file_facts(facts);
         }
     }
 
-    fn register_file_facts(&mut self, path: PathBuf, content: Option<String>) {
-        let extracted_lines = self
-            .extracted_data
-            .as_ref()
-            .and_then(|files| files.get(&path))
-            .map(|file| file.total_lines);
-        if let Some(lines) =
-            extracted_lines.or_else(|| content.as_ref().map(|text| text.lines().count()))
-        {
+    fn register_file_facts(&mut self, facts: FileFacts) {
+        let FileFacts {
+            path,
+            content,
+            lines,
+            suppression,
+        } = facts;
+        if let Some(lines) = lines {
             self.line_count_index.entry(path.clone()).or_insert(lines);
         }
-        if let Some(text) = content.as_deref() {
-            let context = crate::debt::suppression::parse_suppression_comments(
-                text,
-                crate::core::Language::from_path(&path),
-                &path,
-            );
-            if context.has_directives() {
-                self.suppression_contexts.insert(path.clone(), context);
-            }
+        if let Some(context) = suppression {
+            self.suppression_contexts.insert(path.clone(), context);
         }
         self.file_content_index.insert(path, content);
     }
@@ -926,7 +919,7 @@ impl ParallelUnifiedAnalysisBuilder {
         data_flow_graph: DataFlowGraph,
         _file_data: &[(FileDebtItem, Vec<FunctionMetrics>)],
     ) -> UnifiedAnalysis {
-        let mut unified = UnifiedAnalysis::new((*self.call_graph).clone());
+        let mut unified = UnifiedAnalysis::new(Arc::clone(&self.call_graph));
         unified.data_flow_graph = data_flow_graph;
         register_analyzed_files(&mut unified, &self.line_count_index);
         unified
@@ -938,23 +931,34 @@ impl ParallelUnifiedAnalysisBuilder {
         file_data: Vec<(FileDebtItem, Vec<FunctionMetrics>)>,
         coverage_data: Option<&LcovData>,
     ) {
-        let total_file_items = file_data.len();
+        use crate::builders::unified_analysis::{apply_god_object, plan_god_object};
 
-        for (index, (file_item, raw_functions)) in file_data.into_iter().enumerate() {
+        let total_file_items = file_data.len();
+        let shared: &UnifiedAnalysis = unified;
+        let plan = |(file_item, raw_functions): &(FileDebtItem, Vec<FunctionMetrics>)| {
             let content = self
                 .file_content_index
                 .get(&file_item.metrics.path)
                 .and_then(|content| content.as_deref());
-            let finalized = crate::builders::unified_analysis::finalize_file_item_with_content(
-                unified,
+            plan_god_object(
+                shared,
                 file_item,
-                &raw_functions,
+                raw_functions,
                 coverage_data,
                 self.risk_analyzer.as_ref(),
                 &self.project_path,
                 &self.call_graph,
                 content,
-            );
+            )
+        };
+        let plans: Vec<_> = if self.options.parallel {
+            file_data.par_iter().map(plan).collect()
+        } else {
+            file_data.iter().map(plan).collect()
+        };
+
+        for (index, ((file_item, _), plan)) in file_data.into_iter().zip(plans).enumerate() {
+            let finalized = apply_god_object(unified, file_item, plan);
             unified.add_file_item(finalized);
             update_finalization_subtask(index + 1, total_file_items);
         }
@@ -991,6 +995,40 @@ impl ParallelUnifiedAnalysisBuilder {
         log::debug!("  - Finalize files: {:?}", self.timings.finalize_files);
         log::debug!("  - Calculate impact: {:?}", self.timings.calculate_impact);
         log::debug!("  - Sorting: {:?}", self.timings.sorting);
+    }
+}
+
+struct FileFacts {
+    path: PathBuf,
+    content: Option<String>,
+    lines: Option<usize>,
+    suppression: Option<crate::debt::suppression::SuppressionContext>,
+}
+
+fn read_file_facts(
+    path: &Path,
+    extracted: Option<&HashMap<PathBuf, ExtractedFileData>>,
+) -> FileFacts {
+    let content = std::fs::read_to_string(path).ok();
+    let lines = extracted
+        .and_then(|files| files.get(path))
+        .map(|file| file.total_lines)
+        .or_else(|| content.as_ref().map(|text| text.lines().count()));
+    let suppression = content
+        .as_deref()
+        .map(|text| {
+            crate::debt::suppression::parse_suppression_comments(
+                text,
+                crate::core::Language::from_path(path),
+                path,
+            )
+        })
+        .filter(|context| context.has_directives());
+    FileFacts {
+        path: path.to_path_buf(),
+        content,
+        lines,
+        suppression,
     }
 }
 

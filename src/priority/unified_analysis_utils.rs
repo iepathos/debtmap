@@ -173,9 +173,9 @@ impl UnifiedAnalysisUtils for UnifiedAnalysis {
     }
 
     fn populate_purity_analysis(&mut self, metrics: &[crate::core::FunctionMetrics]) {
-        let assessments = crate::analysis::purity_propagation::propagate_graph_assessments(
-            self.data_flow_graph.call_graph(),
-        );
+        let call_graph = self.data_flow_graph.shared_call_graph();
+        let assessments =
+            crate::analysis::purity_propagation::propagate_graph_assessments(&call_graph);
         for metric in metrics {
             let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line)
                 .with_column(metric.column);

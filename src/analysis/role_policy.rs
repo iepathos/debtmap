@@ -209,6 +209,7 @@ pub fn is_entry_name(name: &str, language: Language) -> bool {
     match language {
         Language::Python => matches!(unqualified, "__main__" | "main"),
         Language::Solidity => matches!(unqualified, "constructor" | "fallback" | "receive"),
+        Language::Nix => matches!(unqualified, "outputs" | "default" | "flake"),
         Language::Rust
         | Language::JavaScript
         | Language::TypeScript
@@ -246,8 +247,14 @@ fn test_file_name(file: &str, language: Language) -> bool {
             .any(|marker| file.contains(marker)),
         Language::Go => file.ends_with("_test.go"),
         Language::Solidity => file.ends_with(".t.sol") || file.ends_with(".test.sol"),
+        Language::Nix => is_nix_test_file(file),
         Language::Unknown => false,
     }
+}
+
+fn is_nix_test_file(file: &str) -> bool {
+    file.ends_with(".nix")
+        && (file.starts_with("test") || file.ends_with("-test.nix") || file.ends_with("_test.nix"))
 }
 
 fn is_public_visibility(visibility: Option<&str>) -> bool {

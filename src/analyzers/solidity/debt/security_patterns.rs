@@ -3,6 +3,7 @@
 use tree_sitter::Node;
 
 use crate::analyzers::solidity::parser::node_text;
+use crate::analyzers::syntax_tree::walk_nodes;
 use crate::config::SolidityLanguageConfig;
 
 const SENTINEL_ADDRESSES: [&str; 4] = [
@@ -720,14 +721,6 @@ fn count_kind(node: Node, kind: &str) -> usize {
         count += count_kind(child, kind);
     }
     count
-}
-
-fn walk_nodes(node: Node, f: &mut impl FnMut(Node)) {
-    f(node);
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        walk_nodes(child, f);
-    }
 }
 
 #[cfg(test)]

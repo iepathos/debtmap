@@ -1,4 +1,5 @@
 use crate::analyzers::go::parser::node_text;
+use crate::analyzers::syntax_tree::children;
 use crate::core::PurityLevel;
 use tree_sitter::Node;
 
@@ -92,11 +93,6 @@ fn is_nested_callable(node: Node) -> bool {
         node.kind(),
         "func_literal" | "function_declaration" | "method_declaration"
     )
-}
-
-fn children(node: Node) -> Vec<Node> {
-    let mut cursor = node.walk();
-    node.children(&mut cursor).collect()
 }
 
 #[cfg(test)]

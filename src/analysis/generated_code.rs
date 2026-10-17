@@ -16,6 +16,7 @@ pub fn is_generated_or_vendor(path: &Path, language: Language, source: &str) -> 
                 || file_ends_with(path, ".min.js")
                 || file_ends_with(path, ".min.mjs")
         }
+        Language::Nix => common_generated(path, source),
         Language::Unknown => false,
     }
 }

@@ -3,7 +3,7 @@
 ## Scope
 
 Debtmap is a multi-language static analyzer for Rust, Python, JavaScript, TypeScript, Go,
-and Solidity. Language support is intentionally not uniform: each adapter reports only the
+Solidity, and Nix. Language support is intentionally not uniform: each adapter reports only the
 evidence it can establish, and unresolved relationships should remain absent rather than being
 guessed.
 
@@ -51,9 +51,9 @@ alternative project-analysis API.
 ### Discovery and language adapters
 
 - `src/io/walker.rs` discovers candidate source files.
-- `src/core/mod.rs` contains the canonical six-language enumeration.
+- `src/core/mod.rs` contains the canonical seven-language enumeration.
 - `src/analyzers/` contains language adapters and shared analyzer traits.
-- Rust uses `syn`; Python, JavaScript, TypeScript, Go, and Solidity use tree-sitter based adapters.
+- Rust uses `syn`; Python, JavaScript, TypeScript, Go, Solidity, and Nix use tree-sitter based adapters.
 
 Adapters own syntax-specific parsing. Shared phases should consume explicit facts from adapters
 instead of reproducing language-name or path heuristics.
