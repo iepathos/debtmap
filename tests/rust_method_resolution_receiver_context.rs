@@ -50,7 +50,7 @@ fn definition(graph: &CallGraph, source: &str, marker: &str) -> FunctionId {
         + 1;
     let candidates: Vec<_> = graph
         .get_all_functions()
-        .filter(|id| id.file == PathBuf::from("src/lib.rs") && id.line == line)
+        .filter(|id| id.file == *"src/lib.rs" && id.line == line)
         .collect();
     assert_eq!(candidates.len(), 1, "unique definition at {marker}");
     candidates[0].clone()

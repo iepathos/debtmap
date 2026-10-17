@@ -252,11 +252,7 @@ fn cached_pointer_exclusions_use_canonical_definition_identities() {
 fn source_file_builders_preserve_same_line_implementation_identity() {
     for graph in source_builders::graphs(&[("src/lib.rs", SOURCE)]) {
         assert_separate_bodies(&graph);
-        assert!(
-            graph
-                .get_all_functions()
-                .all(|id| id.file == PathBuf::from("src/lib.rs"))
-        );
+        assert!(graph.get_all_functions().all(|id| id.file == *"src/lib.rs"));
     }
 }
 
