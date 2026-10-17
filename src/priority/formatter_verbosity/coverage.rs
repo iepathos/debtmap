@@ -19,13 +19,16 @@ pub fn format_coverage_section(
 
     if let Some(ref trans_cov) = item.transitive_coverage {
         let coverage_pct = trans_cov.direct * 100.0;
+        let crap = crate::risk::crap::crap_for_item(
+            item,
+            crate::config::get_crap_config().coverage_source,
+        );
 
-        // Always show simple coverage percentage line
         writeln!(
             output,
-            "├─ {}: {:.1}% coverage",
+            "├─ {}: {}",
             "COVERAGE".bright_blue(),
-            coverage_pct
+            coverage_summary(coverage_pct, crap)
         )
         .unwrap();
 
@@ -40,6 +43,13 @@ pub fn format_coverage_section(
     } else {
         // No coverage data available - show this explicitly
         writeln!(output, "├─ {}: no coverage data", "COVERAGE".bright_blue()).unwrap();
+    }
+}
+
+fn coverage_summary(percentage: f64, crap: Option<f64>) -> String {
+    match crap {
+        Some(score) => format!("{percentage:.1}% coverage (CRAP: {score:.1})"),
+        None => format!("{percentage:.1}% coverage"),
     }
 }
 
@@ -259,6 +269,15 @@ pub fn classify_coverage_contribution(item: &UnifiedDebtItem) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn coverage_summary_includes_crap_when_present() {
+        assert_eq!(
+            coverage_summary(40.0, Some(18.5)),
+            "40.0% coverage (CRAP: 18.5)"
+        );
+        assert_eq!(coverage_summary(40.0, None), "40.0% coverage");
+    }
 
     #[test]
     fn test_group_lines_into_ranges() {

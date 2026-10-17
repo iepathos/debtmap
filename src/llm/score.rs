@@ -220,6 +220,11 @@ fn target_value(
             Some((1.0 - TARGET_COVERAGE) * features.inputs.verification_factor)
         }
         Feature::Ripple | Feature::Rework => None,
+        Feature::ContextTokens => profiles
+            .iter()
+            .map(|p| p.tolerance(feature))
+            .min_by(f64::total_cmp)
+            .map(|target| target.max(features.unit_tokens)),
         _ => profiles
             .iter()
             .map(|p| p.tolerance(feature))
@@ -493,6 +498,20 @@ mod tests {
         assert!(list.len() >= 3, "{list:?}");
         assert_eq!(list.last().map(|a| a.feature), Some(Feature::Ripple));
         assert!(list.last().unwrap().score_after.is_empty());
+    }
+
+    #[test]
+    fn callee_action_is_absent_when_no_callees_remain() {
+        let config = LlmEditabilityConfig::default();
+        let mut features = features(500.0, 2.0, 1.0, 0.0, 0.0);
+        features.inputs.fan_out = 0.0;
+        features.context_tokens = features.unit_tokens;
+        features.raw_context_tokens = features.unit_tokens * features.inputs.verbosity;
+        let list = actions(&features, &profiles(), &config);
+        assert!(
+            list.iter()
+                .all(|action| action.feature != Feature::ContextTokens)
+        );
     }
 
     #[test]
