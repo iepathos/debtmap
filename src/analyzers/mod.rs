@@ -35,6 +35,7 @@ pub mod function_registry;
 pub mod go;
 pub mod io_detector;
 pub mod macro_definition_collector;
+pub mod nix;
 pub mod purity_detector;
 pub mod python;
 pub mod rust;
@@ -146,6 +147,7 @@ pub fn get_analyzer(language: crate::core::Language) -> Box<dyn Analyzer> {
         (Language::Solidity, || {
             Box::new(solidity::SolidityAnalyzer::new())
         }),
+        (Language::Nix, || Box::new(nix::NixAnalyzer::new())),
     ];
 
     ANALYZER_MAP
@@ -225,6 +227,7 @@ mod tests {
             ("python", tree_sitter_python::LANGUAGE.into(), 15),
             ("go", tree_sitter_go::LANGUAGE.into(), 15),
             ("solidity", tree_sitter_solidity::LANGUAGE.into(), 15),
+            ("nix", tree_sitter_nix::LANGUAGE.into(), 13),
         ];
 
         for (name, language, abi) in grammars {

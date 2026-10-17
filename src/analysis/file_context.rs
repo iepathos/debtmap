@@ -205,6 +205,13 @@ impl FileContextDetector {
                     0.0
                 }
             }
+            Language::Nix => {
+                if crate::analysis::role_policy::is_test_path(path, Language::Nix) {
+                    0.9
+                } else {
+                    0.0
+                }
+            }
             Language::Unknown => 0.0,
         }
     }

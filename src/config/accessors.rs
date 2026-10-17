@@ -130,6 +130,10 @@ pub fn get_language_features(language: &crate::core::Language) -> LanguageFeatur
             .and_then(|lc| lc.solidity.clone())
             .map(|solidity| solidity.features)
             .unwrap_or_default(),
+        Language::Nix => languages_config
+            .and_then(|lc| lc.nix.clone())
+            .map(|config| config.features)
+            .unwrap_or_default(),
         Language::Unknown => LanguageFeatures::default(),
     }
 }

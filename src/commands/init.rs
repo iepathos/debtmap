@@ -25,7 +25,7 @@ min_coverage_percentage = 0.0
 max_total_debt_score = 10000
 
 [languages]
-enabled = ["rust", "python", "javascript", "typescript", "go", "solidity"]
+enabled = ["rust", "python", "javascript", "typescript", "go", "solidity", "nix"]
 
 [languages.rust]
 detect_dead_code = false
@@ -52,6 +52,11 @@ detect_dead_code = true
 detect_complexity = true
 detect_duplication = true
 generated_code = "suppress_debt"
+
+[languages.nix]
+detect_dead_code = false
+detect_complexity = true
+detect_duplication = true
 
 [languages.solidity]
 detect_dead_code = false

@@ -53,9 +53,11 @@ fn candidates_for(parent: &str) -> &'static [&'static str] {
         | "god_object_detection.python"
         | "god_object_detection.javascript" => GOD_OBJECT_THRESHOLD_KEYS,
         "languages" => LANGUAGE_KEYS,
-        "languages.rust" | "languages.python" | "languages.javascript" | "languages.typescript" => {
-            LANGUAGE_FEATURE_KEYS
-        }
+        "languages.rust"
+        | "languages.python"
+        | "languages.javascript"
+        | "languages.typescript"
+        | "languages.nix" => LANGUAGE_FEATURE_KEYS,
         "languages.go" => GO_KEYS,
         "languages.solidity" => SOLIDITY_KEYS,
         "languages.solidity.security" => SOLIDITY_SECURITY_KEYS,
@@ -148,6 +150,7 @@ const LANGUAGE_KEYS: &[&str] = &[
     "enabled",
     "go",
     "javascript",
+    "nix",
     "python",
     "rust",
     "solidity",

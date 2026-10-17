@@ -479,6 +479,7 @@ pub enum Language {
     TypeScript,
     Go,
     Solidity,
+    Nix,
     Unknown,
 }
 
@@ -491,6 +492,7 @@ impl Language {
             (&["ts", "mts", "cts", "tsx"], Language::TypeScript),
             (&["go"], Language::Go),
             (&["sol"], Language::Solidity),
+            (&["nix"], Language::Nix),
         ];
 
         EXTENSION_MAP
@@ -522,6 +524,7 @@ impl std::fmt::Display for Language {
             (Language::TypeScript, "TypeScript"),
             (Language::Go, "Go"),
             (Language::Solidity, "Solidity"),
+            (Language::Nix, "Nix"),
             (Language::Unknown, "Unknown"),
         ];
 

@@ -54,6 +54,7 @@ tree-sitter-typescript = "=0.23.2"
 tree-sitter-python = "=0.25.0"
 tree-sitter-go = "=0.25.0"
 tree-sitter-solidity = "=1.2.13"
+tree-sitter-nix = "=0.3.0"
 
 # CLI
 clap = { version = "4.6", features = ["derive", "env"] }

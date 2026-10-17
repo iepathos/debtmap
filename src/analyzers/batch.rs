@@ -411,6 +411,12 @@ fn validate_syntax(content: &str, language: Language, path: &Path) -> Result<(),
             })?;
             Ok(())
         }
+        Language::Nix => {
+            crate::analyzers::nix::parser::parse_source(content, path).map_err(|e| {
+                AnalysisError::parse_with_path(format!("Nix syntax error: {}", e), path)
+            })?;
+            Ok(())
+        }
         Language::Unknown => Err(AnalysisError::validation_with_path(
             "Cannot validate unknown language",
             path,

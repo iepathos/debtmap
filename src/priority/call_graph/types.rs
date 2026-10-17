@@ -161,7 +161,7 @@ impl FunctionId {
 
 fn split_owner(language: Language, qualified_name: &str) -> (Option<String>, String) {
     let separator = match language {
-        Language::Python | Language::Go => ".",
+        Language::Python | Language::Go | Language::Nix => ".",
         _ => "::",
     };
     qualified_name

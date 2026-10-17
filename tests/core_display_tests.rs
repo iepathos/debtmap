@@ -160,6 +160,7 @@ fn test_language_display_all_variants() {
         (Language::TypeScript, "TypeScript"),
         (Language::Go, "Go"),
         (Language::Solidity, "Solidity"),
+        (Language::Nix, "Nix"),
         (Language::Unknown, "Unknown"),
     ];
 
@@ -204,6 +205,11 @@ fn test_language_from_extension_go() {
 #[test]
 fn test_language_from_extension_solidity() {
     assert_eq!(Language::from_extension("sol"), Language::Solidity);
+}
+
+#[test]
+fn test_language_from_extension_nix() {
+    assert_eq!(Language::from_extension("nix"), Language::Nix);
 }
 
 #[test]

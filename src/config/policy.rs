@@ -5,13 +5,14 @@ use crate::core::{FileMetrics, Language};
 use crate::priority::DebtType;
 use serde::{Deserialize, Serialize};
 
-const SUPPORTED_LANGUAGES: [Language; 6] = [
+const SUPPORTED_LANGUAGES: [Language; 7] = [
     Language::Rust,
     Language::Python,
     Language::JavaScript,
     Language::TypeScript,
     Language::Go,
     Language::Solidity,
+    Language::Nix,
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -195,6 +196,10 @@ fn language_policy(
         Language::Solidity => languages
             .and_then(|value| value.solidity.clone())
             .map(|value| (value.features, value.vendor_code))
+            .unwrap_or_default(),
+        Language::Nix => languages
+            .and_then(|value| value.nix.clone())
+            .map(|value| (value.features, value.generated_code))
             .unwrap_or_default(),
         Language::Unknown => (LanguageFeatures::default(), GeneratedCodeMode::Analyze),
     };
