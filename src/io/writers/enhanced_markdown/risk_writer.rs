@@ -57,7 +57,7 @@ pub fn get_critical_risk_functions(
 ) -> Vec<&FunctionMetrics> {
     let mut critical: Vec<_> = metrics.iter().filter(|m| m.cyclomatic >= 10).collect();
 
-    critical.sort_by(|a, b| b.cyclomatic.cmp(&a.cyclomatic));
+    critical.sort_by_key(|a| std::cmp::Reverse(a.cyclomatic));
     critical.into_iter().take(limit).collect()
 }
 

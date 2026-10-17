@@ -639,7 +639,7 @@ pub fn display_config_sources(traced: &TracedConfig) {
     println!();
 
     let mut fields: Vec<_> = traced.all_field_sources().iter().collect();
-    fields.sort_by(|(left, _), (right, _)| left.cmp(right));
+    fields.sort_by_key(|(left, _)| *left);
     for (path, source) in fields {
         println!("  {} = <value>", path);
         println!("    from: {}", source);

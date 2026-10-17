@@ -95,7 +95,7 @@ impl FrameworkPatternMetrics {
     /// Returns patterns sorted by count (most frequent first)
     pub fn sorted_by_frequency(&self) -> Vec<&DetectedPattern> {
         let mut sorted: Vec<_> = self.patterns.iter().collect();
-        sorted.sort_by(|a, b| b.count.cmp(&a.count));
+        sorted.sort_by_key(|a| std::cmp::Reverse(a.count));
         sorted
     }
 

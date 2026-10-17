@@ -177,7 +177,7 @@ pub fn compute_layering_score(dependencies: &[ModuleDependency]) -> LayeringAnal
         .into_iter()
         .map(|(m, c)| (m.to_string(), c))
         .collect();
-    problematic_modules.sort_by(|a, b| b.1.cmp(&a.1));
+    problematic_modules.sort_by_key(|a| std::cmp::Reverse(a.1));
 
     LayeringAnalysis {
         score,

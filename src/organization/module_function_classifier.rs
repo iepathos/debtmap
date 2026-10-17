@@ -255,7 +255,7 @@ impl ModuleFunctionClassifier {
 
         // Find most common signals
         let mut signal_list: Vec<_> = signal_counts.into_iter().collect();
-        signal_list.sort_by(|a, b| b.1.cmp(&a.1));
+        signal_list.sort_by_key(|a| std::cmp::Reverse(a.1));
 
         let top_signals: Vec<String> = signal_list
             .iter()

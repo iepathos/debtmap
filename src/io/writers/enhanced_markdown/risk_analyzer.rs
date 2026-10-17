@@ -83,7 +83,7 @@ pub fn get_critical_risk_functions(
         .filter(|m| m.cyclomatic > 10 || m.name.contains("critical"))
         .collect();
 
-    risk_functions.sort_by(|a, b| b.cyclomatic.cmp(&a.cyclomatic));
+    risk_functions.sort_by_key(|a| std::cmp::Reverse(a.cyclomatic));
     risk_functions.truncate(limit);
     risk_functions
 }
