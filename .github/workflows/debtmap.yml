@@ -38,14 +38,15 @@ jobs:
       with:
         components: rustfmt, clippy
 
-    - name: Cache Rust dependencies
-      uses: Swatinem/rust-cache@v2
+    - name: Set up mbx build cache
+      uses: jdx/mr-boxington-action@47ce49b32025d93a7a2f4570815afaa2b7092240 # v1.7.2
       with:
-        cache-bin: "false"
+        cache-key: ${{ runner.os }}-${{ runner.arch }}-mbx-debtmap-${{ hashFiles('rust-toolchain.toml') }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: ${{ runner.os }}-${{ runner.arch }}-mbx-debtmap-${{ hashFiles('rust-toolchain.toml') }}-
 
     - name: Build debtmap debug binary
       run: |
-        cargo build
+        mbx build
         echo "Disk space after debug build:"
         df -h
 

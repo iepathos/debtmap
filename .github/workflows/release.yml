@@ -113,10 +113,11 @@ jobs:
       with:
         targets: ${{ matrix.target }}
 
-    - name: Cache Rust dependencies
-      uses: Swatinem/rust-cache@v2
+    # Release artifacts must not depend on a shared cache: local backend never restores or saves.
+    - name: Set up mbx
+      uses: jdx/mr-boxington-action@47ce49b32025d93a7a2f4570815afaa2b7092240 # v1.7.2
       with:
-        cache-bin: "false"
+        backend: local
 
     - name: Install musl tools
       if: matrix.target == 'x86_64-unknown-linux-musl'
@@ -137,7 +138,7 @@ jobs:
         "OPENSSL_SRC_PERL=$perl" >> $env:GITHUB_ENV
 
     - name: Build release binary
-      run: cargo build --release --target ${{ matrix.target }}
+      run: mbx build --release --target ${{ matrix.target }}
       env:
         OPENSSL_STATIC: ${{ matrix.target == 'x86_64-unknown-linux-musl' && '1' || '' }}
 
