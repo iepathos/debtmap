@@ -30,7 +30,8 @@ ignore = []
 
 [licenses]
 allow = [
-    "MIT", 
+    "MIT",
+    "BSD-3-Clause", # Permissive, same class as MIT. Used by deunicode.
     "Apache-2.0", 
     "CC0-1.0", 
     "Unicode-3.0", 
