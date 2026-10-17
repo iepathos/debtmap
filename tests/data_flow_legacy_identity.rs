@@ -2,7 +2,7 @@
 use debtmap::data_flow::{DataFlowGraph, DataTransformation, PurityInfo};
 use debtmap::extraction::{UnifiedFileExtractor, adapters};
 use debtmap::priority::call_graph::{CallGraph, FunctionId};
-use std::collections::HashMap;
+use foldhash::HashMap;
 
 fn id(column: Option<usize>) -> FunctionId {
     FunctionId::new("src/lib.rs".into(), "work".into(), 1).with_column(column)
@@ -55,7 +55,7 @@ fn cached_legacy_extraction_populates_the_upgraded_graph_identity() {
     for function in &mut file.functions {
         function.column = None;
     }
-    let files = HashMap::from([(path, file)]);
+    let files = debtmap::collections::map_from([(path, file)]);
     let calls = adapters::call_graph::build_call_graph(&files);
     let canonical = calls.get_all_functions().next().unwrap().clone();
     assert!(canonical.column.is_some());

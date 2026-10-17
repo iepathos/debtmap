@@ -7,7 +7,7 @@
 //! - Rust-specific pattern application
 //! - Warnings as data (no side effects)
 
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashSet};
 
 use super::super::categorization::is_test_method;
 use super::super::types::{BehaviorCategory, MethodCluster};

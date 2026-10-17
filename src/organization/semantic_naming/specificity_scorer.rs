@@ -3,7 +3,7 @@
 //! Evaluates how specific and descriptive a module name is,
 //! rejecting generic names like "unknown", "misc", "utils", etc.
 
-use std::collections::HashSet;
+use foldhash::HashSet;
 
 /// Scores module names based on specificity and descriptiveness
 pub struct SpecificityScorer {

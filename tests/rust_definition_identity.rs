@@ -6,7 +6,8 @@ use debtmap::analysis::call_graph::RustCallGraphBuilder;
 use debtmap::analyzers::rust_call_graph::extract_call_graph;
 use debtmap::extraction::{UnifiedFileExtractor, adapters};
 use debtmap::priority::call_graph::{CallGraph, FunctionId};
-use std::collections::{BTreeSet, HashMap};
+use foldhash::HashMap;
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 const SOURCE: &str = "struct Foo; trait First { fn run(&self); } trait Second { fn run(&self); } impl First for Foo { fn run(&self) { first(); } } impl Second for Foo { fn run(&self) { second(); } } fn first() {} fn second() {}";
@@ -64,8 +65,10 @@ fn same_line_implementations_keep_separate_nodes_edges_and_metrics() {
     for (ordinal, function) in extracted.functions.iter_mut().enumerate() {
         function.cyclomatic = ordinal as u32 + 10;
     }
-    let cached =
-        adapters::call_graph::build_call_graph(&HashMap::from([(path.clone(), extracted.clone())]));
+    let cached = adapters::call_graph::build_call_graph(&debtmap::collections::map_from([(
+        path.clone(),
+        extracted.clone(),
+    )]));
     assert_separate_bodies(&cached);
     let metrics = adapters::metrics::all_function_metrics(&extracted);
     for metric in metrics.iter().filter(|metric| metric.name == "Foo::run") {
@@ -190,7 +193,7 @@ fn cached_enhancement_preserves_exact_trait_roles_and_framework_exclusions() {
     let path = PathBuf::from("src/lib.rs");
     let extracted = UnifiedFileExtractor::extract(&path, source).unwrap();
     let count = extracted.functions.len();
-    let snapshots = HashMap::from([(path, extracted)]);
+    let snapshots = debtmap::collections::map_from([(path, extracted)]);
     let (graph, exclusions, pointer_used) =
         debtmap::builders::parallel_call_graph::build_call_graph_from_extracted(
             CallGraph::new(),
@@ -238,7 +241,7 @@ fn cached_pointer_exclusions_use_canonical_definition_identities() {
     let (graph, _, pointer_used) =
         debtmap::builders::parallel_call_graph::build_call_graph_from_extracted(
             CallGraph::new(),
-            &HashMap::from([(path, extracted)]),
+            &debtmap::collections::map_from([(path, extracted)]),
         );
     let handler = graph
         .get_all_functions()

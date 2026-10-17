@@ -4,7 +4,7 @@ use crate::core::FunctionMetrics;
 use crate::data_flow::{DataFlowGraph, PurityInfo};
 use crate::extraction::ExtractedFileData;
 use crate::priority::call_graph::{CallGraph, FunctionId};
-use std::collections::HashMap;
+use foldhash::HashMap;
 use std::path::PathBuf;
 
 /// Build one data-flow graph for either execution mode.

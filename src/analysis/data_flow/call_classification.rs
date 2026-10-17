@@ -20,8 +20,8 @@
 //! assert_eq!(classify_call("my_custom_func"), CallPurity::Unknown);
 //! ```
 
+use foldhash::{HashSet, HashSetExt};
 use once_cell::sync::Lazy;
-use std::collections::HashSet;
 
 /// Classification result for a function call.
 ///

@@ -123,7 +123,7 @@ mod tests {
     };
     use crate::effects::run_effect;
     use chrono::Utc;
-    use std::collections::HashMap;
+    use foldhash::{HashMap, HashMapExt};
     use std::path::PathBuf;
     use tempfile::TempDir;
 

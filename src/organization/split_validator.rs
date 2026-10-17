@@ -156,7 +156,7 @@ fn calculate_naming_cohesion(methods: &[String]) -> f64 {
     }
 
     // Calculate how many methods share common prefixes
-    let unique_prefixes: std::collections::HashSet<_> = prefixes.iter().collect();
+    let unique_prefixes: foldhash::HashSet<_> = prefixes.iter().collect();
     let sharing_ratio = 1.0 - (unique_prefixes.len() as f64 / methods.len() as f64);
 
     // Scale to 0.4-1.0 range (avoid very low scores for naming-based cohesion)
@@ -233,8 +233,8 @@ fn method_naming_similarity(split1: &ModuleSplit, split2: &ModuleSplit) -> f64 {
     }
 
     // Calculate Jaccard similarity of prefixes
-    let set1: std::collections::HashSet<_> = prefixes1.iter().collect();
-    let set2: std::collections::HashSet<_> = prefixes2.iter().collect();
+    let set1: foldhash::HashSet<_> = prefixes1.iter().collect();
+    let set2: foldhash::HashSet<_> = prefixes2.iter().collect();
 
     let intersection = set1.intersection(&set2).count();
     let union = set1.union(&set2).count();

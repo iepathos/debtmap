@@ -17,7 +17,7 @@ use crate::organization::{
     type_based_clustering::{MethodSignature, TypeAffinityAnalyzer},
 };
 
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
 /// Orchestrates all architecture analysis specs (181-184)

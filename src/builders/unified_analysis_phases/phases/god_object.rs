@@ -104,7 +104,7 @@ pub fn create_god_object_debt_item(
         .production
         .iter()
         .chain(&aggregated_metrics.unique_downstream_callees)
-        .collect::<std::collections::HashSet<_>>()
+        .collect::<foldhash::HashSet<_>>()
         .len();
 
     UnifiedDebtItem {
@@ -556,7 +556,7 @@ mod tests {
     use super::*;
     use crate::organization::god_object::ModuleSplit;
     use crate::organization::{DetectionType, GodObjectConfidence, SplitAnalysisMethod};
-    use std::collections::HashMap;
+    use foldhash::{HashMap, HashMapExt};
 
     fn create_test_god_analysis() -> GodObjectAnalysis {
         GodObjectAnalysis {

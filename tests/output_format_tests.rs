@@ -1,6 +1,6 @@
 use chrono::Utc;
 use debtmap::*;
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::path::PathBuf;
 
 #[test]

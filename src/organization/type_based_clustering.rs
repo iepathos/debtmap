@@ -4,7 +4,7 @@
 //! rather than by behavioral patterns. This follows idiomatic Rust principles where
 //! data owns its behavior through impl blocks.
 
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet};
 use syn::{FnArg, ReturnType, Type};
 
 /// Information about a type extracted from a method signature

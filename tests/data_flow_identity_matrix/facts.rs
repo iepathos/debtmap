@@ -3,7 +3,7 @@ use debtmap::data_flow::{
     CfgAnalysisWithContext, DataFlowGraph, IoOperation, MutationInfo, PurityInfo,
 };
 use debtmap::priority::call_graph::FunctionId;
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashSet, HashSetExt};
 
 #[derive(Clone, Copy, Debug)]
 pub enum Fact {
@@ -34,7 +34,7 @@ fn cfg(marker: &str) -> DataFlowAnalysis {
     };
     DataFlowAnalysis {
         reaching_defs: ReachingDefinitions {
-            reach_in: HashMap::from([(BlockId(number), HashSet::new())]),
+            reach_in: debtmap::collections::map_from([(BlockId(number), HashSet::new())]),
             ..Default::default()
         },
     }
@@ -53,7 +53,9 @@ impl Fact {
                     impurity_reasons: vec![marker],
                 },
             ),
-            Self::Dependencies => graph.add_variable_dependencies(id, HashSet::from([marker])),
+            Self::Dependencies => {
+                graph.add_variable_dependencies(id, debtmap::collections::set_from([marker]))
+            }
             Self::Io => graph.add_io_operation(
                 id,
                 IoOperation {

@@ -11,7 +11,7 @@ use debtmap::{
         apply_context_adjustments, context_label, is_test_context,
     },
 };
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::path::PathBuf;
 
 #[test]

@@ -14,7 +14,7 @@ use crate::organization::god_object::{
     DetectionType, GodObjectAnalysis, GodObjectConfidence, GodObjectThresholds, SplitAnalysisMethod,
 };
 
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 
 /// Thresholds for simple heuristic-based detection.
 pub const HEURISTIC_MAX_FUNCTIONS: usize = 50;

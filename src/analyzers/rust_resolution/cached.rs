@@ -3,8 +3,8 @@
 use crate::core::Language;
 use crate::extraction::{ExtractedFileData, ExtractedFunctionData};
 use crate::priority::call_graph::{CallGraph, FunctionId};
+use foldhash::{HashMap, HashMapExt, HashSet};
 use rayon::prelude::*;
-use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 #[path = "cached_enhancement.rs"]
@@ -199,7 +199,7 @@ mod tests {
                 .iter()
                 .any(|function| function.qualified_name == "Wrapper::get")
         );
-        let extracted = HashMap::from([(path.clone(), data.clone())]);
+        let extracted = crate::collections::map_from([(path.clone(), data.clone())]);
         let (graph, available) = extract(&extracted);
         assert!(available.contains(&path));
         assert_eq!(graph.node_count(), data.functions.len());

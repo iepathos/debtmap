@@ -10,6 +10,7 @@ use crate::commands::compare_debtmap::{
 use crate::comparison::{Comparator, ComparisonResult, DebtTrend, PlanParser, TargetStatus};
 use crate::priority::UnifiedAnalysis;
 use anyhow::Result;
+use foldhash::HashMapExt;
 use std::path::Path;
 
 /// Resolve the target item location from a plan file or explicit CLI argument.
@@ -136,7 +137,7 @@ fn json_to_analysis(json: DebtmapJsonInput) -> UnifiedAnalysis {
         has_coverage_data: json.overall_coverage.is_some(),
         timings: None,
         stats: crate::priority::FilterStatistics::new(),
-        analyzed_files: std::collections::HashMap::new(),
+        analyzed_files: foldhash::HashMap::new(),
         suppression_audit: Default::default(),
     }
 }

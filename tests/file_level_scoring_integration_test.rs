@@ -1,4 +1,5 @@
 use debtmap::priority::file_metrics::{FileDebtItem, FileDebtMetrics, FileImpact};
+use foldhash::HashMapExt;
 use std::path::PathBuf;
 
 #[test]
@@ -36,7 +37,7 @@ fn test_file_level_scoring_integration() {
             analysis_method: debtmap::organization::SplitAnalysisMethod::None,
             cross_domain_severity: None,
             domain_diversity_metrics: None,
-            responsibility_method_counts: std::collections::HashMap::new(),
+            responsibility_method_counts: foldhash::HashMap::new(),
             struct_name: None,
             struct_line: None,
             struct_location: None,
@@ -123,7 +124,7 @@ fn test_file_scoring_with_god_object_detection() {
             analysis_method: debtmap::organization::SplitAnalysisMethod::None,
             cross_domain_severity: None,
             domain_diversity_metrics: None,
-            responsibility_method_counts: std::collections::HashMap::new(),
+            responsibility_method_counts: foldhash::HashMap::new(),
             struct_name: None,
             struct_line: None,
             struct_location: None,
@@ -216,7 +217,7 @@ fn test_file_scoring_priorities() {
                 analysis_method: debtmap::organization::SplitAnalysisMethod::None,
                 cross_domain_severity: None,
                 domain_diversity_metrics: None,
-                responsibility_method_counts: std::collections::HashMap::new(),
+                responsibility_method_counts: foldhash::HashMap::new(),
                 struct_name: None,
                 struct_line: None,
                 struct_location: None,
@@ -377,7 +378,7 @@ fn test_recommendation_generation_completeness() {
                     analysis_method: debtmap::organization::SplitAnalysisMethod::None,
                     cross_domain_severity: None,
                     domain_diversity_metrics: None,
-                    responsibility_method_counts: std::collections::HashMap::new(),
+                    responsibility_method_counts: foldhash::HashMap::new(),
                     struct_name: None,
                     struct_line: None,
                     struct_location: None,
@@ -477,7 +478,7 @@ fn test_file_scoring_with_real_world_scenarios() {
             analysis_method: debtmap::organization::SplitAnalysisMethod::None,
             cross_domain_severity: None,
             domain_diversity_metrics: None,
-            responsibility_method_counts: std::collections::HashMap::new(),
+            responsibility_method_counts: foldhash::HashMap::new(),
             struct_name: None,
             struct_line: None,
             struct_location: None,

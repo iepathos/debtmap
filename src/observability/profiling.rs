@@ -41,7 +41,7 @@
 //! }
 //! ```
 
-use dashmap::DashMap;
+use crate::collections::DashMap;
 use serde::Serialize;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -186,8 +186,8 @@ impl TimingCollector {
     /// Create a new timing collector.
     fn new() -> Self {
         Self {
-            timings: DashMap::new(),
-            hierarchy: DashMap::new(),
+            timings: DashMap::default(),
+            hierarchy: DashMap::default(),
             start_time: OnceLock::new(),
         }
     }

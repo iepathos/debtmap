@@ -57,7 +57,7 @@ pub enum ResolutionOutcome {
 }
 
 /// Handles resolution of function calls
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 
 pub struct CallResolver<'a> {
     #[allow(dead_code)]
@@ -381,7 +381,7 @@ impl<'a> CallResolver<'a> {
 
             if all_same_name {
                 // Check if all candidates are in different files (truly ambiguous)
-                let unique_files: std::collections::HashSet<_> =
+                let unique_files: foldhash::HashSet<_> =
                     candidates.iter().map(|f| &f.file).collect();
 
                 // If all have the same exact name and are in different files, it's ambiguous

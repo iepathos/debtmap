@@ -5,7 +5,7 @@
 //! by generating complete type definitions with methods.
 
 use crate::organization::type_based_clustering::{MethodSignature, TypeInfo};
-use std::collections::HashSet;
+use foldhash::{HashSet, HashSetExt};
 
 /// Configuration for hidden type extraction
 #[derive(Clone, Debug)]

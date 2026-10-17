@@ -6,6 +6,7 @@
 use crate::collections::{HashMap, HashSet, Vector};
 use crate::priority::call_graph::FunctionId;
 use anyhow::Result;
+use foldhash::{HashMapExt, HashSetExt};
 use std::path::{Path, PathBuf};
 use syn::spanned::Spanned;
 use syn::visit::Visit;

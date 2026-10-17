@@ -3,7 +3,7 @@
 /// This module assigns priorities to module split recommendations based on
 /// their cohesion scores and whether they're involved in circular dependencies.
 use crate::organization::god_object::types::{ModuleSplit, Priority};
-use std::collections::HashSet;
+use foldhash::HashSet;
 
 /// Assign priorities based on cohesion score and dependency quality
 ///

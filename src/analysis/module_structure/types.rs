@@ -3,8 +3,8 @@
 //! Contains all structs, enums, and their core implementations for
 //! representing module structure, components, and analysis results.
 
+use foldhash::{HashMap, HashMapExt};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// Categorized function counts within a module

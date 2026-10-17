@@ -12,7 +12,7 @@ use super::module_tree::ModuleTree;
 use crate::priority::call_graph::{CallGraph, FunctionId};
 use std::path::{Path, PathBuf};
 
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 
 /// Path resolver combining all resolution strategies
 #[derive(Debug, Clone)]

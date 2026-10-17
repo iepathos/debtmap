@@ -9,10 +9,8 @@ use debtmap::{
     extraction::{UnifiedFileExtractor, adapters},
     priority::call_graph::CallGraph,
 };
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-};
+use foldhash::HashMap;
+use std::path::{Path, PathBuf};
 
 pub fn graphs(root: &Path, files: &[(PathBuf, String)]) -> Vec<(&'static str, CallGraph)> {
     let parsed: Vec<_> = files

@@ -18,7 +18,7 @@ use crate::output::unified::{
     CouplingClassification, FileDebtItemOutput, UnifiedDebtItemOutput, UnifiedLocation,
 };
 use crate::priority::UnifiedAnalysis;
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet};
 use std::io::{self, Write};
 
 /// Configuration for DOT output generation

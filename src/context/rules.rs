@@ -2,7 +2,7 @@
 
 use crate::context::{FileType, FrameworkPattern, FunctionContext, FunctionRole};
 use crate::core::DebtType;
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 
 /// Represents a context-aware rule for debt detection
 #[derive(Debug, Clone)]

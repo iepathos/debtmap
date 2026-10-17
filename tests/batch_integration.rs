@@ -1673,8 +1673,7 @@ pub fn function_{}(x: i32) -> i32 {{
     assert_eq!(results.len(), 10);
 
     // Verify each file was analyzed (check paths are unique)
-    let result_paths: std::collections::HashSet<_> =
-        results.iter().map(|r| r.path.clone()).collect();
+    let result_paths: foldhash::HashSet<_> = results.iter().map(|r| r.path.clone()).collect();
     assert_eq!(
         result_paths.len(),
         10,

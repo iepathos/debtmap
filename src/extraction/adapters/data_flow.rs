@@ -13,7 +13,7 @@ use crate::extraction::types::{
     ExtractedFileData, IoOperation, IoType, PatternType, TransformationPattern,
 };
 use crate::priority::call_graph::FunctionId;
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet};
 use std::path::PathBuf;
 
 /// Statistics about data flow population.

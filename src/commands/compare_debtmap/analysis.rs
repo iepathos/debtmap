@@ -9,7 +9,7 @@ use super::types::{
     extract_location_keys, is_critical, is_score_unchanged, is_significantly_improved,
 };
 use crate::output::unified::{FunctionDebtItemOutput, UnifiedDebtItemOutput};
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashSet};
 use std::path::PathBuf;
 
 // =============================================================================

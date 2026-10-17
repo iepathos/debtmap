@@ -5,7 +5,7 @@
 
 use crate::core::FunctionMetrics;
 use crate::priority::call_graph::{CallGraph, FunctionId};
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 
 /// Purity category for a function.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

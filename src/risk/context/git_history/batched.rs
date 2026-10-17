@@ -1,6 +1,6 @@
 use super::git2_provider::FileCommitScan;
 use chrono::{DateTime, Utc};
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet};
 use std::path::{Path, PathBuf};
 
 /// Commit metadata accumulated into per-file history during preload.

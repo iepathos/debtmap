@@ -46,7 +46,7 @@
 //! ```ignore
 //! use debtmap::extraction::adapters;
 //! use debtmap::extraction::UnifiedFileExtractor;
-//! use std::collections::HashMap;
+//! use foldhash::{HashMap};
 //!
 //! // Extract all files first
 //! let extracted: HashMap<PathBuf, ExtractedFileData> = files

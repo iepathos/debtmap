@@ -20,8 +20,8 @@ use crate::priority::debt_aggregator::{DebtAggregator, FunctionId as AggregatorF
 use crate::priority::scoring::{ContextRecommendationEngine, debt_item};
 use crate::risk::RiskAnalyzer;
 use crate::risk::lcov::LcovData;
+use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use rayon::prelude::*;
-use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 /// Configuration for scoring weights.
@@ -247,9 +247,7 @@ pub fn setup_debt_aggregator(
 }
 
 /// Pure function to transform metrics into purity map.
-pub fn metrics_to_purity_map(
-    metrics: &[FunctionMetrics],
-) -> std::collections::HashMap<String, bool> {
+pub fn metrics_to_purity_map(metrics: &[FunctionMetrics]) -> foldhash::HashMap<String, bool> {
     metrics
         .iter()
         .map(|m| (m.name.clone(), m.is_pure.unwrap_or(false)))
@@ -527,7 +525,7 @@ mod tests {
         });
         let exclusions = HashSet::new();
         let aggregator = DebtAggregator::new();
-        let line_counts = HashMap::from([(PathBuf::from("test.rs"), 100)]);
+        let line_counts = crate::collections::map_from([(PathBuf::from("test.rs"), 100)]);
         let suppressions = HashMap::new();
         let input = PreparedScoringInput {
             call_graph: &graph,
@@ -563,8 +561,8 @@ mod tests {
         let graph = CallGraph::new();
         let exclusions = HashSet::new();
         let aggregator = DebtAggregator::new();
-        let line_counts = HashMap::from([(PathBuf::from("test.rs"), 100)]);
-        let suppressions = HashMap::from([(
+        let line_counts = crate::collections::map_from([(PathBuf::from("test.rs"), 100)]);
+        let suppressions = crate::collections::map_from([(
             PathBuf::from("test.rs"),
             parse_suppression_comments(
                 "// debtmap:ignore[complexity] -- audited exception\nfn suppressed() {}",

@@ -6,7 +6,7 @@
 //! - Applying Rust-specific naming patterns
 //! - Detecting I/O boundary, query, matching, and lookup patterns
 
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 
 use super::super::types::{BehaviorCategory, MethodCluster, capitalize_first};
 use super::cohesion::calculate_standalone_cohesion;

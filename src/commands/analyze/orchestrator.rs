@@ -62,7 +62,7 @@ fn build_unified_analysis_options(
     config: &AnalyzeConfig,
     results: &AnalysisResults,
     extracted_data: Option<
-        std::collections::HashMap<std::path::PathBuf, crate::extraction::ExtractedFileData>,
+        foldhash::HashMap<std::path::PathBuf, crate::extraction::ExtractedFileData>,
     >,
 ) -> Result<crate::priority::UnifiedAnalysis> {
     // Spec 214: Reuse pre-extracted data from metrics phase (no re-extraction needed)
@@ -75,7 +75,7 @@ fn create_analysis_options_with_extracted<'a>(
     config: &'a AnalyzeConfig,
     results: &'a AnalysisResults,
     extracted_data: Option<
-        std::collections::HashMap<std::path::PathBuf, crate::extraction::ExtractedFileData>,
+        foldhash::HashMap<std::path::PathBuf, crate::extraction::ExtractedFileData>,
     >,
 ) -> unified_analysis::UnifiedAnalysisOptions<'a> {
     // Extract Rust files from already-discovered file contexts (avoids re-walking filesystem)

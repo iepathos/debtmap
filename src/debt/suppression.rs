@@ -1,8 +1,8 @@
 use crate::core::{DebtType, Language};
 use crate::debt::suppression_audit::{SuppressionDecision, SuppressionKind};
+use foldhash::{HashMap, HashMapExt};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]

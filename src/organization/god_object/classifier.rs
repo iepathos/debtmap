@@ -7,7 +7,7 @@
 //! - Composable: Can be combined and chained
 //! - Testable: No mocks or I/O needed
 
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 
 use super::classification_types::{
     ClassificationResult, MethodBodyAnalysis, MethodComplexityClass, ReturnExprType, SignalType,
@@ -920,7 +920,7 @@ pub fn extract_domain_from_name(name: &str) -> String {
 /// assert_eq!(count_distinct_domains(&structs), 2);
 /// ```
 pub fn count_distinct_domains(structs: &[super::types::StructMetrics]) -> usize {
-    use std::collections::HashSet;
+    use foldhash::HashSet;
     let domains: HashSet<String> = structs
         .iter()
         .map(|s| classify_struct_domain(&s.name))
@@ -1057,7 +1057,7 @@ pub fn extract_domain_context(
     let primary_keywords = extract_domain_keywords(struct_name);
 
     // Extract keywords from field names and types (excluding common types)
-    let common_types: std::collections::HashSet<&str> = [
+    let common_types: foldhash::HashSet<&str> = [
         "vec", "hashmap", "btreemap", "hashset", "btreeset", "option", "result", "string", "str",
         "bool", "usize", "isize", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64", "f32",
         "f64", "box", "arc", "rc", "refcell", "cell", "mutex", "rwlock", "pathbuf", "path",
@@ -1245,7 +1245,7 @@ fn infer_method_domain(method: &str, context: &DomainContext) -> String {
     let method_keywords = extract_domain_keywords(method);
 
     // Common utility methods that don't count toward domain classification
-    let utility_methods: std::collections::HashSet<&str> = [
+    let utility_methods: foldhash::HashSet<&str> = [
         "new",
         "default",
         "clone",
@@ -1366,7 +1366,7 @@ pub fn extract_domain_keywords(name: &str) -> Vec<String> {
     }
 
     // Filter out common non-domain words
-    let non_domain_words: std::collections::HashSet<&str> = [
+    let non_domain_words: foldhash::HashSet<&str> = [
         "new", "get", "set", "is", "has", "the", "a", "an", "impl", "default",
     ]
     .into_iter()
@@ -1414,7 +1414,7 @@ pub fn calculate_domain_cohesion(struct_name: &str, methods: &[String]) -> f64 {
     }
 
     // Common utility methods that don't need to match domain
-    let utility_methods: std::collections::HashSet<&str> = [
+    let utility_methods: foldhash::HashSet<&str> = [
         "new", "default", "clone", "fmt", "drop", "from", "into", "as_ref", "as_mut",
     ]
     .into_iter()

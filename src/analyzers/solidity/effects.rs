@@ -1,6 +1,6 @@
 //! EVM-relevant state and purity effect analysis for Solidity functions.
 
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet};
 
 use tree_sitter::Node;
 

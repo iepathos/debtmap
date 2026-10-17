@@ -21,6 +21,7 @@
 //! - Pure transformation from view to string/struct
 
 use crate::priority::view::{PreparedDebtView, ViewItem, ViewSummary};
+use foldhash::HashMapExt;
 use serde::{Deserialize, Serialize};
 
 // ============================================================================
@@ -389,8 +390,7 @@ fn format_terminal_summary_mode(output: &mut String, view: &PreparedDebtView) {
     use std::fmt::Write;
 
     // Group by tier and show counts
-    let mut tier_counts: std::collections::HashMap<String, usize> =
-        std::collections::HashMap::new();
+    let mut tier_counts: foldhash::HashMap<String, usize> = foldhash::HashMap::new();
 
     for item in &view.items {
         let tier = item

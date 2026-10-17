@@ -6,7 +6,7 @@
 use crate::common::{SourceLocation, UnifiedLocationExtractor};
 use crate::complexity::cyclomatic::calculate_cyclomatic;
 use crate::organization::FunctionComplexityInfo;
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use syn::{self, visit::Visit};
 
 /// Analysis data for a single type (struct/enum)
@@ -116,7 +116,7 @@ impl TypeVisitor {
     fn extract_field_type_name(ty: &syn::Type) -> String {
         match ty {
             syn::Type::Path(type_path) => {
-                // Get the last segment of the path (handles std::collections::HashMap, etc.)
+                // Get the last segment of the path (handles foldhash::HashMap, etc.)
                 type_path
                     .path
                     .segments

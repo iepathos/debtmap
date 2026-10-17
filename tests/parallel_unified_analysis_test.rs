@@ -136,8 +136,8 @@ fn phase3_uses_prepared_facts_when_source_is_unavailable() {
 
     let extracted = UnifiedFileExtractor::extract(&path, &source).unwrap();
     let extracted_lines = extracted.total_lines;
-    let extracted_data = std::collections::HashMap::from([(path.clone(), extracted)]);
-    let cached_lines = std::collections::HashMap::from([(path.clone(), extracted_lines + 100)]);
+    let extracted_data = debtmap::collections::map_from([(path.clone(), extracted)]);
+    let cached_lines = debtmap::collections::map_from([(path.clone(), extracted_lines + 100)]);
     let metrics = metrics_for_file(&path, 51);
 
     let mut content_builder =
@@ -161,7 +161,7 @@ fn phase3_uses_prepared_facts_when_source_is_unavailable() {
     let cached_line_count = extracted_lines + 200;
     let mut cached_builder =
         ParallelUnifiedAnalysisBuilder::new(CallGraph::new(), parallel_options())
-            .with_line_count_index(std::collections::HashMap::from([(
+            .with_line_count_index(debtmap::collections::map_from([(
                 path.clone(),
                 cached_line_count,
             )]));
@@ -1105,7 +1105,7 @@ fn test_extraction_pipeline_baseline_equivalence() {
     // Verifies that the unified extraction pipeline produces equivalent results
     // to the analysis without extracted data (both should now use extraction internally).
     use debtmap::extraction::{ExtractedFileData, UnifiedFileExtractor};
-    use std::collections::HashMap;
+    use foldhash::{HashMap, HashMapExt};
     use tempfile::TempDir;
 
     // Create a temporary directory with real Rust code
@@ -1114,7 +1114,7 @@ fn test_extraction_pipeline_baseline_equivalence() {
 
     // Write realistic Rust code with various patterns
     let test_code = r#"
-use std::collections::HashMap;
+use foldhash::{HashMap};
 
 pub struct Calculator {
     state: i32,

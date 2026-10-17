@@ -11,7 +11,7 @@ use crate::core::ast::TypeScriptAst;
 use crate::priority::call_graph::{
     CallEdgeProvenance, CallGraph, CallSite, CallType, FunctionId, ResolutionOutcome,
 };
-use std::collections::HashSet;
+use foldhash::{HashSet, HashSetExt};
 use std::path::{Component, Path, PathBuf};
 
 #[derive(Debug)]

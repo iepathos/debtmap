@@ -1,7 +1,7 @@
 use crate::priority::semantic_classifier::FunctionRole;
 use crate::risk::evidence::ModuleType;
+use foldhash::{HashMap, HashMapExt};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComplexityThresholds {

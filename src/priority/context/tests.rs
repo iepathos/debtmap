@@ -2,6 +2,8 @@
 
 #[cfg(test)]
 mod integration_tests {
+    use foldhash::HashMapExt;
+
     use crate::common::{LocationConfidence, SourceLocation};
     use crate::organization::{
         DetectionType, GodObjectAnalysis, GodObjectConfidence, SplitAnalysisMethod,
@@ -468,7 +470,7 @@ mod integration_tests {
             recommended_splits: Vec::new(),
             confidence: GodObjectConfidence::Probable,
             responsibilities: Vec::new(),
-            responsibility_method_counts: std::collections::HashMap::new(),
+            responsibility_method_counts: foldhash::HashMap::new(),
             purity_distribution: None,
             module_structure: None,
             detection_type: DetectionType::GodClass,

@@ -1,7 +1,7 @@
 //! Lexical bindings with explicit declarations kept apart from inferred values.
 use super::body::unknown;
 use super::types::{FactOrigin, TypeFact, UnknownReason};
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
 mod annotations;
 mod patterns;
 use annotations::compatible;

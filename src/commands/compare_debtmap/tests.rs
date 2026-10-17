@@ -21,6 +21,7 @@ use crate::output::unified::{
 };
 use crate::priority::semantic_classifier::FunctionRole;
 use crate::priority::{DebtType, ImpactMetrics};
+use foldhash::HashMapExt;
 use std::path::PathBuf;
 
 // =============================================================================
@@ -1331,7 +1332,7 @@ fn test_output_json_deserializes_for_compare() {
                 file: 0,
                 function: 0,
             },
-            by_category: std::collections::HashMap::new(),
+            by_category: foldhash::HashMap::new(),
             score_distribution: ScoreDistribution {
                 critical: 0,
                 high: 0,

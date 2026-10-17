@@ -12,7 +12,7 @@
 //! - [`Terminator`] - How control leaves a block (goto, branch, return, etc.)
 //! - [`VarId`] - Variable identifier with SSA-like versioning
 
-use std::collections::HashMap;
+use foldhash::HashMap;
 
 /// Control Flow Graph for intra-procedural analysis.
 ///

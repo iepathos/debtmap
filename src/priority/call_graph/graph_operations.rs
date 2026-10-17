@@ -6,6 +6,7 @@ use super::types::{
 };
 use crate::collections::{HashSet, Vector};
 use foldhash::HashMap;
+use foldhash::HashSetExt;
 use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
 

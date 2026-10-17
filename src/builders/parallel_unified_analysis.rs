@@ -1,3 +1,4 @@
+use crate::collections::DashMap;
 use crate::debt::suppression_audit::SuppressionAudit;
 use crate::{
     builders::unified_analysis_phases::phases::scoring::{
@@ -19,11 +20,10 @@ use crate::{
     time_span,
 };
 use chrono::{DateTime, Utc};
-use dashmap::DashMap;
+use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use indicatif::ParallelProgressIterator;
 use parking_lot::Mutex;
 use rayon::prelude::*;
-use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -128,7 +128,7 @@ impl OptimizedTestDetector {
         Self {
             call_graph,
             test_roots,
-            reachability_cache: DashMap::new(),
+            reachability_cache: DashMap::default(),
         }
     }
 
@@ -1119,7 +1119,7 @@ fn add_unified_items(unified: &mut UnifiedAnalysis, items: Vec<UnifiedDebtItem>)
 }
 
 fn apply_analysis_policy(unified: &mut UnifiedAnalysis, policy: &AnalysisPolicy) {
-    let mut generated_allowed = std::collections::HashMap::new();
+    let mut generated_allowed = foldhash::HashMap::new();
     unified.items = unified
         .items
         .iter()

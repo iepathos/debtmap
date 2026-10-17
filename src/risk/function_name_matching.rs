@@ -2,7 +2,7 @@
 // PURE CORE: Function name matching logic (100% testable, no I/O)
 // ============================================================================
 
-use std::collections::HashSet;
+use foldhash::{HashSet, HashSetExt};
 
 /// Match confidence level for function name matching
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

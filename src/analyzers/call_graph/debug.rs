@@ -3,7 +3,7 @@
 /// This module provides comprehensive debug and diagnostic tools for the call graph system,
 /// enabling developers and users to understand, validate, and troubleshoot call resolution issues.
 use crate::priority::call_graph::FunctionId;
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashSet, HashSetExt};
 use std::io::Write;
 use std::time::Duration;
 

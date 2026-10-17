@@ -38,7 +38,7 @@ pub struct DebtSummary {
     pub debt_density: f64,
     pub total_loc: usize,
     pub by_type: TypeBreakdown,
-    pub by_category: std::collections::HashMap<String, usize>,
+    pub by_category: foldhash::HashMap<String, usize>,
     pub score_distribution: ScoreDistribution,
     /// Codebase-wide cohesion statistics (spec 198)
     #[serde(skip_serializing_if = "Option::is_none")]

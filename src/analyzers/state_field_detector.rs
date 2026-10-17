@@ -10,7 +10,7 @@
 //! This module improves state machine pattern detection by reducing
 //! false negatives for non-standard naming conventions.
 
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use syn::{ExprField, Item, Member};
 
 /// Enhanced state field detector with multi-strategy detection

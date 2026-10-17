@@ -1,7 +1,7 @@
 //! Immediate dependency metrics computed from definition identities before formatting.
 use crate::core::FunctionMetrics;
 use crate::priority::call_graph::{CallGraph, FunctionId};
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet};
 
 // Pure function: Extract dependency metrics (spec 205: public for FunctionScoringContext)
 // Spec 267: Now includes production/test caller separation

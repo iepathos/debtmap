@@ -14,6 +14,7 @@
 use crate::collections::HashSet;
 use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
 use anyhow::Result;
+use foldhash::HashSetExt;
 use std::path::{Path, PathBuf};
 use syn::File;
 

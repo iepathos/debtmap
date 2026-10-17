@@ -1,5 +1,5 @@
 use crate::core::{Dependency, DependencyKind, ModuleDependency};
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet};
 use std::path::{Path, PathBuf};
 
 /// Coupling metrics for a module

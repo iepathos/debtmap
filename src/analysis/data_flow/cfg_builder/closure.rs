@@ -3,7 +3,7 @@
 //! This module provides the visitor and helpers for detecting which variables
 //! are captured by closures and how (by value, by reference, or by mutable reference).
 
-use std::collections::HashSet;
+use foldhash::{HashSet, HashSetExt};
 
 use syn::visit::Visit;
 use syn::{Expr, ExprAssign, ExprBinary, ExprClosure, ExprMethodCall, Pat};

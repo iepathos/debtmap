@@ -42,8 +42,8 @@ use crate::core::FunctionMetrics;
 use crate::priority::{TransitiveCoverage, UnifiedDebtItem};
 use crate::risk::context::ContextualRisk;
 use crate::risk::lcov::LcovData;
+use foldhash::{HashSet, HashSetExt};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 use std::path::Path;
 
 /// Default threshold for flagging individual functions as complex (Spec 268).
@@ -1008,6 +1008,7 @@ fn aggregate_from_raw_metrics_with_scope(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use foldhash::HashMapExt;
 
     use crate::complexity::EntropyAnalysis;
     use crate::priority::{
@@ -2641,7 +2642,7 @@ mod tests {
             recommended_splits: Vec::new(),
             confidence: GodObjectConfidence::Probable,
             responsibilities: Vec::new(),
-            responsibility_method_counts: std::collections::HashMap::new(),
+            responsibility_method_counts: foldhash::HashMap::new(),
             purity_distribution: None,
             module_structure: None,
             detection_type: DetectionType::GodClass,

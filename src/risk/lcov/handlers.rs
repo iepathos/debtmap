@@ -26,7 +26,7 @@
 use super::demangle::demangle_function_name;
 use super::normalize::normalize_demangled_name;
 use super::types::{FunctionCoverage, LcovData, NormalizedFunctionName};
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::path::PathBuf;
 
 /// Mutable state during LCOV parsing - the "water flowing through".

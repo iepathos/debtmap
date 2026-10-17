@@ -7,11 +7,11 @@
 use super::blame_cache::{FileBlameCache, extract_authors_for_range};
 use super::function_level::{CommitInfo, FunctionHistory, calculate_function_history_with_authors};
 use super::git2_provider::{self, Git2Repository};
+use crate::collections::DashMap;
 use crate::time_span;
 use anyhow::Result;
-use dashmap::DashMap;
+use foldhash::{HashMap, HashMapExt, HashSet};
 use rayon::prelude::*;
-use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
@@ -81,7 +81,7 @@ impl BatchedFunctionGitHistory {
         let records = scan.functions;
         let file_history = super::batched::BatchedGitHistory::from_commit_scans(&scan.file_scans);
 
-        let histories: DashMap<FunctionHistoryKey, FunctionHistory> = DashMap::new();
+        let histories: DashMap<FunctionHistoryKey, FunctionHistory> = DashMap::default();
         let processed_files = AtomicUsize::new(0);
         if let Some(cb) = progress_cb {
             cb(GitPreloadPhase::BlameFiles, 0, file_count);

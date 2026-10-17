@@ -2,7 +2,7 @@
 
 use crate::analysis::call_graph::RustCallGraphBuilder;
 use crate::priority::call_graph::{CallGraph, FunctionId};
-use std::collections::HashSet;
+use foldhash::HashSet;
 use std::path::PathBuf;
 
 pub(crate) struct EnhancedExtraction {

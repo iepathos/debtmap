@@ -6,8 +6,8 @@
 ///
 /// All core functions are pure (no side effects) and use functional composition.
 use anyhow::{Context, Result};
+use foldhash::{HashMap, HashMapExt};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Type-safe diversity score (0.0 = homogeneous, 1.0 = maximum diversity).
 ///

@@ -1,7 +1,7 @@
 use crate::core::AnalysisResults;
 use crate::priority::{DebtType, UnifiedAnalysis, UnifiedDebtItem};
+use foldhash::{HashMap, HashMapExt};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 // Health Dashboard Components
 #[derive(Debug, Clone, Serialize, Deserialize)]

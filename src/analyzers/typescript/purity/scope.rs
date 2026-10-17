@@ -4,7 +4,7 @@
 
 #![allow(dead_code)] // Methods reserved for future purity analysis enhancements
 
-use std::collections::HashSet;
+use foldhash::{HashSet, HashSetExt};
 
 /// Tracks variable scopes to determine mutation locality
 #[derive(Debug, Default)]

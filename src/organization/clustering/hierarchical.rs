@@ -3,7 +3,7 @@
 use super::Method;
 use super::quality_metrics::ClusterQuality;
 use super::similarity::{CallGraphProvider, ClusteringSimilarityCalculator, FieldAccessProvider};
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt, HashSetExt};
 
 /// A cluster of related methods
 #[derive(Debug, Clone)]
@@ -85,8 +85,7 @@ impl<C: CallGraphProvider, F: FieldAccessProvider> HierarchicalClustering<C, F> 
         let similarity_matrix = self.build_similarity_matrix(&clusters);
 
         // Track failed merge pairs to avoid re-attempting them
-        let mut failed_merges: std::collections::HashSet<(usize, usize)> =
-            std::collections::HashSet::new();
+        let mut failed_merges: foldhash::HashSet<(usize, usize)> = foldhash::HashSet::new();
 
         // Iteratively merge most similar clusters
         loop {
@@ -191,7 +190,7 @@ impl<C: CallGraphProvider, F: FieldAccessProvider> HierarchicalClustering<C, F> 
         &self,
         clusters: &[Cluster],
         similarity_matrix: &SimilarityMatrix,
-        failed_merges: &std::collections::HashSet<(usize, usize)>,
+        failed_merges: &foldhash::HashSet<(usize, usize)>,
     ) -> Option<(usize, usize, f64)> {
         let mut best_merge: Option<(usize, usize, f64)> = None;
 
@@ -322,7 +321,7 @@ mod tests {
     use crate::organization::clustering::similarity::{
         CallGraphProvider, ClusteringSimilarityCalculator, FieldAccessProvider,
     };
-    use std::collections::HashSet;
+    use foldhash::HashSet;
 
     struct MockCallGraph;
     impl CallGraphProvider for MockCallGraph {

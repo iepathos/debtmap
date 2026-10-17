@@ -1,6 +1,7 @@
 //! Source-established out-of-line module relationships.
 
 use super::*;
+use foldhash::HashSetExt;
 
 impl WorkspaceIndex {
     pub(super) fn establish_modules(

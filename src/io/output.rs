@@ -139,7 +139,7 @@ mod tests {
         FunctionMetrics, Priority, TechnicalDebtReport,
     };
     use chrono::Utc;
-    use std::collections::HashMap;
+    use foldhash::{HashMap, HashMapExt};
     use std::path::PathBuf;
 
     fn create_test_results() -> AnalysisResults {

@@ -6,11 +6,9 @@ use crate::{
     priority::call_graph::{CallGraph, FunctionId},
 };
 use anyhow::Result;
+use foldhash::HashSet;
 use rayon::prelude::*;
-use std::{
-    collections::HashSet,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 pub(crate) mod identity;
 

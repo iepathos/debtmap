@@ -6,7 +6,7 @@ use crate::{
     io, priority,
 };
 use anyhow::{Context, Result};
-use std::collections::HashSet;
+use foldhash::HashSet;
 use std::path::{Path, PathBuf};
 
 pub fn build_initial_call_graph(metrics: &[FunctionMetrics]) -> priority::CallGraph {

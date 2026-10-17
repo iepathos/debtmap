@@ -22,7 +22,7 @@ fn create_test_project() -> TempDir {
     // This mirrors src/builders/call_graph.rs
     let builder_content = r#"
 use std::path::Path;
-use std::collections::HashMap;
+use foldhash::{HashMap};
 
 pub type CallGraph = HashMap<String, Vec<String>>;
 

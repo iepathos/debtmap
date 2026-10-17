@@ -4,7 +4,7 @@
 //! including capture detection, capture mode inference, and purity
 //! propagation for higher-order functions and iterator chains.
 
-use std::collections::HashSet;
+use foldhash::{HashSet, HashSetExt};
 use syn::{Expr, ExprClosure, visit::Visit};
 
 use super::purity_detector::{MutationScope, PurityDetector};

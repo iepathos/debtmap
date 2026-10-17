@@ -51,7 +51,7 @@ pub trait OptionExt<T> {
     /// ```rust
     /// use debtmap::utils::option_ext::OptionExt;
     ///
-    /// let map = std::collections::HashMap::<String, i32>::new();
+    /// let map = foldhash::HashMap::<String, i32>::new();
     /// let key = "missing";
     /// let result = map.get(key).ok_or_validation_with(|| {
     ///     format!("Key '{}' not found in map with {} entries", key, map.len())

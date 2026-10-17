@@ -8,8 +8,8 @@ use crate::output::unified::{
     UnifiedOutput,
 };
 use crate::priority::ImpactMetrics;
+use foldhash::HashMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// Internal type for parsing debtmap JSON files during comparison.

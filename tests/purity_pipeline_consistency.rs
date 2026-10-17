@@ -19,7 +19,7 @@ use debtmap::priority::{
     semantic_classifier::{FunctionRole, classify_function_role},
     unified_scorer::calculate_unified_priority_with_role,
 };
-use std::collections::HashMap;
+use foldhash::HashMap;
 use std::path::PathBuf;
 
 const CACHE_FIXTURE: &str = r#"
@@ -60,7 +60,7 @@ fn extract(source: &str, path: &str) -> (Vec<FunctionMetrics>, CallGraph) {
     let metrics = analyzer.analyze(&ast).complexity.functions;
     drop(ast);
     let extracted = UnifiedFileExtractor::extract(&path, source).expect("extracted source");
-    let sources = HashMap::from([(path, extracted)]);
+    let sources = debtmap::collections::map_from([(path, extracted)]);
     let (graph, _, _) =
         build_call_graph_from_extracted(build_initial_call_graph(&metrics), &sources);
     (metrics, graph)

@@ -250,7 +250,7 @@ contract Auth {
             .iter()
             .filter(|item| context.decision_for(item.line, &item.debt_type).is_some())
             .count();
-        let contexts = std::collections::HashMap::from([(path.clone(), context)]);
+        let contexts = crate::collections::map_from([(path.clone(), context)]);
         let outcome = crate::analysis_utils::apply_debt_suppressions_with_contexts(
             metrics.debt_items,
             &contexts,
@@ -299,7 +299,7 @@ contract Branchy {
             .iter()
             .filter(|item| context.decision_for(item.line, &item.debt_type).is_some())
             .count();
-        let contexts = std::collections::HashMap::from([(path.clone(), context)]);
+        let contexts = crate::collections::map_from([(path.clone(), context)]);
         let outcome = crate::analysis_utils::apply_debt_suppressions_with_contexts(
             metrics.debt_items,
             &contexts,

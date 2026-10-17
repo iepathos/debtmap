@@ -1,6 +1,6 @@
 use crate::analyzers::function_registry::{FunctionSignatureRegistry, ReturnTypeInfo};
 use crate::analyzers::type_registry::GlobalTypeRegistry;
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::path::PathBuf;
 use std::sync::Arc;
 use syn::{
@@ -650,11 +650,11 @@ mod tests {
         }
 
         // Test nested module path
-        let code = "std::collections::HashMap::new()";
+        let code = "foldhash::HashMap::new()";
         let expr: Expr = syn::parse_str(code).unwrap();
         if let Expr::Call(call) = expr {
             let path = TypeTracker::extract_function_path(&call.func);
-            assert_eq!(path, Some("std::collections::HashMap::new".to_string()));
+            assert_eq!(path, Some("foldhash::HashMap::new".to_string()));
         }
     }
 
@@ -665,10 +665,10 @@ mod tests {
         assert_eq!(result, Some(("MyType".to_string(), "new".to_string())));
 
         // Test nested module path
-        let result = TypeTracker::parse_function_path("std::collections::HashMap::new");
+        let result = TypeTracker::parse_function_path("foldhash::HashMap::new");
         assert_eq!(
             result,
-            Some(("std::collections::HashMap".to_string(), "new".to_string()))
+            Some(("foldhash::HashMap".to_string(), "new".to_string()))
         );
 
         // Test single name (no ::)
@@ -981,9 +981,9 @@ mod tests {
     #[test]
     fn test_extract_type_from_type_path() {
         // Test path type
-        let ty: syn::Type = syn::parse_str("std::collections::HashMap").unwrap();
+        let ty: syn::Type = syn::parse_str("foldhash::HashMap").unwrap();
         let result = extract_type_from_type(&ty);
-        assert_eq!(result.type_name, "std::collections::HashMap");
+        assert_eq!(result.type_name, "foldhash::HashMap");
         assert_eq!(result.source, TypeSource::Annotation);
     }
 
@@ -1021,11 +1021,11 @@ mod tests {
     #[test]
     fn test_extract_type_from_expr_nested_constructor() {
         // Test nested module constructor
-        let expr: syn::Expr = syn::parse_str("std::collections::HashMap::new()").unwrap();
+        let expr: syn::Expr = syn::parse_str("foldhash::HashMap::new()").unwrap();
         let result = extract_type_from_expr(&expr);
         assert!(result.is_some());
         let resolved_type = result.unwrap();
-        assert_eq!(resolved_type.type_name, "std::collections::HashMap");
+        assert_eq!(resolved_type.type_name, "foldhash::HashMap");
         assert_eq!(resolved_type.source, TypeSource::Constructor);
     }
 

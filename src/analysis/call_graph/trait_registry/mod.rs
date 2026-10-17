@@ -14,6 +14,7 @@
 //! - `visitor` - AST visitor for extraction (I/O boundary)
 //! - `mod` (this file) - Coordinator and state management (the shell)
 
+use foldhash::{HashMapExt, HashSetExt};
 pub(super) mod identity;
 pub mod patterns;
 pub mod resolution;

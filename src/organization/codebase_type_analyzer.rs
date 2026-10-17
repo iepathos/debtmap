@@ -6,7 +6,7 @@
 use crate::organization::RecommendationSeverity;
 use crate::organization::architecture_utils::*;
 use crate::organization::type_based_clustering::MethodSignature;
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet};
 use std::path::{Path, PathBuf};
 
 /// Analysis result for entire codebase

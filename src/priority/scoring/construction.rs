@@ -30,7 +30,7 @@ use crate::priority::{
     semantic_classifier::classify_function_role,
 };
 use crate::risk::lcov::LcovData;
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet};
 use std::path::{Path, PathBuf};
 
 #[path = "construction/dependencies.rs"]

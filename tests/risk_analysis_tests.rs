@@ -4,7 +4,7 @@ use debtmap::core::{
     TechnicalDebtReport,
 };
 use debtmap::utils::risk_analyzer::{analyze_risk_with_coverage, analyze_risk_without_coverage};
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::fs;
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -76,7 +76,7 @@ end_of_record
         },
         technical_debt: TechnicalDebtReport {
             items: vec![],
-            by_type: std::collections::HashMap::new(),
+            by_type: foldhash::HashMap::new(),
             priorities: vec![],
             duplications: vec![],
             suppression_audit: Default::default(),
@@ -152,7 +152,7 @@ fn test_analyze_risk_with_coverage_invalid_lcov_path() {
         },
         technical_debt: TechnicalDebtReport {
             items: vec![],
-            by_type: std::collections::HashMap::new(),
+            by_type: foldhash::HashMap::new(),
             priorities: vec![],
             duplications: vec![],
             suppression_audit: Default::default(),
@@ -231,7 +231,7 @@ fn test_analyze_risk_without_coverage() {
         },
         technical_debt: TechnicalDebtReport {
             items: vec![],
-            by_type: std::collections::HashMap::new(),
+            by_type: foldhash::HashMap::new(),
             priorities: vec![],
             duplications: vec![],
             suppression_audit: Default::default(),
@@ -294,7 +294,7 @@ end_of_record
         },
         technical_debt: TechnicalDebtReport {
             items: vec![],
-            by_type: std::collections::HashMap::new(),
+            by_type: foldhash::HashMap::new(),
             priorities: vec![],
             duplications: vec![],
             suppression_audit: Default::default(),

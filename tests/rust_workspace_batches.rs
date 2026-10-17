@@ -8,10 +8,8 @@ use debtmap::{
     extraction::UnifiedFileExtractor,
     priority::call_graph::CallGraph,
 };
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-};
+use foldhash::HashMap;
+use std::path::{Path, PathBuf};
 
 fn corpus(root: &Path, count: usize) -> Vec<(PathBuf, String)> {
     let mut files = vec![(root.join("lib.rs"), "mod remote;\nfn caller(value: &remote::Remote) { value.run(); }\nfn unknown(value: Missing) { value.run(); }\n".into())];

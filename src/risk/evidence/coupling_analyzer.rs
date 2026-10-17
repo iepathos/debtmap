@@ -6,6 +6,7 @@ use crate::priority::FunctionAnalysis;
 use crate::priority::call_graph::CallGraph;
 use crate::risk::evidence::{ModuleType, RiskContext};
 use crate::risk::thresholds::{CouplingThresholds, StatisticalThresholdProvider};
+use foldhash::HashSetExt;
 
 pub struct CouplingRiskAnalyzer {
     #[allow(dead_code)]
@@ -113,7 +114,7 @@ impl CouplingRiskAnalyzer {
         call_graph: &CallGraph,
     ) -> u32 {
         // Simple circular dependency detection
-        let mut visited = std::collections::HashSet::new();
+        let mut visited = foldhash::HashSet::new();
         let mut circular_count = 0;
 
         for callee in call_graph.get_callees(func_id) {
@@ -132,7 +133,7 @@ impl CouplingRiskAnalyzer {
         from: &crate::priority::call_graph::FunctionId,
         to: &crate::priority::call_graph::FunctionId,
         call_graph: &CallGraph,
-        visited: &mut std::collections::HashSet<crate::priority::call_graph::FunctionId>,
+        visited: &mut foldhash::HashSet<crate::priority::call_graph::FunctionId>,
         depth: u32,
         max_depth: u32,
     ) -> bool {
@@ -149,7 +150,7 @@ impl CouplingRiskAnalyzer {
     fn should_terminate_search(
         from: &crate::priority::call_graph::FunctionId,
         to: &crate::priority::call_graph::FunctionId,
-        visited: &mut std::collections::HashSet<crate::priority::call_graph::FunctionId>,
+        visited: &mut foldhash::HashSet<crate::priority::call_graph::FunctionId>,
         depth: u32,
         max_depth: u32,
     ) -> bool {
@@ -162,7 +163,7 @@ impl CouplingRiskAnalyzer {
         from: &crate::priority::call_graph::FunctionId,
         to: &crate::priority::call_graph::FunctionId,
         call_graph: &CallGraph,
-        visited: &mut std::collections::HashSet<crate::priority::call_graph::FunctionId>,
+        visited: &mut foldhash::HashSet<crate::priority::call_graph::FunctionId>,
         depth: u32,
         max_depth: u32,
     ) -> bool {

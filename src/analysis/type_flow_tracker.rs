@@ -31,7 +31,7 @@
 //! let types = tracker.get_collection_types("self.observers");
 //! ```
 
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet};
 use std::path::PathBuf;
 
 // Stub for removed Python AST types

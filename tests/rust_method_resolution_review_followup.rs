@@ -7,7 +7,8 @@ use debtmap::analyzers::rust_call_graph::extract_call_graph_multi_file;
 use debtmap::builders::parallel_call_graph::build_call_graph_from_extracted;
 use debtmap::extraction::UnifiedFileExtractor;
 use debtmap::priority::call_graph::{CallGraph, FunctionId};
-use std::collections::{BTreeSet, HashMap};
+use foldhash::HashMap;
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 fn graphs(source: &str) -> Vec<CallGraph> {
@@ -19,7 +20,7 @@ fn graphs(source: &str) -> Vec<CallGraph> {
     enhancement.analyze_framework_patterns(&path, &ast).unwrap();
     enhancement.finalize_trait_analysis().unwrap();
     enhancement.finalize_trait_analysis().unwrap();
-    let extracted = HashMap::from([(
+    let extracted = debtmap::collections::map_from([(
         path.clone(),
         UnifiedFileExtractor::extract(&path, source).unwrap(),
     )]);

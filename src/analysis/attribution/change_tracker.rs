@@ -1,7 +1,7 @@
 use super::ComplexityAttribution;
 use crate::analysis::multi_pass::MultiPassResult;
+use foldhash::{HashMap, HashMapExt};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Tracks changes between analysis runs
 pub struct ChangeTracker {

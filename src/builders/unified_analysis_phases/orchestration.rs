@@ -20,7 +20,7 @@ use crate::priority::call_graph::{CallGraph, FunctionId};
 use crate::priority::{UnifiedAnalysis, UnifiedAnalysisUtils};
 use crate::risk::RiskAnalyzer;
 use crate::risk::lcov::LcovData;
-use std::collections::HashSet;
+use foldhash::HashSet;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
@@ -408,7 +408,7 @@ fn process_file_analysis(
 /// Register LOC counts for analyzed files.
 fn register_file_loc_counts(
     unified: &mut UnifiedAnalysis,
-    file_groups: &std::collections::HashMap<std::path::PathBuf, Vec<FunctionMetrics>>,
+    file_groups: &foldhash::HashMap<std::path::PathBuf, Vec<FunctionMetrics>>,
 ) {
     use crate::metrics::loc_counter::LocCounter;
 
@@ -423,6 +423,7 @@ fn register_file_loc_counts(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use foldhash::HashMapExt;
 
     #[test]
     fn test_analysis_timings_default() {
@@ -474,7 +475,7 @@ mod tests {
             recommended_splits: vec![],
             confidence: GodObjectConfidence::Probable,
             responsibilities: vec!["data".to_string()],
-            responsibility_method_counts: std::collections::HashMap::new(),
+            responsibility_method_counts: foldhash::HashMap::new(),
             purity_distribution: None,
             module_structure: None,
             detection_type: DetectionType::GodFile,
@@ -529,7 +530,7 @@ fn main() {}
             recommended_splits: vec![],
             confidence: GodObjectConfidence::Probable,
             responsibilities: vec!["data".to_string()],
-            responsibility_method_counts: std::collections::HashMap::new(),
+            responsibility_method_counts: foldhash::HashMap::new(),
             purity_distribution: None,
             module_structure: None,
             detection_type: DetectionType::GodFile,
@@ -584,7 +585,7 @@ fn main() {}
             recommended_splits: vec![],
             confidence: GodObjectConfidence::Probable,
             responsibilities: vec!["data".to_string()],
-            responsibility_method_counts: std::collections::HashMap::new(),
+            responsibility_method_counts: foldhash::HashMap::new(),
             purity_distribution: None,
             module_structure: None,
             detection_type: DetectionType::GodClass,
@@ -648,7 +649,7 @@ pub struct MergeQueueManager {
             recommended_splits: vec![],
             confidence: GodObjectConfidence::Probable,
             responsibilities: vec!["data".to_string()],
-            responsibility_method_counts: std::collections::HashMap::new(),
+            responsibility_method_counts: foldhash::HashMap::new(),
             purity_distribution: None,
             module_structure: None,
             detection_type: DetectionType::GodFile,
@@ -706,7 +707,7 @@ fn main() {}
             recommended_splits: vec![],
             confidence: GodObjectConfidence::Probable,
             responsibilities: vec!["data".to_string()],
-            responsibility_method_counts: std::collections::HashMap::new(),
+            responsibility_method_counts: foldhash::HashMap::new(),
             purity_distribution: None,
             module_structure: None,
             detection_type: DetectionType::GodClass,

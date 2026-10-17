@@ -1,6 +1,6 @@
 use super::super::priority::TestTarget;
 use super::{Context, DependencyGraph};
-use std::collections::{HashMap as StdHashMap, HashSet};
+use foldhash::{HashMap as StdHashMap, HashMapExt, HashSet, HashSetExt};
 
 #[derive(Clone, Debug)]
 pub struct CascadeImpact {

@@ -10,6 +10,7 @@ use debtmap::output::unified::{
     UnifiedLocation, UnifiedOutput,
 };
 use debtmap::priority::{DebtType, FunctionRole};
+use foldhash::HashMapExt;
 use serde_json::Value;
 
 /// Create a simple test DebtType for use in tests
@@ -51,7 +52,7 @@ fn test_unified_output_has_required_fields() {
                 file: 0,
                 function: 0,
             },
-            by_category: std::collections::HashMap::new(),
+            by_category: foldhash::HashMap::new(),
             score_distribution: debtmap::output::unified::ScoreDistribution {
                 critical: 0,
                 high: 0,

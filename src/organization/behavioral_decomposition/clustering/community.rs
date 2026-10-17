@@ -10,7 +10,7 @@
 //! - No side effects (no I/O, no logging)
 //! - Thread-safe
 
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 
 use super::super::categorization::infer_cluster_category;
 use super::super::types::MethodCluster;
@@ -308,7 +308,8 @@ mod tests {
     #[test]
     fn test_should_skip_too_many_methods() {
         let methods: Vec<String> = (0..250).map(|i| format!("m{}", i)).collect();
-        let adjacency = HashMap::from([((String::from("m0"), String::from("m1")), 1)]);
+        let adjacency =
+            crate::collections::map_from([((String::from("m0"), String::from("m1")), 1)]);
         assert!(should_skip_clustering(&methods, &adjacency));
     }
 
@@ -329,8 +330,10 @@ mod tests {
 
     #[test]
     fn test_bidirectional_count() {
-        let adjacency =
-            HashMap::from([(("a".into(), "b".into()), 2), (("b".into(), "a".into()), 3)]);
+        let adjacency = crate::collections::map_from([
+            (("a".into(), "b".into()), 2),
+            (("b".into(), "a".into()), 3),
+        ]);
         assert_eq!(get_bidirectional_count("a", "b", &adjacency), 5);
     }
 }

@@ -19,8 +19,8 @@
 //! - Avoiding duplication of data across types
 //! - Using `Vec` instead of `HashMap` for small collections
 
+use foldhash::{HashMap, HashMapExt};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// All data extracted from a single file parse.
@@ -276,7 +276,7 @@ pub enum CallType {
 /// Import statement information for call resolution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImportInfo {
-    /// Full import path: "std::collections::HashMap"
+    /// Full import path: "foldhash::HashMap"
     pub path: String,
     /// Alias if renamed: `use foo as bar`
     pub alias: Option<String>,
@@ -681,7 +681,7 @@ mod tests {
                 line: 12,
             }],
             imports: vec![ImportInfo {
-                path: "std::collections::HashMap".to_string(),
+                path: "foldhash::HashMap".to_string(),
                 alias: None,
                 is_glob: false,
                 kind: ImportKind::Unknown,

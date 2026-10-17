@@ -1,6 +1,7 @@
 use crate::core::{DuplicationBlock, DuplicationLocation};
+use foldhash::HashSet;
 use rayon::slice::ParallelSliceMut;
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 
 mod blocks;
 #[cfg(test)]

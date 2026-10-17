@@ -6,7 +6,7 @@ use debtmap::core::FunctionMetrics;
 use debtmap::priority::TransitiveCoverage;
 use debtmap::priority::call_graph::{CallGraph, FunctionId};
 use debtmap::priority::scoring::classification::classify_debt_type_with_exclusions;
-use std::collections::HashSet;
+use foldhash::{HashSet, HashSetExt};
 use std::hint::black_box;
 use std::path::PathBuf;
 

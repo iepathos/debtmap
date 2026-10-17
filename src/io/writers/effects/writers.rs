@@ -192,7 +192,7 @@ mod tests {
     };
     use crate::effects::run_effect;
     use chrono::Utc;
-    use std::collections::HashMap;
+    use foldhash::{HashMap, HashMapExt};
     use tempfile::TempDir;
 
     fn create_test_results() -> AnalysisResults {

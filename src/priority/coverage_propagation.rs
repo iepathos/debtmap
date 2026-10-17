@@ -104,10 +104,12 @@
 //!
 //! The algorithm is efficient for typical codebases but may be slower on very dense
 //! call graphs with many highly-connected functions.
+use foldhash::{HashMapExt, HashSetExt};
+
 use crate::priority::call_graph::{CallGraph, FunctionId};
 use crate::risk::lcov::LcovData;
+use foldhash::HashSet as StdHashSet;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet as StdHashSet;
 
 /// Measured coverage and a separate callee-based fallback estimate.
 /// Unlike `CompleteCoverage`, this record does not propagate from callers.

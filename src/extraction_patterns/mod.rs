@@ -23,8 +23,8 @@ pub mod naming;
 
 use crate::core::{FileMetrics, FunctionMetrics};
 use crate::data_flow::DataFlowGraph;
+use foldhash::{HashMap, HashMapExt};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ExtractablePattern {

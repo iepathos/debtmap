@@ -5,7 +5,7 @@ use crate::analyzers::go::types::{GoAnalysis, GoFunction, GoFunctionKind};
 use crate::analyzers::syntax_tree::{children, function_length};
 use crate::core::PurityLevel;
 use crate::core::ast::GoAst;
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashSet};
 use std::path::Path;
 use tree_sitter::Node;
 

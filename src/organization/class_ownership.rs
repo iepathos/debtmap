@@ -1,5 +1,5 @@
 use super::language::Language;
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 
 /// Unified class ownership structure across all languages
 #[derive(Debug, Clone)]

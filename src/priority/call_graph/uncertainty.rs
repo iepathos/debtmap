@@ -2,6 +2,7 @@
 
 use super::{CallGraph, FunctionId, UncertainCall};
 use crate::collections::HashSet;
+use foldhash::HashSetExt;
 
 impl CallGraph {
     /// Retain a call even when no admissible project target is known.

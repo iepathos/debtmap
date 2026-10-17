@@ -1,5 +1,6 @@
 use debtmap::extraction::UnifiedFileExtractor;
 use debtmap::extraction::adapters::god_object::analyze_god_objects;
+use foldhash::HashSetExt;
 use std::fs;
 use std::path::Path;
 
@@ -39,7 +40,7 @@ fn test_struct_ownership_analysis_quality() {
     let analyses = analyze_god_objects(config_path, &extracted);
 
     // Each struct should be assigned to exactly one module
-    let mut all_structs = std::collections::HashSet::new();
+    let mut all_structs = foldhash::HashSet::new();
     if let Some(analysis) = analyses.first() {
         for split in &analysis.recommended_splits {
             for struct_name in &split.structs_to_move {

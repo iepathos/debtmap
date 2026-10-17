@@ -1,6 +1,6 @@
 use crate::core::{AnalysisResults, DebtItem};
 use crate::priority::UnifiedDebtItem;
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 
 /// Categorize debt items by type
 pub fn categorize_debt(items: &[DebtItem]) -> HashMap<&'static str, Vec<&DebtItem>> {
@@ -187,7 +187,7 @@ mod tests {
         ImpactMetrics, Location as PriorityLocation, TransitiveCoverage, UnifiedDebtItem,
         UnifiedScore,
     };
-    use std::collections::HashMap;
+    use foldhash::HashMap;
     use std::path::PathBuf;
 
     #[test]
@@ -703,7 +703,7 @@ mod tests {
                 circular: vec![],
             },
             duplications: vec![],
-            file_contexts: std::collections::HashMap::new(),
+            file_contexts: foldhash::HashMap::new(),
         };
 
         let top_functions = get_top_complex_functions(&results, 2);

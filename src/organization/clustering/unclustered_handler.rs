@@ -98,7 +98,7 @@ mod tests {
     use crate::organization::clustering::similarity::{
         CallGraphProvider, ClusteringSimilarityCalculator, FieldAccessProvider,
     };
-    use std::collections::{HashMap, HashSet};
+    use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
 
     struct MockCallGraph {
         callees: HashMap<String, HashSet<String>>,

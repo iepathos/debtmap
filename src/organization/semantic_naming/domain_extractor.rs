@@ -4,7 +4,7 @@
 //! meaningful module names based on the dominant terminology.
 
 use super::{NameCandidate, NamingStrategy};
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 
 /// Extracts domain-specific terminology from method names
 pub struct DomainTermExtractor {
@@ -523,7 +523,7 @@ impl DomainTermExtractor {
 /// assert_eq!(extract_dominant_verb(&methods), Some("Validate".to_string()));
 /// ```
 pub fn extract_dominant_verb(methods: &[String]) -> Option<String> {
-    use std::collections::HashMap;
+    use foldhash::HashMap;
 
     // Specific action verbs to detect (in priority order)
     // Note: Excludes overly generic verbs like "process", "compute", "handle"

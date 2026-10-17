@@ -4,6 +4,7 @@ use crate::config::DataFlowScoringConfig;
 use crate::core::FunctionMetrics;
 use crate::priority::call_graph::CallGraph;
 use crate::risk::lcov::{FunctionCoverage, LcovData};
+use foldhash::HashSetExt;
 use std::path::PathBuf;
 
 fn graph_with_assessment(metric: &FunctionMetrics, class: EffectClass) -> CallGraph {
@@ -1368,7 +1369,7 @@ fn test_calculate_pattern_factor_data_flow_pipeline() {
     let mut data_flow = DataFlowGraph::from_call_graph(call_graph);
 
     // Add variable dependencies
-    let mut vars = std::collections::HashSet::new();
+    let mut vars = foldhash::HashSet::new();
     vars.insert("input".to_string());
     vars.insert("output".to_string());
     data_flow.add_variable_dependencies(func_id.clone(), vars);

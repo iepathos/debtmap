@@ -1,7 +1,7 @@
 use debtmap::priority::call_graph::{CallGraph, CallType, FunctionId};
 use debtmap::risk::context::{Context, ContextDetails};
 use debtmap::risk::lcov::parse_lcov_file;
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::io::Write;
 use std::path::PathBuf;
 use tempfile::NamedTempFile;

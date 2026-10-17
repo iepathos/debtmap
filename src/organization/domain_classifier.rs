@@ -1,3 +1,4 @@
+use foldhash::HashMapExt;
 /// Enhanced domain classification for struct-based grouping.
 ///
 /// This module provides sophisticated pattern matching to classify structs into semantic
@@ -135,8 +136,7 @@ fn infer_domain_from_methods(methods: &[String]) -> String {
     let method_names: Vec<String> = methods.iter().map(|m| m.to_lowercase()).collect();
 
     // Count domain-specific method patterns
-    let mut domain_counts: std::collections::HashMap<&str, usize> =
-        std::collections::HashMap::new();
+    let mut domain_counts: foldhash::HashMap<&str, usize> = foldhash::HashMap::new();
 
     for method in &method_names {
         if method.contains("detect") || method.contains("check") || method.contains("analyze") {

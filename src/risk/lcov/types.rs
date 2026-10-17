@@ -18,7 +18,7 @@
 //! - [`LcovData`] - Parsed LCOV coverage data container
 
 use super::super::coverage_index::CoverageIndex;
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::path::PathBuf;
 use std::sync::Arc;
 

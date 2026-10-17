@@ -6,7 +6,7 @@
 use crate::core::AnalysisResults;
 use crate::extraction::ExtractedFileData;
 use crate::formatting::FormattingConfig;
-use std::collections::HashMap;
+use foldhash::HashMap;
 use std::path::{Path, PathBuf};
 
 /// Configuration error types.

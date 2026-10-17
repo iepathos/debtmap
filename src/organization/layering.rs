@@ -20,8 +20,8 @@
 //! God objects typically break layering by depending on everything and having
 //! everything depend on them.
 
+use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
 
 /// Dependency between two modules
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

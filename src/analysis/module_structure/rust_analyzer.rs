@@ -10,8 +10,8 @@
 //! Line ranges are extracted from `syn::Span` information using the `Spanned` trait.
 //! All line numbers are 1-based, consistent with syn's conventions.
 
-use std::collections::HashMap;
-use std::collections::{BTreeSet, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
+use std::collections::BTreeSet;
 use std::path::Path;
 use syn::spanned::Spanned;
 use syn::visit::Visit;

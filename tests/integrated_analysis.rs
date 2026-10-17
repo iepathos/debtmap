@@ -9,6 +9,7 @@
 use debtmap::organization::{
     AnalysisConfig, ConflictResolutionStrategy, EnabledAnalyzers, IntegratedArchitectureAnalyzer,
 };
+use foldhash::HashMapExt;
 use std::time::Duration;
 
 #[test]
@@ -156,7 +157,7 @@ fn test_analyze_simple_code() {
         recommended_splits: vec![],
         confidence: debtmap::organization::GodObjectConfidence::NotGodObject,
         responsibilities: vec!["Example".to_string()],
-        responsibility_method_counts: std::collections::HashMap::new(),
+        responsibility_method_counts: foldhash::HashMap::new(),
         purity_distribution: None,
         module_structure: None,
         detection_type: debtmap::organization::DetectionType::GodClass,
@@ -179,7 +180,7 @@ fn test_analyze_simple_code() {
         trait_method_summary: None, // Spec 217
     };
 
-    let call_graph = std::collections::HashMap::new();
+    let call_graph = foldhash::HashMap::new();
 
     // Should not panic, even with low score (below threshold)
     let result = analyzer.analyze(&god_object, &ast, &call_graph);
@@ -228,7 +229,7 @@ fn test_timeout_budget() {
         recommended_splits: vec![],
         confidence: debtmap::organization::GodObjectConfidence::Probable,
         responsibilities: vec!["Complex".to_string()],
-        responsibility_method_counts: std::collections::HashMap::new(),
+        responsibility_method_counts: foldhash::HashMap::new(),
         purity_distribution: None,
         module_structure: None,
         detection_type: debtmap::organization::DetectionType::GodClass,
@@ -251,7 +252,7 @@ fn test_timeout_budget() {
         trait_method_summary: None, // Spec 217
     };
 
-    let call_graph = std::collections::HashMap::new();
+    let call_graph = foldhash::HashMap::new();
 
     // Should handle timeout gracefully (either return error or partial results)
     let result = analyzer.analyze(&god_object, &ast, &call_graph);

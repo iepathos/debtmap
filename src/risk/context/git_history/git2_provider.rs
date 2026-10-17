@@ -20,9 +20,9 @@
 
 use anyhow::{Context as _, Result};
 use chrono::{DateTime, TimeZone, Utc};
+use foldhash::{HashMap, HashMapExt, HashSet};
 use git2::{BlameOptions, DiffOptions, Oid, Repository, Sort};
 use rayon::prelude::*;
-use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 /// Statistics for a single commit
@@ -986,7 +986,7 @@ mod tests {
         let repo = Git2Repository::open(&path)?;
         let file = PathBuf::from("test.rs");
         let name = "inner::A::run";
-        let targets = HashMap::from([(file.clone(), vec![name.to_string()])]);
+        let targets = crate::collections::map_from([(file.clone(), vec![name.to_string()])]);
         let scan = compute_repo_function_histories(&path, &targets, None)?;
         let expected = get_head_oid(&path)?;
         assert_eq!(
@@ -1009,7 +1009,8 @@ mod tests {
         use super::super::batched_function::GitPreloadPhase;
         let (_temp, path) = setup_test_repo()?;
         create_and_commit_file(&path, "test.rs", "fn work() {}", "Add work")?;
-        let targets = HashMap::from([(PathBuf::from("test.rs"), vec!["missing".to_string()])]);
+        let targets =
+            crate::collections::map_from([(PathBuf::from("test.rs"), vec!["missing".to_string()])]);
         let hide_repository = |phase, processed, _| {
             if matches!(phase, GitPreloadPhase::Commits) && processed == 0 {
                 std::fs::rename(path.join(".git"), path.join("hidden-git")).unwrap();
@@ -1026,7 +1027,7 @@ mod tests {
             "left::Worker::run".to_string(),
             "right::Worker::run".to_string(),
         ];
-        let targets = HashMap::from([(file.clone(), names.clone())]);
+        let targets = crate::collections::map_from([(file.clone(), names.clone())]);
         let (intro, modifications) = build_function_pattern_tables(&targets);
         for name in names {
             assert!(

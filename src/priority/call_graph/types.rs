@@ -162,8 +162,12 @@ impl FunctionId {
 /// Megabytes of successfully canonicalized paths retained for every language.
 pub const DEFAULT_CANONICAL_CACHE_MB: usize = 64;
 
-static CANONICAL: once_cell::sync::Lazy<dashmap::DashMap<PathBuf, PathBuf>> =
-    once_cell::sync::Lazy::new(dashmap::DashMap::new);
+fn empty_canonical_cache() -> crate::collections::DashMap<PathBuf, PathBuf> {
+    crate::collections::DashMap::default()
+}
+
+static CANONICAL: once_cell::sync::Lazy<crate::collections::DashMap<PathBuf, PathBuf>> =
+    once_cell::sync::Lazy::new(empty_canonical_cache);
 static CANONICAL_BUDGET: AtomicUsize = AtomicUsize::new(DEFAULT_CANONICAL_CACHE_MB << 20);
 static CANONICAL_USED: AtomicUsize = AtomicUsize::new(0);
 
@@ -547,8 +551,8 @@ impl FunctionNode {
 // Custom serialization for HashMap with FunctionId keys
 mod function_id_map {
     use super::*;
+    use foldhash::HashMap as StdHashMap;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
-    use std::collections::HashMap as StdHashMap;
 
     #[derive(Deserialize)]
     #[serde(untagged)]

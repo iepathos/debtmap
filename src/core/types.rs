@@ -1,7 +1,7 @@
 //! Common type definitions used across the codebase
 
+use foldhash::HashMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// Language enumeration for all supported languages

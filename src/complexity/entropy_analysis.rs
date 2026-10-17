@@ -2,7 +2,7 @@
 //! This module contains refactored, testable pure functions for entropy calculation
 
 use crate::complexity::entropy_core::{EntropyToken, TokenCategory};
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 
 /// Represents a token sequence pattern
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]

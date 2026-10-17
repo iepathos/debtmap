@@ -1,6 +1,6 @@
 //! NatSpec parsing and documentation quality checks for Solidity functions.
 
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet};
 use std::path::Path;
 
 use tree_sitter::Node;
@@ -476,7 +476,7 @@ mod tests {
     fn test_detects_missing_param_and_stale_param() {
         let doc = NatSpecDoc {
             notice: Some("Does something".to_string()),
-            params: HashMap::from([
+            params: crate::collections::map_from([
                 ("old".to_string(), "Old param".to_string()),
                 ("amount".to_string(), "Amount".to_string()),
             ]),

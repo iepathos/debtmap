@@ -1,4 +1,5 @@
 use anyhow::Result;
+use foldhash::HashMapExt;
 
 use crate::priority::{UnifiedAnalysis, UnifiedDebtItem};
 
@@ -445,7 +446,7 @@ mod tests {
             has_coverage_data: false,
             timings: None,
             stats: crate::priority::FilterStatistics::new(),
-            analyzed_files: std::collections::HashMap::new(),
+            analyzed_files: foldhash::HashMap::new(),
             suppression_audit: Default::default(),
         }
     }

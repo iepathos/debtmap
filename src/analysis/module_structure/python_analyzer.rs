@@ -2,7 +2,8 @@
 //!
 //! Provides parser-backed analysis of Python source files.
 
-use std::collections::{BTreeSet, HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet};
+use std::collections::BTreeSet;
 use std::path::Path;
 
 use super::types::{

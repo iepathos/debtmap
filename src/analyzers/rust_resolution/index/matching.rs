@@ -1,6 +1,7 @@
 //! Structural type matching and direct generic bindings.
 
 use super::*;
+use foldhash::HashMapExt;
 
 /// A represented owner constraint can admit candidates; unknown owners cannot.
 pub(super) fn constrained_owner_compatible(pattern: &TypeFact, receiver: &TypeFact) -> bool {

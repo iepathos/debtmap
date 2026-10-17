@@ -1,5 +1,5 @@
 use crate::core::{CircularDependency, Dependency, ModuleDependency};
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 
 /// Dependency graph for analyzing module relationships
 #[derive(Debug, Clone)]

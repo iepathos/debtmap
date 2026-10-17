@@ -30,10 +30,10 @@ use crate::analysis::effect_evidence::{
     EffectAssessment, EffectClassification, ObservedEffect, UnresolvedBehavior, UnresolvedReason,
 };
 use crate::analysis::purity_analysis::{PurityAnalysis, PurityAnalyzer, PurityLevel};
+use crate::collections::DashMap;
 use crate::core::FunctionMetrics;
 use crate::priority::call_graph::{CallGraph, FunctionId};
 use anyhow::Result;
-use dashmap::DashMap;
 use rayon::prelude::*;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -120,7 +120,7 @@ impl PurityPropagator {
     /// Create a new purity propagator
     pub fn new(call_graph: PurityCallGraphAdapter, purity_analyzer: PurityAnalyzer) -> Self {
         Self {
-            cache: DashMap::new(),
+            cache: DashMap::default(),
             call_graph,
             purity_analyzer,
         }

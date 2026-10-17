@@ -62,7 +62,7 @@ pub trait UnifiedAnalysisUtils {
     fn add_variable_dependencies(
         &mut self,
         func_id: FunctionId,
-        variables: std::collections::HashSet<String>,
+        variables: foldhash::HashSet<String>,
     );
 
     /// Apply file context adjustments to all debt item scores (spec 166)
@@ -71,7 +71,7 @@ pub trait UnifiedAnalysisUtils {
     /// Test files receive reduced scores to avoid false positives.
     fn apply_file_context_adjustments(
         &mut self,
-        file_contexts: &std::collections::HashMap<std::path::PathBuf, crate::analysis::FileContext>,
+        file_contexts: &foldhash::HashMap<std::path::PathBuf, crate::analysis::FileContext>,
     );
 }
 
@@ -209,7 +209,7 @@ impl UnifiedAnalysisUtils for UnifiedAnalysis {
     fn add_variable_dependencies(
         &mut self,
         func_id: FunctionId,
-        variables: std::collections::HashSet<String>,
+        variables: foldhash::HashSet<String>,
     ) {
         self.data_flow_graph
             .add_variable_dependencies(func_id, variables);
@@ -217,7 +217,7 @@ impl UnifiedAnalysisUtils for UnifiedAnalysis {
 
     fn apply_file_context_adjustments(
         &mut self,
-        file_contexts: &std::collections::HashMap<std::path::PathBuf, crate::analysis::FileContext>,
+        file_contexts: &foldhash::HashMap<std::path::PathBuf, crate::analysis::FileContext>,
     ) {
         use crate::priority::scoring::file_context_scoring::apply_context_adjustments;
 
@@ -274,7 +274,7 @@ mod tests {
     use crate::priority::{
         ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location, UnifiedScore,
     };
-    use std::collections::HashMap;
+    use foldhash::{HashMap, HashMapExt};
     use std::path::PathBuf;
 
     fn create_god_object_item(score: f64) -> UnifiedDebtItem {

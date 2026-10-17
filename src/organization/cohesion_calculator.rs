@@ -5,7 +5,7 @@
 use crate::organization::god_object::types::ModuleSplit;
 use crate::organization::struct_ownership::StructOwnershipAnalyzer;
 use crate::priority::call_graph::CallGraph;
-use std::collections::HashSet;
+use foldhash::HashSet;
 use std::path::Path;
 
 /// Result of file-level cohesion calculation (spec 198)

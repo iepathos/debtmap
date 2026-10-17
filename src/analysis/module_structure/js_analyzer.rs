@@ -2,7 +2,8 @@
 //!
 //! Provides parser-backed analysis of JavaScript and TypeScript source files.
 
-use std::collections::{BTreeSet, HashMap};
+use foldhash::{HashMap, HashMapExt};
+use std::collections::BTreeSet;
 use std::path::Path;
 
 use super::types::{

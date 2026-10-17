@@ -20,6 +20,7 @@
 //! - **Performance**: Async misuse, collection inefficiency
 //! - **Code Quality**: Complexity hotspots, duplication
 
+use foldhash::HashMapExt;
 pub mod architecture_recognition;
 pub mod call_graph;
 pub mod caller_classification;
@@ -114,7 +115,7 @@ pub struct UnifiedAnalysis {
     /// All analyzed files with their line counts (Spec 201)
     /// Used for accurate total LOC calculation including files without debt items
     #[serde(skip)]
-    pub analyzed_files: std::collections::HashMap<PathBuf, usize>,
+    pub analyzed_files: foldhash::HashMap<PathBuf, usize>,
     /// Unified finding suppressions applied after scoring.
     #[serde(skip)]
     pub suppression_audit: crate::debt::suppression_audit::SuppressionAudit,
@@ -498,7 +499,7 @@ impl UnifiedAnalysis {
             has_coverage_data: false,
             timings: None,
             stats: FilterStatistics::new(),
-            analyzed_files: std::collections::HashMap::new(),
+            analyzed_files: foldhash::HashMap::new(),
             suppression_audit: crate::debt::suppression_audit::SuppressionAudit::default(),
         }
     }
@@ -560,7 +561,7 @@ impl UnifiedAnalysis {
     fn log_scoring_debug(
         &self,
         total_debt_score: f64,
-        god_object_files: &std::collections::HashSet<PathBuf>,
+        god_object_files: &foldhash::HashSet<PathBuf>,
     ) {
         if std::env::var("DEBTMAP_DEBUG_SCORING").is_err() {
             return;

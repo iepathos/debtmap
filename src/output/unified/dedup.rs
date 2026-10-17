@@ -4,7 +4,7 @@
 //! duplicate entries in the output.
 
 use super::types::UnifiedDebtItemOutput;
-use std::collections::HashSet;
+use foldhash::{HashSet, HashSetExt};
 use std::hash::{Hash, Hasher};
 
 /// Unique key for debt item deduplication (spec 231)

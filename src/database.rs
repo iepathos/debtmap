@@ -4,7 +4,7 @@
 //! It demonstrates common patterns for configuration-based initialization and
 //! serves as a reference implementation for test coverage validation.
 
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 
 #[derive(Debug, Clone)]
 pub struct Database {

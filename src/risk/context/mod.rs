@@ -1,10 +1,11 @@
+use foldhash::HashMapExt;
 pub mod critical_path;
 pub mod dependency;
 pub mod git_history;
 
+use crate::collections::DashMap;
 use crate::collections::HashMap;
 use anyhow::Result;
-use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -116,7 +117,7 @@ impl ContextAggregator {
     pub fn new() -> Self {
         Self {
             providers: Vec::new(),
-            cache: Arc::new(DashMap::new()),
+            cache: Arc::new(DashMap::default()),
         }
     }
 

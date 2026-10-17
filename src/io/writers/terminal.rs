@@ -156,7 +156,7 @@ fn print_summary(results: &AnalysisResults) {
     let debt_threshold = 100;
 
     // Count unique files from function metrics
-    let unique_files: std::collections::HashSet<_> =
+    let unique_files: foldhash::HashSet<_> =
         results.complexity.metrics.iter().map(|m| &m.file).collect();
     let file_count = unique_files.len();
 

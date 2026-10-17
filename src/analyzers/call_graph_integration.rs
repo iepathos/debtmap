@@ -6,7 +6,7 @@
 
 use crate::core::FunctionMetrics;
 use crate::priority::call_graph::{CallGraph, FunctionId};
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 
 /// Populate call graph data into function metrics
 ///
@@ -265,12 +265,12 @@ mod tests {
             use std::path::Path;
 
             pub struct LcovData {
-                pub functions: std::collections::HashMap<String, Vec<()>>,
+                pub functions: foldhash::HashMap<String, Vec<()>>,
             }
 
             pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
                 Ok(LcovData {
-                    functions: std::collections::HashMap::new(),
+                    functions: foldhash::HashMap::new(),
                 })
             }
         "#;
@@ -424,12 +424,12 @@ mod tests {
             use std::path::Path;
 
             pub struct LcovData {
-                pub functions: std::collections::HashMap<String, Vec<()>>,
+                pub functions: foldhash::HashMap<String, Vec<()>>,
             }
 
             pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
                 Ok(LcovData {
-                    functions: std::collections::HashMap::new(),
+                    functions: foldhash::HashMap::new(),
                 })
             }
         "#;

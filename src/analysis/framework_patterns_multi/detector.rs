@@ -1,10 +1,10 @@
 //! Framework Pattern Detector Implementation
 
 use super::patterns::{FrameworkMatch, FrameworkPattern, Language, PatternMatcher};
+use crate::collections::DashMap;
 use anyhow::{Context, Result};
-use dashmap::DashMap;
+use foldhash::{HashMap, HashMapExt};
 use regex::Regex;
-use std::collections::HashMap;
 use std::path::Path;
 
 /// File context for pattern matching
@@ -126,7 +126,7 @@ impl FrameworkDetector {
 
         Ok(Self {
             patterns,
-            regex_cache: DashMap::new(),
+            regex_cache: DashMap::default(),
         })
     }
 
@@ -135,7 +135,7 @@ impl FrameworkDetector {
         // Use embedded defaults if no config file available
         Self {
             patterns: HashMap::new(),
-            regex_cache: DashMap::new(),
+            regex_cache: DashMap::default(),
         }
     }
 

@@ -1,7 +1,7 @@
 //! Preserve exact facts while bridging uniquely identified legacy declarations.
 use super::DataFlowGraph;
 use crate::priority::call_graph::FunctionId;
-use std::collections::HashMap;
+use foldhash::HashMap;
 
 impl DataFlowGraph {
     fn canonical_identity(&self, id: &FunctionId) -> Option<FunctionId> {

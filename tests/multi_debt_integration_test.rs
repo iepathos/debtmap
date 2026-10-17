@@ -5,7 +5,7 @@ use debtmap::core::FunctionMetrics;
 use debtmap::priority::call_graph::{CallGraph, FunctionId};
 use debtmap::priority::scoring::classification::classify_debt_type_with_exclusions;
 use debtmap::priority::{DebtType, TransitiveCoverage};
-use std::collections::HashSet;
+use foldhash::{HashSet, HashSetExt};
 use std::path::PathBuf;
 
 /// Helper to create a test function with specified metrics

@@ -1,6 +1,6 @@
 //! Detection of async boundaries and async context analysis
 
-use std::collections::HashSet;
+use foldhash::HashSet;
 use syn::{
     Block, Expr, ExprAsync, ExprAwait, ExprBlock, ExprCall, ExprClosure, ExprMethodCall, Item,
     ItemFn, Path, Stmt, UseTree, visit::Visit,

@@ -5,8 +5,8 @@
 
 use crate::priority::classification::Severity;
 use crate::priority::{TransitiveCoverage, UnifiedDebtItem};
+use foldhash::{HashMap, HashMapExt};
 use std::cmp::Ordering;
-use std::collections::HashMap;
 use std::path::PathBuf;
 
 use super::sort::SortCriteria;

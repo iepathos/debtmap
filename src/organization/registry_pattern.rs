@@ -2,7 +2,7 @@
 ///
 /// Detects intentional registry/catalog patterns where many small trait implementations
 /// are centralized in one file for discoverability and consistency.
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt, HashSetExt};
 use syn::{File, Item, ItemImpl, visit::Visit};
 
 /// Information about a trait implementation
@@ -179,7 +179,7 @@ impl RegistryPatternDetector {
 fn extract_trait_impls(file: &File, file_content: &str) -> Vec<TraitImplInfo> {
     let mut visitor = TraitImplVisitor {
         impls: Vec::new(),
-        unit_structs: std::collections::HashSet::new(),
+        unit_structs: foldhash::HashSet::new(),
         file_content,
     };
 
@@ -190,7 +190,7 @@ fn extract_trait_impls(file: &File, file_content: &str) -> Vec<TraitImplInfo> {
 /// AST visitor for extracting trait implementations
 struct TraitImplVisitor<'a> {
     impls: Vec<TraitImplInfo>,
-    unit_structs: std::collections::HashSet<String>,
+    unit_structs: foldhash::HashSet<String>,
     file_content: &'a str,
 }
 

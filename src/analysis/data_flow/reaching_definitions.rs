@@ -19,7 +19,7 @@
 //! - Precise data flow path tracking
 //! - SSA-style analysis without explicit phi nodes
 
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
 
 use super::types::{
     BasicBlock, BlockId, ControlFlowGraph, Definition, ExprKind, ProgramPoint, Rvalue, Statement,

@@ -17,7 +17,7 @@ use crate::organization::god_object::{
 use crate::priority::file_metrics::FileDebtMetrics;
 use crate::risk::lcov::LcovData;
 use anyhow::Result;
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::path::Path;
 
 /// Helper struct for complexity calculation results
@@ -676,7 +676,7 @@ mod tests {
     #[test]
     fn test_calculate_coverage_metrics_with_data() {
         use crate::risk::lcov::LcovData;
-        use std::collections::HashMap;
+        use foldhash::HashMap;
 
         use crate::risk::lcov::FunctionCoverage;
 

@@ -10,7 +10,7 @@ use debtmap::debt::{
     patterns::{find_code_smells_with_suppression, find_todos_and_fixmes_with_suppression},
     suppression::parse_suppression_comments,
 };
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 

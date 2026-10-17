@@ -1,4 +1,6 @@
 //! Lexical declaration paths and namespace-specific import precedence.
+use foldhash::HashSetExt;
+
 use super::*;
 #[path = "path_availability.rs"]
 mod availability;

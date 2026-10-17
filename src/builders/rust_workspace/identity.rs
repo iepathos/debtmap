@@ -1,6 +1,6 @@
 //! Align source outcomes with existing metric definitions without fuzzy selection.
 use crate::priority::call_graph::{CallGraph, FunctionId};
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::path::PathBuf;
 
 type DefinitionKey = (PathBuf, String, usize, Option<usize>);

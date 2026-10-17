@@ -54,8 +54,8 @@ pub fn sort_by_complexity(mut metrics: Vec<FunctionMetrics>) -> Vec<FunctionMetr
 
 pub fn group_by_file(
     metrics: Vec<FunctionMetrics>,
-) -> std::collections::HashMap<PathBuf, Vec<FunctionMetrics>> {
-    use std::collections::HashMap;
+) -> foldhash::HashMap<PathBuf, Vec<FunctionMetrics>> {
+    use foldhash::{HashMap, HashMapExt};
 
     metrics.into_iter().fold(HashMap::new(), |mut acc, metric| {
         acc.entry(metric.file.clone()).or_default().push(metric);

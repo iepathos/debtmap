@@ -10,7 +10,7 @@
 //! - Finds natural cohesion boundaries within behavioral categories
 //! - More accurate than either approach alone
 
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet};
 
 use super::super::categorization::cluster_methods_by_behavior;
 use super::super::types::{BehaviorCategory, MethodCluster};

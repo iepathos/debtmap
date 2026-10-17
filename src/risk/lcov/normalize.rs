@@ -129,8 +129,8 @@ pub fn strip_trailing_generics(s: &str) -> Cow<'_, str> {
 /// assert_eq!(result.full_path, "debtmap::Foo::bar");
 /// assert_eq!(result.method_name, "bar");
 ///
-/// let result = normalize_demangled_name("std::collections::HashMap<K,V>::insert");
-/// assert_eq!(result.full_path, "std::collections::HashMap::insert");
+/// let result = normalize_demangled_name("foldhash::HashMap<K,V>::insert");
+/// assert_eq!(result.full_path, "foldhash::HashMap::insert");
 /// assert_eq!(result.method_name, "insert");
 ///
 /// let result = normalize_demangled_name("<Struct as Trait>::method");
@@ -260,8 +260,8 @@ mod tests {
 
     #[test]
     fn test_normalize_preserves_module_path() {
-        let result = normalize_demangled_name("std::collections::HashMap<K,V>::insert");
-        assert_eq!(result.full_path, "std::collections::HashMap::insert");
+        let result = normalize_demangled_name("foldhash::HashMap<K,V>::insert");
+        assert_eq!(result.full_path, "foldhash::HashMap::insert");
         assert_eq!(result.method_name, "insert");
     }
 

@@ -37,8 +37,8 @@
 //! }
 //! ```
 
+use foldhash::{HashMap, HashMapExt};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::env;
 use std::fmt;
 use std::path::{Path, PathBuf};

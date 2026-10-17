@@ -12,8 +12,8 @@
 
 use crate::analysis::data_flow::DataFlowAnalysis;
 use crate::priority::{call_graph::CallGraph, call_graph::FunctionId};
+use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
 
 pub mod population;
 

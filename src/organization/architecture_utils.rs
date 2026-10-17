@@ -1,5 +1,5 @@
 /// Shared utilities for architecture analysis (Specs 181-185)
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 
 // ============================================================================
 // Case Conversion

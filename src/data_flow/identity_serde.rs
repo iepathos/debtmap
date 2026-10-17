@@ -1,7 +1,7 @@
 //! Internal map keys retain complete declaration identities and read legacy keys.
 use crate::priority::call_graph::FunctionId;
+use foldhash::HashMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::collections::HashMap;
 
 const PREFIX: &str = "v2:";
 

@@ -13,6 +13,7 @@ use debtmap::priority::unified_scorer::{Location, UnifiedScore};
 use debtmap::priority::{
     ActionableRecommendation, DebtType, ImpactMetrics, UnifiedAnalysis, UnifiedDebtItem,
 };
+use foldhash::HashMapExt;
 use std::hint::black_box;
 use std::path::PathBuf;
 
@@ -186,7 +187,7 @@ fn bench_sorting_various_sizes(c: &mut Criterion) {
             has_coverage_data: false,
             timings: None,
             stats: FilterStatistics::default(),
-            analyzed_files: std::collections::HashMap::new(),
+            analyzed_files: foldhash::HashMap::new(),
             suppression_audit: Default::default(),
         };
 
@@ -252,7 +253,7 @@ fn bench_worst_case_sorting(c: &mut Criterion) {
         has_coverage_data: false,
         timings: None,
         stats: FilterStatistics::default(),
-        analyzed_files: std::collections::HashMap::new(),
+        analyzed_files: foldhash::HashMap::new(),
         suppression_audit: Default::default(),
     };
 
@@ -320,7 +321,7 @@ fn bench_mixed_debt_types(c: &mut Criterion) {
         has_coverage_data: false,
         timings: None,
         stats: FilterStatistics::default(),
-        analyzed_files: std::collections::HashMap::new(),
+        analyzed_files: foldhash::HashMap::new(),
         suppression_audit: Default::default(),
     };
 
@@ -377,7 +378,7 @@ fn bench_with_risk_boosts(c: &mut Criterion) {
         has_coverage_data: false,
         timings: None,
         stats: FilterStatistics::default(),
-        analyzed_files: std::collections::HashMap::new(),
+        analyzed_files: foldhash::HashMap::new(),
         suppression_audit: Default::default(),
     };
 

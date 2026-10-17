@@ -31,7 +31,7 @@ use crate::priority::{
 };
 use crate::risk;
 use anyhow::Result;
-use std::collections::HashSet;
+use foldhash::HashSet;
 use std::path::{Path, PathBuf};
 
 const ANALYSIS_THREAD_STACK_SIZE: usize = 8 * 1024 * 1024;
@@ -180,8 +180,7 @@ struct CallGraphStageOptions<'a> {
     verbose_macro_warnings: bool,
     show_macro_stats: bool,
     rust_files: Option<&'a [PathBuf]>,
-    extracted_data:
-        Option<&'a std::collections::HashMap<PathBuf, crate::extraction::ExtractedFileData>>,
+    extracted_data: Option<&'a foldhash::HashMap<PathBuf, crate::extraction::ExtractedFileData>>,
 }
 
 struct CallGraphStageResult {
@@ -266,7 +265,7 @@ fn build_rust_call_graph(
 
 fn build_extracted_call_graph(
     call_graph: &mut CallGraph,
-    extracted: &std::collections::HashMap<PathBuf, crate::extraction::ExtractedFileData>,
+    extracted: &foldhash::HashMap<PathBuf, crate::extraction::ExtractedFileData>,
 ) -> (HashSet<FunctionId>, HashSet<FunctionId>) {
     info!("Building call graph from extracted data (spec 214)");
     let (graph, exclusions, fn_pointers) =
@@ -308,7 +307,7 @@ fn collect_js_ts_files(results: &AnalysisResults) -> Vec<PathBuf> {
         .iter()
         .filter(|m| is_js_ts_file(&m.file))
         .map(|m| m.file.clone())
-        .collect::<std::collections::HashSet<_>>()
+        .collect::<foldhash::HashSet<_>>()
         .into_iter()
         .collect();
     files.sort();
@@ -443,8 +442,7 @@ struct DebtScoringOptions<'a> {
     project_path: &'a Path,
     parallel: bool,
     jobs: usize,
-    extracted_data:
-        Option<std::collections::HashMap<PathBuf, crate::extraction::ExtractedFileData>>,
+    extracted_data: Option<foldhash::HashMap<PathBuf, crate::extraction::ExtractedFileData>>,
     reference_time: chrono::DateTime<chrono::Utc>,
 }
 
@@ -544,9 +542,7 @@ fn create_unified_analysis_with_exclusions_and_timing(
     project_path: &Path,
     parallel: bool,
     jobs: usize,
-    extracted_data: Option<
-        std::collections::HashMap<PathBuf, crate::extraction::ExtractedFileData>,
-    >,
+    extracted_data: Option<foldhash::HashMap<PathBuf, crate::extraction::ExtractedFileData>>,
     reference_time: chrono::DateTime<chrono::Utc>,
 ) -> UnifiedAnalysis {
     create_scheduled_analysis(
@@ -583,9 +579,7 @@ fn create_scheduled_analysis(
     coverage_time: std::time::Duration,
     risk_analyzer: Option<risk::RiskAnalyzer>,
     project_path: &Path,
-    extracted_data: Option<
-        std::collections::HashMap<PathBuf, crate::extraction::ExtractedFileData>,
-    >,
+    extracted_data: Option<foldhash::HashMap<PathBuf, crate::extraction::ExtractedFileData>>,
     reference_time: chrono::DateTime<chrono::Utc>,
 ) -> UnifiedAnalysis {
     use parallel_unified_analysis::ParallelUnifiedAnalysisOptions;
@@ -652,9 +646,7 @@ fn execute_parallel_analysis(
     coverage_time: std::time::Duration,
     risk_analyzer: Option<risk::RiskAnalyzer>,
     project_path: &Path,
-    extracted_data: Option<
-        std::collections::HashMap<PathBuf, crate::extraction::ExtractedFileData>,
-    >,
+    extracted_data: Option<foldhash::HashMap<PathBuf, crate::extraction::ExtractedFileData>>,
     options: parallel_unified_analysis::ParallelUnifiedAnalysisOptions,
 ) -> UnifiedAnalysis {
     use parallel_unified_analysis::ParallelUnifiedAnalysisBuilder;

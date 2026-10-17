@@ -4,8 +4,8 @@
 //! automatically identifying framework entry points, event handlers, and lifecycle
 //! methods to improve call graph accuracy and reduce false positive dead code detection.
 
+use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use regex::Regex;
-use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 /// Supported Python frameworks

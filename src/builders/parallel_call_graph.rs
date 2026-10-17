@@ -8,7 +8,7 @@ use crate::{
     },
 };
 use anyhow::{Context, Result};
-use std::collections::HashSet;
+use foldhash::HashSet;
 use std::path::{Path, PathBuf};
 
 /// Call graph construction phases for progress tracking
@@ -164,7 +164,7 @@ where
 // ============================================================================
 
 use crate::extraction::{ExtractedFileData, ExtractedFunctionData};
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 
 /// Build call graph from pre-extracted file data (spec 213).
 ///
@@ -785,7 +785,7 @@ mod extracted_call_resolution_tests {
                 kind: ImportKind::Module,
             },
         ];
-        let extracted = HashMap::from([
+        let extracted = crate::collections::map_from([
             (caller_path.clone(), caller_file),
             (
                 helper_path.clone(),

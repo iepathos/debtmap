@@ -94,7 +94,7 @@ mod tests {
         UnifiedDebtItem, UnifiedScore,
     };
     use chrono::Utc;
-    use std::collections::HashMap;
+    use foldhash::{HashMap, HashMapExt};
     use std::io::Cursor;
     use std::path::PathBuf;
 
@@ -205,7 +205,7 @@ mod tests {
             has_coverage_data: false,
             timings: None,
             stats: crate::priority::FilterStatistics::new(),
-            analyzed_files: std::collections::HashMap::new(),
+            analyzed_files: foldhash::HashMap::new(),
             suppression_audit: Default::default(),
         }
     }
@@ -284,7 +284,7 @@ mod tests {
                 circular: vec![],
             },
             duplications: vec![],
-            file_contexts: std::collections::HashMap::new(),
+            file_contexts: foldhash::HashMap::new(),
         }
     }
 

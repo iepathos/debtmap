@@ -7,6 +7,7 @@
 use super::types::TraitImplementation;
 use crate::collections::{HashMap, Vector};
 use crate::priority::call_graph::FunctionId;
+use foldhash::HashMapExt;
 
 /// Result of pattern detection - functions to mark as entry points
 #[derive(Debug, Clone, Default)]

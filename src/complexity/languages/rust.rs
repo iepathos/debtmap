@@ -3,7 +3,7 @@ use crate::complexity::entropy_traits::{AnalyzerHelpers, GenericToken};
 use crate::complexity::token_classifier::{
     CallType, ClassifiedToken, FlowType, NodeType, TokenClass, TokenClassifier, TokenContext,
 };
-use std::collections::HashSet;
+use foldhash::{HashSet, HashSetExt};
 use syn::visit::Visit;
 use syn::{Block, Expr, ItemFn};
 

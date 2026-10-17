@@ -10,7 +10,7 @@
 //! - No side effects (no I/O, no logging)
 //! - Thread-safe
 
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet};
 use syn::visit::Visit;
 
 /// Build method call adjacency matrix from impl blocks.

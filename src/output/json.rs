@@ -2,8 +2,8 @@ use crate::priority;
 #[cfg(test)]
 use crate::priority::UnifiedAnalysisUtils;
 use anyhow::Result;
+use foldhash::HashSet;
 use std::cmp::Ordering;
-use std::collections::HashSet;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;

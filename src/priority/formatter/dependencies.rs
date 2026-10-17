@@ -105,7 +105,7 @@ mod tests {
         );
 
         assert_eq!(
-            format_function_reference("std::collections::HashMap"),
+            format_function_reference("foldhash::HashMap"),
             "collections::HashMap"
         );
     }

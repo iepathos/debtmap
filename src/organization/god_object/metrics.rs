@@ -12,7 +12,7 @@ use crate::organization::{
     calculate_avg_complexity, calculate_complexity_weight, calculate_god_object_score,
     calculate_god_object_score_weighted, group_methods_by_responsibility,
 };
-use std::collections::HashMap;
+use foldhash::HashMap;
 
 /// Visibility classification for functions/methods.
 ///
