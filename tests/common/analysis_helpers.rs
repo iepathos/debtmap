@@ -55,7 +55,7 @@ pub fn analyze_file_directly(file_path: &Path) -> Result<AnalysisResults> {
 
     // Combine all debt items and add IDs
     let mut all_debt_items = Vec::new();
-    for (i, mut item) in todos.into_iter().chain(smells.into_iter()).enumerate() {
+    for (i, mut item) in todos.into_iter().chain(smells).enumerate() {
         item.id = format!("debt_{}", i);
         all_debt_items.push(item);
     }

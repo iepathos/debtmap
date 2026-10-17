@@ -169,7 +169,7 @@ fn test_count_branches_empty() {
 #[test]
 fn test_count_branches_with_mock_nodes() {
     // Create mock nodes for testing branch counting logic
-    let mock_nodes = vec![
+    let mock_nodes = [
         AstNode {
             kind: NodeKind::If,
             name: None,

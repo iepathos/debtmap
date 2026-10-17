@@ -166,7 +166,7 @@ pub fn get_top_complex_functions(results: &AnalysisResults, limit: usize) -> Vec
         .map(|m| (m.name.clone(), m.cyclomatic))
         .collect();
 
-    functions.sort_by(|a, b| b.1.cmp(&a.1));
+    functions.sort_by_key(|a| std::cmp::Reverse(a.1));
     functions.truncate(limit);
 
     functions

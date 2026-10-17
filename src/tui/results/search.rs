@@ -124,7 +124,7 @@ pub fn filter_items(analysis: &UnifiedAnalysis, query: &str) -> Vec<usize> {
     }
 
     // Sort by match score (best matches first)
-    matches.sort_by(|a, b| b.1.cmp(&a.1));
+    matches.sort_by_key(|a| std::cmp::Reverse(a.1));
 
     // Extract indices
     matches.into_iter().map(|(idx, _)| idx).collect()

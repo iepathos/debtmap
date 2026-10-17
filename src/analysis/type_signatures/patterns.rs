@@ -194,7 +194,7 @@ impl TypePatternLibrary {
         ];
 
         // Sort patterns by priority (highest first)
-        patterns.sort_by(|a, b| b.priority.cmp(&a.priority));
+        patterns.sort_by_key(|a| std::cmp::Reverse(a.priority));
 
         TypePatternLibrary { patterns }
     }

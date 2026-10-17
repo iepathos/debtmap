@@ -225,7 +225,7 @@ mod tests {
 
     #[test]
     fn test_detect_constructor_patterns() {
-        let functions = vec![
+        let functions = [
             make_function_id("MyType::new", 10),
             make_function_id("Config::builder", 20),
             make_function_id("Settings::with_defaults", 30),

@@ -255,7 +255,7 @@ fn source_file_builders_preserve_same_line_implementation_identity() {
         assert!(
             graph
                 .get_all_functions()
-                .all(|id| id.file == PathBuf::from("src/lib.rs"))
+                .all(|id| id.file == std::path::Path::new("src/lib.rs"))
         );
     }
 }

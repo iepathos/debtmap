@@ -172,9 +172,9 @@ fn test_visibility_integration_with_godfile() {
     assert_eq!(breakdown.total(), 10);
 
     // If it's a god object, verify module_structure integration
-    if analysis.is_god_object && analysis.module_structure.is_some() {
-        let module_structure = analysis.module_structure.as_ref().unwrap();
-
+    if analysis.is_god_object
+        && let Some(module_structure) = analysis.module_structure.as_ref()
+    {
         assert_eq!(
             module_structure.function_counts.public_functions,
             breakdown.public

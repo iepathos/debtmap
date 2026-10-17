@@ -212,48 +212,40 @@ impl PatternMatchRecognizer {
         let mut current_if = if_expr;
 
         loop {
-            // Extract the variable being tested
-            if let Some(var) = self.extract_tested_variable(&current_if.cond) {
-                if tracked_var.is_none() {
-                    *tracked_var = Some(var.clone());
-                } else if tracked_var.as_ref() != Some(&var) {
-                    // Different variable, not pattern matching
-                    return None;
-                }
-
-                // Check for immediate return in then branch
-                if !self.has_immediate_return(&current_if.then_branch) {
-                    // Allow simple single expressions too (common in pattern matching)
-                    if current_if.then_branch.stmts.len() != 1 {
-                        return None;
-                    }
-                }
-
-                conditions.push(());
-                pattern_types.push(self.detect_pattern_type(&current_if.cond));
-
-                // Check else branch
-                match &current_if.else_branch {
-                    Some((_, else_expr)) => match &**else_expr {
-                        Expr::If(next_if) => {
-                            current_if = next_if;
-                            continue;
-                        }
-                        Expr::Block(_block) => {
-                            // This is the final else block
-                            has_else = true;
-                            break;
-                        }
-                        _ => {
-                            has_else = true;
-                            break;
-                        }
-                    },
-                    None => break,
-                }
-            } else {
-                // Couldn't extract variable, not pattern matching
+            let var = self.extract_tested_variable(&current_if.cond)?;
+            if tracked_var.is_none() {
+                *tracked_var = Some(var.clone());
+            } else if tracked_var.as_ref() != Some(&var) {
+                // Different variable, not pattern matching
                 return None;
+            }
+
+            // Check for immediate return in then branch
+            if !self.has_immediate_return(&current_if.then_branch)
+                && current_if.then_branch.stmts.len() != 1
+            {
+                return None;
+            }
+
+            conditions.push(());
+            pattern_types.push(self.detect_pattern_type(&current_if.cond));
+
+            match &current_if.else_branch {
+                Some((_, else_expr)) => match &**else_expr {
+                    Expr::If(next_if) => {
+                        current_if = next_if;
+                        continue;
+                    }
+                    Expr::Block(_block) => {
+                        has_else = true;
+                        break;
+                    }
+                    _ => {
+                        has_else = true;
+                        break;
+                    }
+                },
+                None => break,
             }
         }
 

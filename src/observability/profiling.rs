@@ -257,7 +257,7 @@ impl TimingCollector {
         }
 
         // Sort by duration descending for easy identification of bottlenecks
-        phases.sort_by(|a, b| b.duration.cmp(&a.duration));
+        phases.sort_by_key(|a| std::cmp::Reverse(a.duration));
 
         // Build hierarchy
         let phases = build_hierarchy(phases);
@@ -313,7 +313,9 @@ fn add_child_to_parent(parent: &mut PhaseTiming, target_name: &str, child: Phase
 
 /// Recursively sort children by duration.
 fn sort_children_recursive(phase: &mut PhaseTiming) {
-    phase.children.sort_by(|a, b| b.duration.cmp(&a.duration));
+    phase
+        .children
+        .sort_by_key(|a| std::cmp::Reverse(a.duration));
     for child in &mut phase.children {
         sort_children_recursive(child);
     }

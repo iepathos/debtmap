@@ -164,7 +164,7 @@ fn test_file_scoring_with_god_object_detection() {
 #[test]
 fn test_file_scoring_priorities() {
     // Test that files are correctly prioritized based on scores
-    let files = vec![
+    let files = [
         FileDebtMetrics {
             path: PathBuf::from("low_priority.rs"),
             total_lines: 50,

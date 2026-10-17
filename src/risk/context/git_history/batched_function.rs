@@ -128,7 +128,7 @@ impl BatchedFunctionGitHistory {
 
             let done = processed_files.fetch_add(1, Ordering::Relaxed) + 1;
             if let Some(cb) = progress_cb
-                && (done % 10 == 0 || done == file_count)
+                && (done.is_multiple_of(10) || done == file_count)
             {
                 cb(GitPreloadPhase::BlameFiles, done, file_count);
             }

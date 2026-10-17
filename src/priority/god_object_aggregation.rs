@@ -229,7 +229,7 @@ pub fn calculate_median(values: &[u32]) -> u32 {
     sorted.sort_unstable();
 
     let mid = sorted.len() / 2;
-    if sorted.len() % 2 == 0 {
+    if sorted.len().is_multiple_of(2) {
         // Even number of elements: average of two middle values
         (sorted[mid - 1] + sorted[mid]) / 2
     } else {
@@ -1110,7 +1110,7 @@ mod tests {
 
     #[test]
     fn test_complexity_aggregation_sums_and_maxes() {
-        let members = vec![
+        let members = [
             create_test_item("file.rs", 5, 10, 2, 50),
             create_test_item("file.rs", 10, 15, 5, 100),
             create_test_item("file.rs", 15, 20, 3, 75),
@@ -1126,7 +1126,7 @@ mod tests {
 
     #[test]
     fn test_coverage_weighted_average() {
-        let mut members = vec![
+        let mut members = [
             create_test_item("file.rs", 0, 0, 0, 10),
             create_test_item("file.rs", 0, 0, 0, 50),
             create_test_item("file.rs", 0, 0, 0, 40),
@@ -1162,7 +1162,7 @@ mod tests {
 
     #[test]
     fn test_dependencies_deduplicate() {
-        let mut members = vec![
+        let mut members = [
             create_test_item("file.rs", 0, 0, 0, 10),
             create_test_item("file.rs", 0, 0, 0, 20),
         ];
@@ -1184,7 +1184,7 @@ mod tests {
 
     #[test]
     fn test_extract_member_functions() {
-        let items = vec![
+        let items = [
             create_test_item("file1.rs", 5, 10, 2, 50),
             create_test_item("file2.rs", 10, 15, 3, 100),
             create_test_item("file1.rs", 15, 20, 4, 75),
@@ -1202,7 +1202,7 @@ mod tests {
 
     #[test]
     fn test_aggregate_god_object_metrics_composition() {
-        let members = vec![
+        let members = [
             create_test_item("file.rs", 5, 10, 2, 50),
             create_test_item("file.rs", 10, 15, 5, 100),
         ];
@@ -2259,7 +2259,7 @@ mod tests {
     #[test]
     fn test_aggregate_distribution_metrics() {
         // Create items with varied complexity to test distribution calculation
-        let members = vec![
+        let members = [
             create_test_item("file.rs", 5, 10, 2, 50), // Low complexity
             create_test_item("file.rs", 8, 15, 3, 100), // Medium complexity
             create_test_item("file.rs", 12, 20, 4, 75), // Medium complexity
@@ -2305,7 +2305,7 @@ mod tests {
     #[test]
     fn test_aggregate_distribution_metrics_concentrated_file() {
         // Create items simulating a god function dominating the file
-        let members = vec![
+        let members = [
             create_test_item("file.rs", 60, 100, 5, 500), // God function
             create_test_item("file.rs", 5, 10, 2, 30),    // Small helper
             create_test_item("file.rs", 5, 10, 2, 30),    // Small helper
@@ -2512,7 +2512,7 @@ mod tests {
 
     #[test]
     fn test_aggregate_god_object_metrics_includes_distribution() {
-        let members = vec![
+        let members = [
             create_test_item("file.rs", 10, 20, 2, 100),
             create_test_item("file.rs", 8, 15, 3, 80),
         ];

@@ -358,7 +358,7 @@ impl ContextRuleEngine {
     pub fn add_rule(&mut self, rule: ContextRule) {
         self.rules.push(rule);
         // Sort by priority (highest first)
-        self.rules.sort_by(|a, b| b.priority.cmp(&a.priority));
+        self.rules.sort_by_key(|a| std::cmp::Reverse(a.priority));
         // Clear cache when rules change
         self.cache.clear();
     }

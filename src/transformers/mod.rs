@@ -62,7 +62,7 @@ where
 
 pub fn sort_functions_by_complexity(metrics: FileMetrics) -> FileMetrics {
     let mut functions = metrics.complexity.functions;
-    functions.sort_by(|a, b| b.cyclomatic.cmp(&a.cyclomatic));
+    functions.sort_by_key(|a| std::cmp::Reverse(a.cyclomatic));
     let (cyclomatic, cognitive) = calculate_total_complexity(&functions);
 
     FileMetrics {

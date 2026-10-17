@@ -235,10 +235,12 @@ pub fn validate_recommendation_consistency(action: &str, steps: &[String]) -> Re
     }
 
     // If action has count but steps don't (or vice versa), that's suspicious
-    if action_count.is_some() && step_counts.is_empty() {
+    if let Some(count) = action_count
+        && step_counts.is_empty()
+    {
         return Err(format!(
             "ACTION mentions {} tests but steps don't mention any test count",
-            action_count.unwrap()
+            count
         ));
     }
 

@@ -608,7 +608,7 @@ mod tests {
         let call: ExprCall = parse_quote! { compute(42) };
         // Manually change the func to something that's not a Path
         let mut call = call;
-        call.func = Box::new(parse_quote! { 42 }); // Replace with a literal, not a path
+        *call.func = parse_quote! { 42 }; // Replace with a literal, not a path
         let result = visitor.extract_direct_pointer_call(&call, &caller, 10);
 
         assert!(result.is_none());

@@ -351,12 +351,7 @@ impl DataFlowAnalyzer {
         // If node is root of SCC, pop the SCC
         if lowlinks[node] == indices[node] {
             let mut component = Vec::new();
-            loop {
-                // Safe: Tarjan's algorithm guarantees stack is not empty here
-                // because we pushed node at the start of this function
-                let Some(w) = stack.pop() else {
-                    break; // Defensive: shouldn't happen but avoid panic
-                };
+            while let Some(w) = stack.pop() {
                 on_stack.remove(&w);
                 component.push(w.clone());
                 if w == node {

@@ -42,7 +42,9 @@ fn graphs(source: &str) -> Vec<CallGraph> {
 fn definition(graph: &CallGraph, name: &str, line: usize) -> FunctionId {
     let ids: Vec<_> = graph
         .get_all_functions()
-        .filter(|id| id.name == name && id.line == line && id.file == PathBuf::from("src/lib.rs"))
+        .filter(|id| {
+            id.name == name && id.line == line && id.file == std::path::Path::new("src/lib.rs")
+        })
         .cloned()
         .collect();
     assert_eq!(ids.len(), 1, "definition {name} at line {line}");

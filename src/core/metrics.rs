@@ -48,7 +48,7 @@ where
 }
 
 pub fn sort_by_complexity(mut metrics: Vec<FunctionMetrics>) -> Vec<FunctionMetrics> {
-    metrics.sort_by(|a, b| b.cyclomatic.cmp(&a.cyclomatic));
+    metrics.sort_by_key(|a| std::cmp::Reverse(a.cyclomatic));
     metrics
 }
 
