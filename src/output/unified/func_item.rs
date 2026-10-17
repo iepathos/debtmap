@@ -94,6 +94,14 @@ impl FunctionDebtItemOutput {
     pub fn assert_invariants(&self) {}
 
     pub fn from_function_item(item: &UnifiedDebtItem, include_scoring_details: bool) -> Self {
+        Self::from_function_item_with_v4(item, include_scoring_details, false)
+    }
+
+    pub(crate) fn from_function_item_with_v4(
+        item: &UnifiedDebtItem,
+        include_scoring_details: bool,
+        include_v4_fields: bool,
+    ) -> Self {
         // Apply rounding for clean output (spec 230)
         let rounded_score = round_score(item.unified_score.final_score);
         let complexity_pattern = extract_complexity_pattern(
@@ -160,7 +168,10 @@ impl FunctionDebtItemOutput {
                     .as_ref()
                     .map(|e| e.adjusted_complexity),
                 transitive_coverage,
-                crap: crap_for_item(item, get_crap_config().coverage_source).map(round_score),
+                crap: include_v4_fields
+                    .then(|| crap_for_item(item, get_crap_config().coverage_source))
+                    .flatten()
+                    .map(round_score),
             },
             debt_type: item.debt_type.clone(),
             function_role: item.function_role,
@@ -292,7 +303,9 @@ impl FunctionDebtItemOutput {
                 .contextual_risk
                 .as_ref()
                 .map(ContextualRiskImpactOutput::from_contextual_risk),
-            llm_editability: crate::llm::evaluator().map(|e| e.evaluate(item)),
+            llm_editability: include_v4_fields
+                .then(|| crate::llm::evaluator().map(|e| e.evaluate(item)))
+                .flatten(),
         }
     }
 }

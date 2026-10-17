@@ -129,7 +129,11 @@ impl Registry {
     /// Map a user-supplied name (id or alias) to a profile id.
     pub fn find(&self, name: &str) -> Result<String, String> {
         let wanted = name.trim().to_ascii_lowercase();
-        if let Some(id) = self.ids().into_iter().find(|id| *id == wanted) {
+        if let Some(id) = self
+            .ids()
+            .into_iter()
+            .find(|id| id.eq_ignore_ascii_case(&wanted))
+        {
             return Ok(id);
         }
         self.models
@@ -355,6 +359,20 @@ mod tests {
         assert_eq!(sonnet.tolerance(Feature::Reasoning), 30.0);
         assert_eq!(sonnet.tolerance(Feature::UnitTokens), 1200.0);
         assert_eq!(sonnet.provider, "anthropic");
+    }
+
+    #[test]
+    fn custom_profile_id_matches_ignoring_case() {
+        let user = BTreeMap::from([(
+            "MyCoder".to_string(),
+            ProfileSpec {
+                cost_tier: Some(1),
+                ..Default::default()
+            },
+        )]);
+        let registry = Registry::load(&user).unwrap();
+        assert_eq!(registry.find("MyCoder").unwrap(), "MyCoder");
+        assert_eq!(registry.find("mycoder").unwrap(), "MyCoder");
     }
 
     #[test]
