@@ -1,5 +1,4 @@
 use super::{graphs_files, possible};
-use std::path::PathBuf;
 
 #[test]
 fn nested_out_of_line_modules_rebase_bound_context_before_resolution() {
