@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-17
+
+### Changed
+
+- **Hash maps and sets use foldhash.** Public `collections::HashMap` and `HashSet` now carry `foldhash::fast::RandomState`. `HashMap::new` and `HashSet::new` need `HashMapExt` and `HashSetExt` in scope. `collections::map_from` and `collections::set_from` replace `HashMap::from` and `HashSet::from`.
+- **Concurrent maps use the same hasher.** `collections::DashMap` and `DashSet` take `foldhash::fast::RandomState`. Construct them with `default()`, not `DashMap::new()`.
+- Call-graph cycle and topo walks read the callee index directly instead of cloning and sorting an adjacency list on every step.
+
 ## [0.24.1] - 2026-09-24
 
 ### Fixed
