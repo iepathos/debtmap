@@ -5,7 +5,7 @@
 use std::time::Duration;
 
 fn should_update_progress(current_file: usize, elapsed_since_update: Duration) -> bool {
-    current_file % 10 == 0 || elapsed_since_update > Duration::from_millis(100)
+    current_file.is_multiple_of(10) || elapsed_since_update > Duration::from_millis(100)
 }
 
 fn simulate_progress_updates(

@@ -583,7 +583,7 @@ pub fn compute_repo_function_histories(
             )?;
             let done = processed.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
             if let Some(cb) = progress_cb
-                && (done % 50 == 0 || done == total)
+                && (done.is_multiple_of(50) || done == total)
             {
                 cb(GitPreloadPhase::Commits, done, total);
             }

@@ -1032,7 +1032,7 @@ fn record_file_progress(
     let Ok(mut last) = last_update.try_lock() else {
         return;
     };
-    if current % 10 != 0 && last.elapsed() <= Duration::from_millis(100) {
+    if !current.is_multiple_of(10) && last.elapsed() <= Duration::from_millis(100) {
         return;
     }
     if let Some(manager) = ProgressManager::global() {
@@ -1148,7 +1148,7 @@ fn update_finalization_subtask(current: usize, total: usize) {
         return;
     };
 
-    let should_refresh = current == total || current == 1 || current % 10 == 0;
+    let should_refresh = current == total || current == 1 || current.is_multiple_of(10);
     if should_refresh {
         manager.tui_update_subtask(
             5,

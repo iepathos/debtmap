@@ -84,7 +84,9 @@ pub fn collect_file_metrics_with_errors(files: &[PathBuf]) -> AnalysisResults<Fi
 
             // Update TUI progress (throttled to reduce lock contention)
             // Update on interval, first file, and last file
-            if (current % tui_update_interval == 0 || current == 1 || current == total_files)
+            if (current.is_multiple_of(tui_update_interval)
+                || current == 1
+                || current == total_files)
                 && let Some(manager) = crate::progress::ProgressManager::global()
             {
                 manager.tui_update_subtask(

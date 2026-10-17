@@ -137,7 +137,7 @@ where
             Record::EndOfRecord => {
                 handle_end_of_record(&mut state);
                 // Throttle: update every 10 files
-                if state.file_count % 10 == 0 {
+                if state.file_count.is_multiple_of(10) {
                     progress_callback(CoverageProgress::Parsing {
                         current: state.file_count,
                         total: state.file_count,
