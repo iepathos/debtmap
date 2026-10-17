@@ -39,9 +39,10 @@ type Declarations = (
 /// Enhancement facts of the parsed files are returned in source order.
 pub(crate) fn extract_sources(
     sources: &[Source],
+    workers: usize,
 ) -> (CallGraph, HashSet<PathBuf>, Vec<FileEnhancements>) {
     let known: HashSet<_> = sources.iter().map(|(file, _)| file.clone()).collect();
-    let parts = partitions(sources, rayon::current_num_threads());
+    let parts = partitions(sources, workers.max(1));
     let budget = crate::core::parsing::parse_cache_bytes() / parts.len().max(1);
     let splits: Vec<_> = parts
         .iter()
@@ -409,7 +410,7 @@ mod tests {
         };
         let run = |threads, cache_mb| {
             crate::core::parsing::set_parse_cache_mb(cache_mb);
-            let graph = pool(threads).install(|| extract_sources(&files).0);
+            let graph = pool(threads).install(|| extract_sources(&files, threads).0);
             let mut nodes: Vec<_> = graph.get_all_functions().cloned().collect();
             nodes.sort();
             format!(

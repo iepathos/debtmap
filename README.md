@@ -193,11 +193,11 @@ Debtmap includes built-in profiling to identify performance bottlenecks.
 
 | Flag | Default | Languages | What it stores |
 | --- | --- | --- | --- |
-| `--parse-cache-mb` | 64 | Rust | Syntax trees kept between call-graph passes |
+| `--parse-cache-mb` | 64 | Rust | Source bytes whose syntax trees are kept between passes |
 | `--resolution-cache-mb` | 256 | Rust | Resolved paths and reexport expansions |
 | `--canonical-cache-mb` | 64 | Rust, Python, JavaScript, TypeScript, Go, Solidity | Successful path canonicalization |
 
-Rust is the only language that keeps syntax trees and a resolution index between passes. Canonical paths are shared by every language debtmap analyzes.
+Rust is the only language that keeps syntax trees and a resolution index between passes. The parse-cache budget counts source bytes; the retained trees use more memory than that budget. Canonical paths are shared by every language debtmap analyzes.
 
 ### Built-in Timing
 

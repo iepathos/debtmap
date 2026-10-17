@@ -29,7 +29,12 @@ pub(super) fn build(
     });
     let sources = snapshots(paths, parallel);
     let mut enhancement = RustCallGraphBuilder::new();
-    let (resolved, _, enhancements) = workspace::extract_sources(&sources);
+    let workers = if parallel {
+        rayon::current_num_threads()
+    } else {
+        1
+    };
+    let (resolved, _, enhancements) = workspace::extract_sources(&sources, workers);
     enhancements
         .into_iter()
         .for_each(|facts| enhancement.apply_file_enhancements(facts));

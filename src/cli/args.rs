@@ -220,8 +220,8 @@ pub enum Commands {
         #[arg(long = "jobs", short = 'j', default_value = "0", env = "DEBTMAP_JOBS")]
         jobs: usize,
 
-        /// Megabytes of Rust syntax trees kept between call-graph passes (0 = reparse).
-        /// Other languages ignore this flag.
+        /// Megabytes of Rust source whose syntax trees are kept between call-graph passes (0 = reparse).
+        /// Retained trees use more memory than this budget. Other languages ignore this flag.
         #[arg(long = "parse-cache-mb", default_value_t = crate::core::parsing::DEFAULT_PARSE_CACHE_MB, env = "DEBTMAP_PARSE_CACHE_MB")]
         parse_cache_mb: usize,
 
@@ -405,8 +405,8 @@ pub enum Commands {
         #[arg(long = "jobs", short = 'j', default_value = "0", env = "DEBTMAP_JOBS")]
         jobs: usize,
 
-        /// Megabytes of Rust syntax trees kept between call-graph passes (0 = reparse).
-        /// Other languages ignore this flag.
+        /// Megabytes of Rust source whose syntax trees are kept between call-graph passes (0 = reparse).
+        /// Retained trees use more memory than this budget. Other languages ignore this flag.
         #[arg(long = "parse-cache-mb", default_value_t = crate::core::parsing::DEFAULT_PARSE_CACHE_MB, env = "DEBTMAP_PARSE_CACHE_MB")]
         parse_cache_mb: usize,
 
