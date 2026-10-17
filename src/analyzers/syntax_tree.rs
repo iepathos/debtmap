@@ -1,6 +1,11 @@
 //! Helpers shared by the tree-sitter based analyzers.
 
-use tree_sitter::{Node, TreeCursor};
+use tree_sitter::{Node, Tree, TreeCursor};
+
+/// Whether the parse tree contains an error node.
+pub fn has_parse_errors(tree: &Tree) -> bool {
+    tree.root_node().has_error()
+}
 
 /// Source text covered by `node`.
 pub fn node_text<'a>(node: &Node, source: &'a str) -> &'a str {

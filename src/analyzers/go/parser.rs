@@ -3,7 +3,7 @@
 use crate::core::ast::GoAst;
 use anyhow::{Context, Result};
 use std::path::Path;
-use tree_sitter::{Language as TsLanguage, Parser, Tree};
+use tree_sitter::{Language as TsLanguage, Parser};
 
 fn get_language() -> TsLanguage {
     tree_sitter_go::LANGUAGE.into()
@@ -32,9 +32,7 @@ pub fn parse_source(content: &str, path: &Path) -> Result<GoAst> {
     })
 }
 
-pub fn has_parse_errors(tree: &Tree) -> bool {
-    tree.root_node().has_error()
-}
+pub use crate::analyzers::syntax_tree::has_parse_errors;
 
 pub use crate::analyzers::syntax_tree::{node_column, node_line, node_text};
 

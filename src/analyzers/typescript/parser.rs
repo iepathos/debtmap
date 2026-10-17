@@ -6,7 +6,7 @@ use crate::core::ast::{JsLanguageVariant, TypeScriptAst};
 use anyhow::{Context, Result};
 use std::borrow::Cow;
 use std::path::Path;
-use tree_sitter::{Language as TsLanguage, Parser, Tree};
+use tree_sitter::{Language as TsLanguage, Parser};
 
 /// Get the tree-sitter language for a JS variant
 fn get_language(variant: JsLanguageVariant) -> TsLanguage {
@@ -133,10 +133,7 @@ pub fn detect_variant(path: &Path) -> JsLanguageVariant {
         .unwrap_or(JsLanguageVariant::JavaScript)
 }
 
-/// Check if a parse tree has errors
-pub fn has_parse_errors(tree: &Tree) -> bool {
-    tree.root_node().has_error()
-}
+pub use crate::analyzers::syntax_tree::has_parse_errors;
 
 pub use crate::analyzers::syntax_tree::{node_column, node_line, node_text};
 

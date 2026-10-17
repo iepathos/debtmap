@@ -1,5 +1,6 @@
-pub use crate::analyzers::syntax_tree::{children, function_length};
 use tree_sitter::Node;
+
+pub use crate::analyzers::syntax_tree::{children, function_length};
 
 use crate::analyzers::solidity::parser::node_text;
 
