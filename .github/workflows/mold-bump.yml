@@ -22,16 +22,26 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           current=$(sed -n 's/.*"mold@\([0-9.]*\)".*/\1/p' .mbx.toml)
+          if [ -z "$current" ]; then
+            echo "::error::Could not find a mold@ pin in .mbx.toml"
+            exit 1
+          fi
           latest=$(gh release list -R rui314/mold --exclude-drafts --exclude-pre-releases \
             --limit 50 --json tagName \
-            --jq "[.[].tagName | ltrimstr(\"v\") | select(startswith(\"${current%%.*}.\"))] | first")
+            --jq "[.[].tagName | ltrimstr(\"v\") | select(startswith(\"${current%%.*}.\"))] | sort_by(split(\".\") | map(tonumber)) | .[-1] // empty")
           if [ -z "$latest" ] || [ "$latest" = "$current" ]; then
             echo "mold $current is up to date"
             exit 0
           fi
           branch="deps/mold-$latest"
           if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
-            echo "$branch already exists"
+            open=$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')
+            if [ -n "$open" ]; then
+              echo "$branch already has pull request #$open"
+              exit 0
+            fi
+            gh pr create --head "$branch" --title "chore(deps): Bump mold to $latest" \
+              --body "Updates the mold linker pinned in \`.mbx.toml\` from $current to $latest. Release notes: https://github.com/rui314/mold/releases/tag/v$latest"
             exit 0
           fi
           sed -i "s/mold@$current/mold@$latest/" .mbx.toml
