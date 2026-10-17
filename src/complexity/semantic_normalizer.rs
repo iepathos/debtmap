@@ -397,10 +397,8 @@ fn calculate_branching_factor(statements: &[NormalizedStatement]) -> usize {
                 ControlType::If | ControlType::Match => branching += 1,
                 _ => {}
             },
-            NormalizedStatement::Expression(expr) => {
-                if expr.expr_type == ExprType::LogicalOp {
-                    branching += 1;
-                }
+            NormalizedStatement::Expression(expr) if expr.expr_type == ExprType::LogicalOp => {
+                branching += 1;
             }
             _ => {}
         }
