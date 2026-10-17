@@ -109,15 +109,24 @@ impl LlmEditabilityConfig {
     /// Validate scalar settings; profiles and languages are validated on resolution.
     pub fn validate(&self) -> Result<(), String> {
         self.thresholds.validate("llm_editability")?;
-        if let Some((feature, w)) = self.weights.iter().find(|(_, w)| **w < 0.0) {
+        if let Some((feature, w)) = self
+            .weights
+            .iter()
+            .find(|(_, w)| !(**w).is_finite() || **w < 0.0)
+        {
             return Err(format!(
-                "llm_editability.weights.{}: must be >= 0, got {w}",
+                "llm_editability.weights.{}: must be finite and >= 0, got {w}",
                 feature.as_str()
             ));
         }
-        if self.tokens_per_dependency < 0.0 || self.nesting_weight < 0.0 {
+        if !self.tokens_per_dependency.is_finite()
+            || !self.nesting_weight.is_finite()
+            || self.tokens_per_dependency < 0.0
+            || self.nesting_weight < 0.0
+        {
             return Err(
-                "llm_editability: tokens_per_dependency and nesting_weight must be >= 0".into(),
+                "llm_editability: tokens_per_dependency and nesting_weight must be finite and >= 0"
+                    .into(),
             );
         }
         if !(0.0..=1.0).contains(&self.unknown_coverage) {
@@ -177,6 +186,11 @@ churn = { window_days = 7, agents = ["*our-bot*"] }
             ..Default::default()
         };
         assert!(negative.validate().is_err());
+        let nan = LlmEditabilityConfig {
+            weights: BTreeMap::from([(Feature::Ripple, f64::NAN)]),
+            ..Default::default()
+        };
+        assert!(nan.validate().is_err());
         let coverage = LlmEditabilityConfig {
             unknown_coverage: 1.5,
             ..Default::default()

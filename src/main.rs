@@ -73,8 +73,10 @@ fn install_runtime_config(command: &Commands) -> Result<()> {
     })?;
 
     let config = apply_llm_cli_flags(traced.into_config(), command);
-    debtmap::llm::evaluator_for(&config)
-        .map_err(|e| anyhow::anyhow!("Invalid LLM editability configuration: {e}"))?;
+    if matches!(command, Commands::Analyze { .. }) {
+        debtmap::llm::evaluator_for(&config)
+            .map_err(|e| anyhow::anyhow!("Invalid LLM editability configuration: {e}"))?;
+    }
     debtmap::config::install_config(config)
         .map_err(|_| anyhow::anyhow!("Configuration was already initialized"))
 }
