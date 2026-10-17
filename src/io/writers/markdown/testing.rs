@@ -333,7 +333,7 @@ mod tests {
 
     #[test]
     fn test_format_testing_recommendations_with_gaps() {
-        let items = vec![
+        let items = [
             create_testing_gap_item("func1", 0.2, 10),
             create_testing_gap_item("func2", 0.5, 15),
         ];

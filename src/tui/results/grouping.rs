@@ -274,7 +274,7 @@ mod tests {
 
     #[test]
     fn test_group_by_location_single_item() {
-        let items = vec![create_test_item("file.rs", "func", 10, 50.0)];
+        let items = [create_test_item("file.rs", "func", 10, 50.0)];
         let groups = group_by_location(items.iter(), SortCriteria::Score);
         assert_eq!(groups.len(), 1);
         assert_eq!(groups[0].items.len(), 1);
@@ -283,7 +283,7 @@ mod tests {
 
     #[test]
     fn test_group_by_location_multiple_types() {
-        let items = vec![
+        let items = [
             create_test_item("file.rs", "func", 10, 75.0),
             create_test_item("file.rs", "func", 10, 60.0),
             create_test_item("file.rs", "func", 10, 45.0),
@@ -296,7 +296,7 @@ mod tests {
 
     #[test]
     fn test_combined_score_calculation() {
-        let items = vec![
+        let items = [
             create_test_item("file.rs", "func", 10, 75.0),
             create_test_item("file.rs", "func", 10, 60.0),
             create_test_item("file.rs", "func", 10, 45.0),
@@ -307,7 +307,7 @@ mod tests {
 
     #[test]
     fn test_separate_locations() {
-        let items = vec![
+        let items = [
             create_test_item("file.rs", "func1", 10, 50.0),
             create_test_item("file.rs", "func2", 20, 50.0),
             create_test_item("other.rs", "func1", 10, 50.0),
@@ -321,7 +321,7 @@ mod tests {
 
     #[test]
     fn test_max_severity() {
-        let items = vec![
+        let items = [
             create_test_item("file.rs", "func", 10, 75.0),  // high
             create_test_item("file.rs", "func", 10, 120.0), // critical
             create_test_item("file.rs", "func", 10, 45.0),  // medium

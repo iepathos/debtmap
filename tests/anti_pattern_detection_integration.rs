@@ -151,7 +151,7 @@ fn test_quality_score_formula() {
         ..Default::default()
     };
 
-    let report = detector.calculate_split_quality(&vec![critical_split], &[]);
+    let report = detector.calculate_split_quality(&[critical_split], &[]);
 
     // Should have exactly 1 anti-pattern
     assert_eq!(report.anti_patterns.len(), 1);
@@ -344,7 +344,7 @@ fn test_quality_report_display_formatting() {
         ..Default::default()
     };
 
-    let report = detector.calculate_split_quality(&vec![split], &[]);
+    let report = detector.calculate_split_quality(&[split], &[]);
 
     // Format the report
     let output = format!("{}", report);

@@ -507,7 +507,7 @@ mod tests {
         let detector = MagicValueDetector::new();
 
         // Test with numeric values
-        let values = vec![
+        let values = [
             ("42".to_string(), SourceLocation::default()),
             ("42".to_string(), SourceLocation::default()),
             ("1".to_string(), SourceLocation::default()),
@@ -529,7 +529,7 @@ mod tests {
         let detector = MagicValueDetector::new();
 
         // Test with string values
-        let values = vec![
+        let values = [
             ("config".to_string(), SourceLocation::default()),
             ("".to_string(), SourceLocation::default()),
             ("config".to_string(), SourceLocation::default()),
