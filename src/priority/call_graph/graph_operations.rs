@@ -10,6 +10,33 @@ use foldhash::HashSetExt;
 use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
 
+impl CallGraph {
+    fn canonical_id(&self, func_id: &FunctionId) -> FunctionId {
+        self.find_function(func_id)
+            .unwrap_or_else(|| func_id.clone())
+    }
+
+    fn exact_callees(&self, func_id: &FunctionId) -> impl Iterator<Item = FunctionId> + '_ {
+        self.callee_index
+            .get(func_id)
+            .into_iter()
+            .flat_map(|ids| ids.iter().cloned())
+    }
+
+    fn exact_callers(&self, func_id: &FunctionId) -> impl Iterator<Item = FunctionId> + '_ {
+        self.caller_index
+            .get(func_id)
+            .into_iter()
+            .flat_map(|ids| ids.iter().cloned())
+    }
+
+    fn sorted_callees(&self, func_id: &FunctionId) -> Vec<FunctionId> {
+        let mut callees: Vec<_> = self.exact_callees(func_id).collect();
+        callees.sort();
+        callees
+    }
+}
+
 fn file_ord(left: &Path, right: &Path) -> Ordering {
     if left.as_os_str() == right.as_os_str() {
         Ordering::Equal
@@ -446,22 +473,20 @@ impl CallGraph {
         func_id: &FunctionId,
         max_depth: usize,
     ) -> HashSet<FunctionId> {
+        let start = self.canonical_id(func_id);
         let mut visited = HashSet::new();
         let mut to_visit = std::collections::VecDeque::new();
-        to_visit.push_back((func_id.clone(), 0));
+        to_visit.push_back((start, 0));
 
         while let Some((current, depth)) = to_visit.pop_front() {
-            if depth >= max_depth || visited.contains(&current) {
+            if depth >= max_depth || !visited.insert(current.clone()) {
                 continue;
             }
-
-            visited.insert(current.clone());
-
-            for callee in self.get_callees(&current) {
-                if !visited.contains(&callee) {
-                    to_visit.push_back((callee, depth + 1));
-                }
-            }
+            to_visit.extend(
+                self.exact_callees(&current)
+                    .filter(|callee| !visited.contains(callee))
+                    .map(|callee| (callee, depth + 1)),
+            );
         }
 
         visited.remove(func_id);
@@ -473,23 +498,21 @@ impl CallGraph {
         func_id: &FunctionId,
         max_depth: usize,
     ) -> HashSet<FunctionId> {
+        let start = self.canonical_id(func_id);
         let mut visited = HashSet::new();
         let mut to_visit = std::collections::VecDeque::new();
-        to_visit.push_back((func_id.clone(), 0));
+        to_visit.push_back((start, 0));
 
         while let Some((current, depth)) = to_visit.pop_front() {
-            if visited.contains(&current) {
+            if !visited.insert(current.clone()) {
                 continue;
             }
-
-            visited.insert(current.clone());
-
             if depth < max_depth {
-                for caller in self.get_callers(&current) {
-                    if !visited.contains(&caller) {
-                        to_visit.push_back((caller, depth + 1));
-                    }
-                }
+                to_visit.extend(
+                    self.exact_callers(&current)
+                        .filter(|caller| !visited.contains(caller))
+                        .map(|caller| (caller, depth + 1)),
+                );
             }
         }
 
@@ -711,9 +734,10 @@ impl CallGraph {
     ///
     /// Uses iterative DFS with explicit stack to avoid stack overflow on large graphs.
     pub fn is_recursive(&self, func_id: &FunctionId) -> bool {
+        let start = self.canonical_id(func_id);
         let mut visited = HashSet::new();
         let mut rec_stack = HashSet::new();
-        self.has_cycle_dfs_iterative(func_id, &mut visited, &mut rec_stack)
+        self.has_cycle_dfs_iterative(&start, &mut visited, &mut rec_stack)
     }
 
     /// Iterative DFS helper to detect cycles.
@@ -751,10 +775,9 @@ impl CallGraph {
                     // Schedule exit (remove from rec_stack) after processing children
                     stack.push(CycleState::Exit(node.clone()));
 
-                    // Process callees - check for cycles and schedule unvisited
-                    for callee in self.get_callees(&node) {
+                    for callee in self.exact_callees(&node) {
                         if rec_stack.contains(&callee) {
-                            return true; // Cycle found
+                            return true;
                         }
                         if !visited.contains(&callee) {
                             stack.push(CycleState::Enter(callee));
@@ -830,8 +853,7 @@ impl CallGraph {
                     // Schedule finish (add to result) after processing children
                     stack.push(TopoState::Finish(node.clone()));
 
-                    // Add unvisited children
-                    for callee in self.get_callees(&node) {
+                    for callee in self.sorted_callees(&node) {
                         if !visited.contains(&callee) {
                             stack.push(TopoState::Visit(callee));
                         }
