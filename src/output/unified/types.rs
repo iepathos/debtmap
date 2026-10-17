@@ -107,6 +107,15 @@ impl UnifiedDebtItemOutput {
         include_scoring_details: bool,
         call_graph: Option<&crate::priority::CallGraph>,
     ) -> Self {
+        Self::from_debt_item_with_options(item, include_scoring_details, call_graph, false)
+    }
+
+    pub(crate) fn from_debt_item_with_options(
+        item: &DebtItem,
+        include_scoring_details: bool,
+        call_graph: Option<&crate::priority::CallGraph>,
+        include_v4_fields: bool,
+    ) -> Self {
         use super::cohesion::build_cohesion_output;
 
         match item {
@@ -125,7 +134,11 @@ impl UnifiedDebtItemOutput {
                 ))
             }
             DebtItem::Function(func_item) => UnifiedDebtItemOutput::Function(Box::new(
-                FunctionDebtItemOutput::from_function_item(func_item, include_scoring_details),
+                FunctionDebtItemOutput::from_function_item_with_v4(
+                    func_item,
+                    include_scoring_details,
+                    include_v4_fields,
+                ),
             )),
         }
     }
