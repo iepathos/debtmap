@@ -180,10 +180,15 @@ fn format_coverage_section(context: &FormatContext) -> Option<String> {
 
     // If we have actual transitive coverage data with a percentage, show it
     if let Some(coverage_pct) = coverage_info.coverage_percentage {
+        let crap = coverage_info
+            .crap
+            .map(|c| format!(" (CRAP: {c:.1})"))
+            .unwrap_or_default();
         Some(format!(
-            "{} {:.1}%",
+            "{} {:.1}%{}",
             "├─ COVERAGE:".bright_blue(),
-            coverage_pct
+            coverage_pct,
+            crap
         ))
     } else {
         // LCOV was provided but this function was not found in it

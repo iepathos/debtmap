@@ -565,6 +565,15 @@ fn merge_config(
         source_id,
         field_sources
     );
+    merge_optional_field!(target, source, crap, "crap", source_id, field_sources);
+    merge_optional_field!(
+        target,
+        source,
+        llm_editability,
+        "llm_editability",
+        source_id,
+        field_sources
+    );
 }
 
 /// Apply environment variable overrides to the config.
@@ -669,6 +678,8 @@ mod tests {
             ),
             data_flow_scoring: Some(crate::config::DataFlowScoringConfig::default()),
             context_suggestion: Some(crate::priority::context::ContextConfig::default()),
+            crap: Some(crate::risk::crap::CrapConfig::default()),
+            llm_editability: Some(crate::llm::LlmEditabilityConfig::default()),
             ..DebtmapConfig::default()
         };
         let mut merged = DebtmapConfig::default();
@@ -683,6 +694,8 @@ mod tests {
         assert!(merged.state_detection.is_some());
         assert!(merged.data_flow_scoring.is_some());
         assert!(merged.context_suggestion.is_some());
+        assert!(merged.crap.is_some());
+        assert!(merged.llm_editability.is_some());
         for name in [
             "batch_analysis",
             "retry",
@@ -690,6 +703,8 @@ mod tests {
             "state_detection",
             "data_flow_scoring",
             "context_suggestion",
+            "crap",
+            "llm_editability",
         ] {
             assert_eq!(fields.get(name), Some(&origin));
         }
