@@ -29,7 +29,7 @@ pub fn dynamic() -> &'static dyn T { todo!() }
     for graph in graphs_files(&files) {
         let expected: Vec<_> = graph
             .get_all_functions()
-            .filter(|id| id.file == *"src/outer/declared.rs" && id.line == 4)
+            .filter(|id| id.file == std::path::Path::new("src/outer/declared.rs") && id.line == 4)
             .cloned()
             .collect();
         assert_eq!(expected.len(), 1);
@@ -43,7 +43,7 @@ pub fn dynamic() -> &'static dyn T { todo!() }
                 graph
                     .get_callees(caller_id)
                     .iter()
-                    .all(|id| id.file != *"src/lib.rs")
+                    .all(|id| id.file != std::path::Path::new("src/lib.rs"))
             );
         }
     }
