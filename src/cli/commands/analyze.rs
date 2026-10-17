@@ -95,6 +95,8 @@ pub fn extract_analyze_params(
         no_tui,
         quiet,
         show_filter_stats,
+        llm_editability: _,
+        llm_models: _,
         profile: _,
         profile_output: _,
     } = command

@@ -145,6 +145,7 @@ fn format_git_context_section(output: &mut String, item: &UnifiedDebtItem) {
         author_count,
         total_commits,
         bug_fix_count,
+        ..
     } = &ctx.details
     else {
         return;

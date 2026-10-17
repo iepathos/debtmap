@@ -58,6 +58,7 @@ pub mod format {
             context(item.context.as_ref()),
             git_history(item.git_history.as_ref()),
             contextual_risk(item.contextual_risk.as_ref()),
+            llm_editability(item.llm_editability.as_ref()),
         ]
         .into_iter()
         .flatten()
@@ -168,7 +169,7 @@ pub mod format {
 
     /// Format coverage section (returns None if no coverage data)
     pub fn coverage(m: &FunctionMetricsOutput) -> Option<String> {
-        if m.coverage.is_none() && m.transitive_coverage.is_none() {
+        if m.coverage.is_none() && m.transitive_coverage.is_none() && m.crap.is_none() {
             return None;
         }
         let mut out = String::new();
@@ -183,6 +184,62 @@ pub mod format {
                 transitive_coverage * 100.0
             )
             .unwrap();
+        }
+        if let Some(crap) = m.crap {
+            writeln!(out, "- CRAP: {:.1}", crap).unwrap();
+        }
+        Some(out)
+    }
+
+    /// Format LLM editability section (returns None when the estimate is disabled)
+    pub fn llm_editability(llm: Option<&crate::llm::LlmEditabilityOutput>) -> Option<String> {
+        let llm = llm?;
+        let mut out = String::new();
+        write_section_heading(&mut out, "LLM Editability");
+        writeln!(out, "- Basis: {}", llm.basis).unwrap();
+        writeln!(
+            out,
+            "- Recommended Model: {}",
+            llm.recommended_model.as_deref().unwrap_or("none (human)")
+        )
+        .unwrap();
+        for m in &llm.models {
+            let factors: Vec<_> = m.top_factors.iter().map(|f| f.as_str()).collect();
+            let reason = m
+                .reason
+                .as_deref()
+                .map(|r| format!(", {r}"))
+                .unwrap_or_default();
+            writeln!(
+                out,
+                "- {}: {:.1} ({}{}; top factors: {})",
+                m.model,
+                m.score,
+                m.verdict.as_str(),
+                reason,
+                factors.join(", ")
+            )
+            .unwrap();
+        }
+        if let Some(c) = &llm.churn {
+            writeln!(
+                out,
+                "- Recent LLM Churn ({}d): {} LLM edits, {} fixes after LLM edits, \
+                 {} reverted LLM edits, {}, {} proven LLM edits",
+                c.window_days,
+                c.llm_edits,
+                c.fixes_after_llm_edit,
+                c.reverts_of_llm_edits,
+                crate::llm::fix_burst_text(c),
+                c.proven_llm_edits
+            )
+            .unwrap();
+        }
+        if !llm.actions.is_empty() {
+            writeln!(out, "- Actions:").unwrap();
+            for (i, action) in llm.actions.iter().enumerate() {
+                writeln!(out, "  {}. {}", i + 1, action.text).unwrap();
+            }
         }
         Some(out)
     }
@@ -1016,6 +1073,7 @@ mod tests {
                 branch_similarity: Some(0.4),
                 entropy_adjusted_cognitive: Some(24),
                 transitive_coverage: Some(0.75),
+                crap: None,
             },
             debt_type: DebtType::ComplexityHotspot {
                 cyclomatic: 25,
@@ -1053,6 +1111,7 @@ mod tests {
             context: None,
             git_history: None,
             contextual_risk: None,
+            llm_editability: None,
         };
 
         let result = writer.write_function_item(&item);
@@ -1182,6 +1241,7 @@ mod tests {
             context: None,
             git_history: None,
             contextual_risk: None,
+            llm_editability: None,
         };
 
         let result = writer.write_function_item(&item);
@@ -1343,6 +1403,7 @@ mod tests {
                 stability: "Frequently Changed".to_string(),
             }),
             contextual_risk: None,
+            llm_editability: None,
         };
 
         let result = writer.write_function_item(&item);
@@ -1538,6 +1599,7 @@ mod tests {
             context: None,
             git_history: None,
             contextual_risk: None,
+            llm_editability: None,
         }
     }
 
@@ -1566,6 +1628,19 @@ mod tests {
             !markdown.contains("- Type: Function"),
             "GodObject debt items must not be mislabeled as Function:\n{markdown}"
         );
+    }
+
+    #[test]
+    fn coverage_renders_crap_without_percentages() {
+        use crate::output::unified::FunctionMetricsOutput;
+
+        let text = format::coverage(&FunctionMetricsOutput {
+            crap: Some(12.0),
+            ..FunctionMetricsOutput::default()
+        })
+        .expect("crap");
+
+        assert!(text.contains("CRAP: 12.0"), "{text}");
     }
 
     #[test]

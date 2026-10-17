@@ -67,6 +67,9 @@ pub enum ContextDetails {
         total_commits: u32,
         /// Number of commits that were bug fixes
         bug_fix_count: u32,
+        /// Per-commit facts; empty for file-level history.
+        #[serde(default)]
+        activity: git_history::activity::CommitActivity,
     },
     Business {
         priority: Priority,

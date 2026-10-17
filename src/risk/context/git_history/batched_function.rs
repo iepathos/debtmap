@@ -4,6 +4,7 @@
 //! introductions and `-G` modifications, matching `git log` semantics
 //! without per-function subprocess fan-out.
 
+use super::activity::commit_fact;
 use super::blame_cache::{FileBlameCache, extract_authors_for_range};
 use super::function_level::{CommitInfo, FunctionHistory, calculate_function_history_with_authors};
 use super::git2_provider::{self, Git2Repository};
@@ -78,8 +79,8 @@ impl BatchedFunctionGitHistory {
             &file_names,
             progress_cb,
         )?;
-        let records = scan.functions;
         let file_history = super::batched::BatchedGitHistory::from_commit_scans(&scan.file_scans);
+        let records = &scan.functions;
 
         let histories: DashMap<FunctionHistoryKey, FunctionHistory> = DashMap::new();
         let processed_files = AtomicUsize::new(0);
@@ -111,11 +112,16 @@ impl BatchedFunctionGitHistory {
                         author: s.author_email.clone(),
                     })
                     .collect();
-                let history = calculate_function_history_with_authors(
-                    record.introduction_oid.map(|o| o.to_string()),
-                    record.introduction_date,
-                    &modification_commits,
-                    blame_authors,
+                let history = with_activity_context(
+                    calculate_function_history_with_authors(
+                        record.introduction_oid.map(|o| o.to_string()),
+                        record.introduction_date,
+                        &modification_commits,
+                        blame_authors,
+                    ),
+                    record,
+                    &scan,
+                    file,
                 );
                 histories.insert(
                     FunctionHistoryKey {
@@ -181,6 +187,32 @@ impl BatchedFunctionGitHistory {
     pub fn is_empty(&self) -> bool {
         self.histories.is_empty()
     }
+}
+
+/// Adds the introduction commit, the repo-wide fix dates of the
+/// conventional-commit scopes this function's commits used, and the
+/// scope-less fix dates of its file.
+fn with_activity_context(
+    mut history: FunctionHistory,
+    record: &git2_provider::FileFunctionRecord,
+    scan: &git2_provider::RepoHistoryScan,
+    file: &Path,
+) -> FunctionHistory {
+    if let (Some(oid), Some(date), Some(message)) = (
+        record.introduction_oid,
+        record.introduction_date,
+        &record.introduction_message,
+    ) {
+        let intro = commit_fact(&oid.to_string(), date, message);
+        history.activity.commits.insert(0, intro);
+    }
+    history.activity.scope_fixes = history
+        .activity
+        .scopes()
+        .filter_map(|s| Some((s.to_string(), scan.scope_fixes.get(s)?.clone())))
+        .collect();
+    history.activity.file_fixes = scan.file_fixes.get(file).cloned().unwrap_or_default();
+    history
 }
 
 type FileTargetMap = HashMap<PathBuf, Vec<(String, (usize, usize))>>;

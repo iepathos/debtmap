@@ -505,6 +505,7 @@ pub fn commit_pickaxe_changes_pattern(
 pub struct FileFunctionRecord {
     pub introduction_oid: Option<git2::Oid>,
     pub introduction_date: Option<DateTime<Utc>>,
+    pub introduction_message: Option<String>,
     pub modifications: Vec<CommitStats>,
 }
 
@@ -534,6 +535,10 @@ pub struct FileCommitScan {
 pub struct RepoHistoryScan {
     pub functions: HashMap<(PathBuf, String), FileFunctionRecord>,
     pub file_scans: Vec<FileCommitScan>,
+    /// Dates of conventional `fix(scope):` commits across the repo, oldest first.
+    pub scope_fixes: HashMap<String, Vec<DateTime<Utc>>>,
+    /// Dates of scope-less conventional `fix:` commits per touched file, oldest first.
+    pub file_fixes: HashMap<PathBuf, Vec<DateTime<Utc>>>,
 }
 
 /// Compute per-function histories for many files via one repository-wide commit walk.
@@ -558,6 +563,8 @@ pub fn compute_repo_function_histories(
         return Ok(RepoHistoryScan {
             functions: HashMap::new(),
             file_scans: Vec::new(),
+            scope_fixes: HashMap::new(),
+            file_fixes: HashMap::new(),
         });
     }
 
@@ -606,7 +613,28 @@ pub fn compute_repo_function_histories(
     Ok(RepoHistoryScan {
         functions: reduce_commit_data_to_records(file_targets, &commit_data),
         file_scans,
+        scope_fixes: fix_dates_by(&commit_data, |_, scope| scope.into_iter().collect()),
+        file_fixes: fix_dates_by(&commit_data, |d, scope| match scope {
+            Some(_) => Vec::new(),
+            None => d.file_churn.keys().cloned().collect(),
+        }),
     })
+}
+
+/// Dates of conventional fix commits grouped by the keys `keys` derives
+/// from each commit and its fix scope.
+fn fix_dates_by<K: std::hash::Hash + Eq>(
+    commit_data: &[CommitFunctionData],
+    keys: impl Fn(&CommitFunctionData, Option<String>) -> Vec<K>,
+) -> HashMap<K, Vec<DateTime<Utc>>> {
+    commit_data
+        .iter()
+        .filter_map(|d| Some((d, super::activity::conventional_fix_scope(&d.message)?)))
+        .flat_map(|(d, scope)| keys(d, scope).into_iter().map(|k| (k, d.date)))
+        .fold(HashMap::new(), |mut acc, (key, date)| {
+            acc.entry(key).or_default().push(date);
+            acc
+        })
 }
 
 type IntroPatternTable = HashMap<PathBuf, Vec<(String, String)>>;
@@ -789,6 +817,7 @@ fn reduce_commit_data_to_records(
                 if added != removed {
                     record.introduction_oid = Some(data.oid);
                     record.introduction_date = Some(data.date);
+                    record.introduction_message = Some(data.message.clone());
                 }
             } else if *matched && record.introduction_oid != Some(data.oid) {
                 record.modifications.push(CommitStats {

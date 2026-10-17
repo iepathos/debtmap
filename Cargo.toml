@@ -146,6 +146,8 @@ petgraph = "0.8.1"  # minimum for stable node_indices API
 lazy_static = "1.5.0"
 html-escape = "0.2.13"
 tui-scrollview = "0.6.3"
+git-conventional = "1.1"
+globset = "0.4"
 
 [dev-dependencies]
 jsonschema = { version = "0.49", default-features = false }

@@ -268,3 +268,8 @@ pub fn get_data_flow_scoring_config() -> super::scoring::DataFlowScoringConfig {
 pub fn get_context_suggestion_config() -> crate::priority::context::ContextConfig {
     get_config().context_suggestion.clone().unwrap_or_default()
 }
+
+/// Get CRAP metric configuration
+pub fn get_crap_config() -> crate::risk::crap::CrapConfig {
+    get_config().crap.clone().unwrap_or_default()
+}

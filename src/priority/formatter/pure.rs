@@ -111,6 +111,7 @@ fn build_all_sections(
     sections.extend(build_complexity_section(context));
     sections.extend(build_pattern_section(&context.pattern_info));
     sections.extend(build_coverage_section(&context.coverage_info));
+    sections.extend(build_llm_section(item));
     sections.extend(build_contextual_risk_section(&item.contextual_risk));
     sections.extend(build_dependencies_section(context));
     sections.extend(build_debt_specific_section(sections_data));
@@ -217,14 +218,40 @@ fn build_pattern_section(pattern_info: &Option<DetectedPattern>) -> Option<Forma
 fn build_coverage_section(
     coverage_info: &Option<super::context::CoverageInfo>,
 ) -> Option<FormattedSection> {
-    coverage_info
-        .as_ref()
-        .and_then(|info| info.coverage_percentage)
+    let info = coverage_info.as_ref()?;
+    info.coverage_percentage
         .map(|percentage| FormattedSection::Coverage {
             percentage,
             level: CoverageLevel::from_percentage(percentage),
             details: Some(format!("{:.1}%", percentage)),
+            crap: info.crap,
         })
+}
+
+fn build_llm_section(item: &UnifiedDebtItem) -> Option<FormattedSection> {
+    let output = crate::llm::evaluator()?.evaluate(item);
+    Some(llm_section(&output))
+}
+
+fn llm_section(output: &crate::llm::LlmEditabilityOutput) -> FormattedSection {
+    let recommended = output.recommended_model.as_deref();
+    let models = output
+        .models
+        .iter()
+        .map(|m| {
+            let mark = if Some(m.model.as_str()) == recommended {
+                " (recommended)"
+            } else {
+                ""
+            };
+            format!("{} {:.1} {}{}", m.model, m.score, m.verdict.as_str(), mark)
+        })
+        .collect::<Vec<_>>()
+        .join("; ");
+    FormattedSection::LlmEditability {
+        summary: models,
+        top_action: output.actions.first().map(|a| a.text.clone()),
+    }
 }
 
 /// Calculate risk multiplier from base and contextual risk.
