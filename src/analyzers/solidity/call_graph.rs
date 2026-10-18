@@ -2,7 +2,10 @@
 
 use crate::analyzers::solidity::calls::{SolidityCallKind, SolidityCallShape, extract_calls};
 use crate::analyzers::solidity::parser::{node_text, parse_source};
+use crate::analyzers::syntax_tree::walk_children;
 use crate::core::Language;
+use crate::core::ast::SolidityAst;
+use rayon::prelude::*;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use tree_sitter::Node;
@@ -17,14 +20,37 @@ pub struct SolidityBatchSnapshot {
 pub fn compute_call_edges(
     snapshots: &[SolidityBatchSnapshot],
 ) -> HashMap<(PathBuf, String), Vec<String>> {
-    let index = SolidityCallIndex::from_snapshots(snapshots);
-    let mut edges = HashMap::new();
+    compute_call_edges_with(snapshots, &parse_snapshots(snapshots))
+}
 
-    for snapshot in snapshots
-        .iter()
+/// Reads and parses Solidity snapshots in parallel; unreadable or unparsable files are skipped.
+pub fn parse_snapshots(snapshots: &[SolidityBatchSnapshot]) -> Vec<SolidityAst> {
+    snapshots
+        .par_iter()
         .filter(|snapshot| snapshot.language == Language::Solidity)
-    {
-        for function in &snapshot.functions {
+        .filter_map(|snapshot| {
+            let content = std::fs::read_to_string(&snapshot.path).ok()?;
+            parse_source(&content, &snapshot.path).ok()
+        })
+        .collect()
+}
+
+/// `asts` must come from [`parse_snapshots`] on the same snapshots.
+pub fn compute_call_edges_with(
+    snapshots: &[SolidityBatchSnapshot],
+    asts: &[SolidityAst],
+) -> HashMap<(PathBuf, String), Vec<String>> {
+    let index = SolidityCallIndex::from_asts(snapshots, asts);
+    snapshots
+        .par_iter()
+        .filter(|snapshot| snapshot.language == Language::Solidity)
+        .flat_map_iter(|snapshot| {
+            snapshot
+                .functions
+                .iter()
+                .map(move |function| (snapshot, function))
+        })
+        .filter_map(|(snapshot, function)| {
             let (caller_contract, _) = split_qualified_name(function);
             let downstream: Vec<_> = index
                 .calls_for_function(&snapshot.path, function)
@@ -33,20 +59,17 @@ pub fn compute_call_edges(
                     index.resolve_call(call, &caller_contract, &snapshot.path, function)
                 })
                 .collect();
-
-            if !downstream.is_empty() {
-                edges.insert((snapshot.path.clone(), function.clone()), downstream);
-            }
-        }
-    }
-
-    edges
+            (!downstream.is_empty())
+                .then(|| ((snapshot.path.clone(), function.clone()), downstream))
+        })
+        .collect()
 }
 
 #[derive(Debug, Default)]
 struct SolidityCallIndex {
     contracts: HashMap<String, ContractRecord>,
     functions_by_contract_method: HashMap<(String, String), Vec<String>>,
+    functions_by_method: HashMap<String, Vec<String>>,
     import_symbols: HashMap<PathBuf, HashMap<String, String>>,
     function_calls: HashMap<(PathBuf, String), Vec<SolidityCallShape>>,
 }
@@ -59,24 +82,23 @@ struct ContractRecord {
 }
 
 impl SolidityCallIndex {
-    fn from_snapshots(snapshots: &[SolidityBatchSnapshot]) -> Self {
+    fn from_asts(snapshots: &[SolidityBatchSnapshot], asts: &[SolidityAst]) -> Self {
         let mut index = Self::default();
         index.seed_functions(snapshots);
-
-        for snapshot in snapshots
-            .iter()
-            .filter(|snapshot| snapshot.language == Language::Solidity)
-        {
-            let Ok(content) = std::fs::read_to_string(&snapshot.path) else {
-                continue;
-            };
-            let Ok(ast) = parse_source(&content, &snapshot.path) else {
-                continue;
-            };
-            index.ingest_ast(&ast);
+        for ast in asts {
+            index.ingest_ast(ast);
         }
-
+        index.index_methods();
         index
+    }
+
+    fn index_methods(&mut self) {
+        for ((_, method), qualified) in &self.functions_by_contract_method {
+            self.functions_by_method
+                .entry(method.clone())
+                .or_default()
+                .extend(qualified.iter().cloned());
+        }
     }
 
     fn seed_functions(&mut self, snapshots: &[SolidityBatchSnapshot]) {
@@ -207,13 +229,9 @@ impl SolidityCallIndex {
     }
 
     fn unambiguous_bare(&self, method: &str) -> Option<String> {
-        let matches = self
-            .functions_by_contract_method
-            .iter()
-            .filter(|((_, name), _)| name == method)
-            .flat_map(|(_, qualified)| qualified.clone())
-            .collect::<Vec<_>>();
-        unique_match(&matches)
+        self.functions_by_method
+            .get(method)
+            .and_then(|matches| unique_match(matches))
     }
 }
 
@@ -456,13 +474,6 @@ fn contract_name_from_node(node: Node, ast: &crate::core::ast::SolidityAst) -> O
         current = parent.parent();
     }
     None
-}
-
-fn walk_children(node: Node, mut visit: impl FnMut(Node)) {
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        visit(child);
-    }
 }
 
 #[cfg(test)]

@@ -19,6 +19,11 @@ impl PurityCallGraphAdapter {
         Self { rust_graph }
     }
 
+    /// Return the wrapped base call graph.
+    pub fn into_call_graph(self) -> crate::priority::call_graph::CallGraph {
+        self.rust_graph.base_graph
+    }
+
     /// Get dependencies for a function (functions this function calls)
     pub fn get_dependencies(&self, func_id: &FunctionId) -> Vec<FunctionId> {
         self.effect_assessment(func_id)

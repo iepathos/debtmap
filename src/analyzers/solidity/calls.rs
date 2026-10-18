@@ -1,6 +1,7 @@
 //! Structured Solidity call extraction from tree-sitter AST nodes.
 
 use crate::analyzers::solidity::parser::node_text;
+use crate::analyzers::syntax_tree::walk_children;
 use crate::core::ast::SolidityAst;
 use tree_sitter::Node;
 
@@ -161,13 +162,6 @@ fn is_callable_node(node: Node) -> bool {
             | "fallback"
             | "receive"
     )
-}
-
-fn walk_children(node: Node, mut visit: impl FnMut(Node)) {
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        visit(child);
-    }
 }
 
 #[cfg(test)]

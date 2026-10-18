@@ -1,3 +1,4 @@
+use crate::analyzers::syntax_tree::walk_children;
 use tree_sitter::Node;
 
 use super::*;
@@ -163,11 +164,4 @@ fn is_contract_node(node: Node) -> bool {
         node.kind(),
         "contract_declaration" | "interface_declaration" | "library_declaration"
     )
-}
-
-fn walk_children(node: Node, mut visit: impl FnMut(Node)) {
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        visit(child);
-    }
 }

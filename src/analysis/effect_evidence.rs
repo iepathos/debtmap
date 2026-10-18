@@ -6,6 +6,7 @@
 use crate::priority::call_graph::FunctionId;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 /// An effect directly observed by a supported analysis or model.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -35,7 +36,7 @@ pub enum UnresolvedReason {
 /// Compact source identity shared by effects and uncertainty records.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct EffectProvenance {
-    pub owner: FunctionId,
+    pub owner: Arc<FunctionId>,
     pub line: usize,
     pub column: Option<usize>,
     pub identity: Option<String>,
@@ -43,9 +44,9 @@ pub struct EffectProvenance {
 }
 
 impl EffectProvenance {
-    pub fn source(owner: FunctionId, line: usize, column: Option<usize>) -> Self {
+    pub fn source(owner: impl Into<Arc<FunctionId>>, line: usize, column: Option<usize>) -> Self {
         Self {
-            owner,
+            owner: owner.into(),
             line,
             column,
             identity: None,
@@ -134,7 +135,7 @@ impl From<AssessmentRecords> for EffectAssessment {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 struct SourceKey {
-    owner: FunctionId,
+    owner: Arc<FunctionId>,
     line: usize,
     column: Option<usize>,
     identity: Option<String>,
@@ -279,7 +280,7 @@ impl EffectAssessment {
 
     pub(crate) fn remap_identities(&self, identity: impl Fn(&FunctionId) -> FunctionId) -> Self {
         let provenance = |source: &EffectProvenance| EffectProvenance {
-            owner: identity(&source.owner),
+            owner: Arc::new(identity(&source.owner)),
             line: source.line,
             column: source.column,
             identity: source.identity.clone(),

@@ -1,8 +1,10 @@
 //! Solidity-specific security and quality pattern detection.
 
+use crate::analyzers::syntax_tree::walk_nodes;
 use tree_sitter::Node;
 
 use crate::analyzers::solidity::parser::node_text;
+use crate::analyzers::syntax_tree::walk_nodes;
 use crate::config::SolidityLanguageConfig;
 
 const SENTINEL_ADDRESSES: [&str; 4] = [
@@ -312,9 +314,7 @@ fn call_arguments_text<'a>(node: Node, source: &'a str) -> Option<&'a str> {
 }
 
 fn has_unbounded_loop(function_node: Node, body: Node, source: &str) -> bool {
-    let storage_arrays = contract_ancestor(function_node)
-        .map(|contract| storage_dynamic_array_names(contract, source))
-        .unwrap_or_default();
+    let mut storage_arrays = None;
     let calldata_params = calldata_array_params(function_node, source);
     let mut found = false;
 
@@ -335,6 +335,11 @@ fn has_unbounded_loop(function_node: Node, body: Node, source: &str) -> bool {
             return;
         }
 
+        let storage_arrays = storage_arrays.get_or_insert_with(|| {
+            contract_ancestor(function_node)
+                .map(|contract| storage_dynamic_array_names(contract, source))
+                .unwrap_or_default()
+        });
         if storage_arrays.iter().any(|name| name == &target) {
             found = true;
         }
@@ -720,14 +725,6 @@ fn count_kind(node: Node, kind: &str) -> usize {
         count += count_kind(child, kind);
     }
     count
-}
-
-fn walk_nodes(node: Node, f: &mut impl FnMut(Node)) {
-    f(node);
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        walk_nodes(child, f);
-    }
 }
 
 #[cfg(test)]

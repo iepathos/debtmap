@@ -1,5 +1,6 @@
 //! NatSpec parsing and documentation quality checks for Solidity functions.
 
+use crate::analyzers::syntax_tree::walk_nodes;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
@@ -8,6 +9,7 @@ use tree_sitter::Node;
 use crate::analyzers::solidity::parser::{node_line, node_text};
 pub use crate::analyzers::solidity::types::SolidityFunctionSignature as FunctionSignature;
 use crate::analyzers::solidity::types::SolidityFunctionSignatures;
+use crate::analyzers::syntax_tree::walk_nodes;
 use crate::core::ast::SolidityAst;
 use crate::core::{DebtItem, DebtType, FunctionMetrics, Priority};
 
@@ -385,14 +387,6 @@ fn is_under_node(node: Node, ancestor: Option<Node>) -> bool {
         current = parent.parent();
     }
     false
-}
-
-fn walk_nodes(node: Node, visit: &mut impl FnMut(Node)) {
-    visit(node);
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        walk_nodes(child, visit);
-    }
 }
 
 fn debt_item_for_issue(path: &Path, function: &FunctionMetrics, issue: NatSpecIssue) -> DebtItem {

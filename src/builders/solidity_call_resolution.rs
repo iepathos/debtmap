@@ -1,21 +1,36 @@
 //! Conservative Solidity call resolution for the shared priority graph.
 
-use crate::analyzers::solidity::call_graph::{SolidityBatchSnapshot, compute_call_edges};
+use crate::analyzers::solidity::call_graph::{
+    SolidityBatchSnapshot, compute_call_edges_with, parse_snapshots,
+};
+use crate::core::ast::SolidityAst;
 use crate::core::{FunctionMetrics, Language};
 use crate::priority::CallGraph;
 use crate::priority::call_graph::{CallEdgeProvenance, CallType, FunctionId, ResolutionOutcome};
-use std::collections::HashMap;
+use rayon::prelude::*;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 pub(super) fn add_resolved_calls(graph: &mut CallGraph, metrics: &[FunctionMetrics]) {
-    add_framework_evidence(graph, metrics);
-    let functions = production_functions(metrics);
-    let edges = compute_call_edges(&snapshots(&functions));
+    let solidity: Vec<_> = metrics
+        .iter()
+        .filter(|metric| Language::from_path(&metric.file) == Language::Solidity)
+        .collect();
+    let sources = read_sources(&solidity);
+    add_framework_evidence(graph, &solidity, &sources);
+    let functions = production_functions(&solidity);
+    let snapshots = snapshots(&functions);
+    let asts = parse_snapshots(&snapshots);
+    let edges = compute_call_edges_with(&snapshots, &asts);
     let targets = target_index(&functions);
-    let imports = import_index(&functions);
+    let imports = import_index(&functions, &asts);
+    let callers = caller_index(&functions);
 
     for ((caller_file, caller_name), callees) in sorted_edges(edges) {
-        let Some(caller) = function_id_for(&functions, &caller_file, &caller_name) else {
+        let Some([caller]) = callers
+            .get(&(caller_file.clone(), caller_name))
+            .map(Vec::as_slice)
+        else {
             continue;
         };
         for callee in callees {
@@ -34,30 +49,58 @@ pub(super) fn add_resolved_calls(graph: &mut CallGraph, metrics: &[FunctionMetri
     }
 }
 
-fn add_framework_evidence(graph: &mut CallGraph, metrics: &[FunctionMetrics]) {
-    let mut sources = HashMap::new();
-    for metric in metrics
-        .iter()
-        .filter(|metric| Language::from_path(&metric.file) == Language::Solidity)
-    {
-        let source = sources
-            .entry(metric.file.clone())
-            .or_insert_with(|| std::fs::read_to_string(&metric.file).unwrap_or_default());
-        let evidence = crate::analysis::role_policy::framework_evidence_for_source(
-            Language::Solidity,
-            source,
-            &metric.name,
-        );
+fn read_sources(metrics: &[&FunctionMetrics]) -> HashMap<PathBuf, String> {
+    let files: HashSet<_> = metrics.iter().map(|metric| &metric.file).collect();
+    files
+        .into_par_iter()
+        .map(|file| {
+            (
+                file.clone(),
+                std::fs::read_to_string(file).unwrap_or_default(),
+            )
+        })
+        .collect()
+}
+
+fn add_framework_evidence(
+    graph: &mut CallGraph,
+    metrics: &[&FunctionMetrics],
+    sources: &HashMap<PathBuf, String>,
+) {
+    let evidence: Vec<_> = metrics
+        .par_iter()
+        .map(|metric| {
+            crate::analysis::role_policy::framework_evidence_for_source(
+                Language::Solidity,
+                sources
+                    .get(&metric.file)
+                    .map(String::as_str)
+                    .unwrap_or_default(),
+                &metric.name,
+            )
+        })
+        .collect();
+    for (metric, evidence) in metrics.iter().zip(evidence) {
         graph.add_role_evidence(&function_id(metric), evidence);
     }
 }
 
-fn production_functions(metrics: &[FunctionMetrics]) -> Vec<&FunctionMetrics> {
+fn production_functions<'a>(metrics: &[&'a FunctionMetrics]) -> Vec<&'a FunctionMetrics> {
     metrics
         .iter()
-        .filter(|metric| Language::from_path(&metric.file) == Language::Solidity)
+        .copied()
         .filter(|metric| crate::analysis::role_policy::roles_for_metric(metric).is_production())
         .collect()
+}
+
+fn caller_index(functions: &[&FunctionMetrics]) -> HashMap<(PathBuf, String), Vec<FunctionId>> {
+    functions.iter().fold(HashMap::new(), |mut index, metric| {
+        index
+            .entry((metric.file.clone(), metric.name.clone()))
+            .or_default()
+            .push(function_id(metric));
+        index
+    })
 }
 
 fn snapshots(functions: &[&FunctionMetrics]) -> Vec<SolidityBatchSnapshot> {
@@ -94,14 +137,17 @@ fn target_index(functions: &[&FunctionMetrics]) -> HashMap<String, Vec<FunctionI
     })
 }
 
-fn import_index(functions: &[&FunctionMetrics]) -> HashMap<PathBuf, Vec<PathBuf>> {
-    let files = unique_files(functions);
+fn import_index(
+    functions: &[&FunctionMetrics],
+    asts: &[SolidityAst],
+) -> HashMap<PathBuf, Vec<PathBuf>> {
     let resolver =
-        crate::analyzers::solidity::remappings::SolidityImportResolver::from_analyzed_files(&files);
-    files.into_iter().fold(HashMap::new(), |mut index, file| {
-        index.insert(file.clone(), imports_for_file(&file, &resolver));
-        index
-    })
+        crate::analyzers::solidity::remappings::SolidityImportResolver::from_analyzed_files(
+            &unique_files(functions),
+        );
+    asts.par_iter()
+        .map(|ast| (ast.path.clone(), imports_for_ast(ast, &resolver)))
+        .collect()
 }
 
 fn unique_files(functions: &[&FunctionMetrics]) -> Vec<PathBuf> {
@@ -114,20 +160,14 @@ fn unique_files(functions: &[&FunctionMetrics]) -> Vec<PathBuf> {
     files
 }
 
-fn imports_for_file(
-    file: &Path,
+fn imports_for_ast(
+    ast: &SolidityAst,
     resolver: &crate::analyzers::solidity::remappings::SolidityImportResolver,
 ) -> Vec<PathBuf> {
-    let Ok(source) = std::fs::read_to_string(file) else {
-        return Vec::new();
-    };
-    let Ok(ast) = crate::analyzers::solidity::parser::parse_source(&source, file) else {
-        return Vec::new();
-    };
-    crate::analyzers::solidity::dependencies::extract_dependencies(&ast)
+    crate::analyzers::solidity::dependencies::extract_dependencies(ast)
         .into_iter()
         .filter(|dependency| dependency.kind == crate::core::DependencyKind::Import)
-        .map(|dependency| PathBuf::from(resolver.resolve(&dependency.name, file)))
+        .map(|dependency| PathBuf::from(resolver.resolve(&dependency.name, &ast.path)))
         .collect()
 }
 
@@ -137,22 +177,6 @@ fn sorted_edges(
     let mut edges: Vec<_> = edges.into_iter().collect();
     edges.sort_by(|left, right| left.0.cmp(&right.0));
     edges
-}
-
-fn function_id_for(
-    functions: &[&FunctionMetrics],
-    file: &PathBuf,
-    name: &str,
-) -> Option<FunctionId> {
-    let candidates: Vec<_> = functions
-        .iter()
-        .filter(|metric| metric.file == *file && metric.name == name)
-        .map(|metric| function_id(metric))
-        .collect();
-    match candidates.as_slice() {
-        [candidate] => Some(candidate.clone()),
-        _ => None,
-    }
 }
 
 fn resolution(

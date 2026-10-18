@@ -1,5 +1,7 @@
 use tree_sitter::Node;
 
+pub use crate::analyzers::syntax_tree::{children, function_length};
+
 use crate::analyzers::solidity::parser::node_text;
 
 pub fn cyclomatic_complexity(node: Node, source: &str) -> u32 {
@@ -48,10 +50,6 @@ pub fn max_nesting(node: Node, depth: u32) -> u32 {
         .unwrap_or(next_depth);
 
     next_depth.max(child_max)
-}
-
-pub fn function_length(node: Node) -> usize {
-    node.end_position().row + 1 - node.start_position().row
 }
 
 fn branch_complexity(node: Node, source: &str) -> u32 {
@@ -148,11 +146,6 @@ fn child_sum_with_depth(node: Node, source: &str, depth: u32) -> u32 {
         .into_iter()
         .map(|child| cognitive_complexity(child, source, depth))
         .sum()
-}
-
-fn children(node: Node) -> Vec<Node> {
-    let mut cursor = node.walk();
-    node.children(&mut cursor).collect()
 }
 
 #[cfg(test)]

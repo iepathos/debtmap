@@ -131,7 +131,6 @@ mod tests {
 
     fn create_test_analysis() -> UnifiedAnalysis {
         use crate::data_flow::DataFlowGraph;
-        use crate::priority::call_graph::CallGraph;
 
         use crate::collections::Vector;
 
@@ -232,7 +231,7 @@ mod tests {
             total_debt_score: 0.0,
             debt_density: 0.0,
             total_lines_of_code: 0,
-            call_graph: CallGraph::new(),
+            call_graph: Default::default(),
             data_flow_graph: DataFlowGraph::new(),
             overall_coverage: None,
             has_coverage_data: false,
