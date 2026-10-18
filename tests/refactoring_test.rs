@@ -37,6 +37,7 @@ fn create_test_function(name: &str, cyclomatic: u32, cognitive: u32) -> Function
 
 fn create_test_file() -> FileMetrics {
     FileMetrics {
+        js_facts: None,
         path: PathBuf::from("test.rs"),
         language: debtmap::core::Language::Rust,
         complexity: debtmap::core::ComplexityMetrics::default(),

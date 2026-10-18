@@ -285,7 +285,7 @@ fn output_unified_priorities_with_summary_and_receipt(
     show_filter_stats: bool,
     analysis_receipt: Option<unified::AnalysisReceipt>,
 ) -> Result<()> {
-    match output_format {
+    let result = match output_format {
         Some(crate::cli::OutputFormat::Json) => {
             let include_scoring_details = verbosity >= 2;
             json::output_json_with_format_and_receipt(
@@ -335,7 +335,9 @@ fn output_unified_priorities_with_summary_and_receipt(
                 )
             }
         }
-    }
+    };
+    crate::utils::drop_in_background(analysis);
+    result
 }
 
 fn is_markdown_file(output_file: &Option<PathBuf>) -> bool {

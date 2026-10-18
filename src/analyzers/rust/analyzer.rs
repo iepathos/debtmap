@@ -108,6 +108,7 @@ impl Analyzer for RustAnalyzer {
                 result
             }
             _ => FileMetrics {
+                js_facts: None,
                 path: PathBuf::new(),
                 language: Language::Rust,
                 complexity: ComplexityMetrics::default(),

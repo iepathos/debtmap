@@ -1,10 +1,13 @@
 //! Core types and data structures for call graph representation
 
-use crate::collections::{HashMap, HashSet, Vector};
+use crate::collections::Vector;
 use crate::core::Language;
+use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use serde::{Deserialize, Deserializer, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Component, Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
+use std::sync::{Arc, RwLock};
 
 /// Stable cross-language function identity. Source line is intentionally absent.
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -18,7 +21,7 @@ pub struct CanonicalSymbolKey {
 }
 
 /// Unique identifier for a function in the codebase
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FunctionId {
     pub file: PathBuf,
     pub name: String,
@@ -32,9 +35,12 @@ pub struct FunctionId {
 
 impl Ord for FunctionId {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.file
-            .cmp(&other.file)
-            .then_with(|| self.line.cmp(&other.line))
+        let file = if self.file.as_os_str() == other.file.as_os_str() {
+            std::cmp::Ordering::Equal
+        } else {
+            self.file.cmp(&other.file)
+        };
+        file.then_with(|| self.line.cmp(&other.line))
             .then_with(|| self.column.cmp(&other.column))
             .then_with(|| self.name.cmp(&other.name))
             .then_with(|| self.module_path.cmp(&other.module_path))
@@ -44,6 +50,18 @@ impl Ord for FunctionId {
 impl PartialOrd for FunctionId {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
+    }
+}
+
+/// Hashes only the file name: hashing a whole `Path` parses every component,
+/// and equal paths always share their last component.
+impl std::hash::Hash for FunctionId {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.file.file_name().hash(state);
+        self.name.hash(state);
+        self.line.hash(state);
+        self.column.hash(state);
+        self.module_path.hash(state);
     }
 }
 
@@ -125,9 +143,19 @@ impl FunctionId {
 
     /// Canonicalize file path for consistent matching
     pub fn canonicalize_path(path: &Path) -> PathBuf {
-        // Try to canonicalize the path, but if it fails (e.g., file doesn't exist),
-        // just use the path as-is
-        path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
+        // Only successes are cached, so a file created later still canonicalizes.
+        static CANONICAL: once_cell::sync::Lazy<dashmap::DashMap<PathBuf, PathBuf>> =
+            once_cell::sync::Lazy::new(dashmap::DashMap::new);
+        if let Some(canonical) = CANONICAL.get(path) {
+            return canonical.clone();
+        }
+        match path.canonicalize() {
+            Ok(canonical) => {
+                CANONICAL.insert(path.to_path_buf(), canonical.clone());
+                canonical
+            }
+            Err(_) => path.to_path_buf(),
+        }
     }
 }
 
@@ -293,7 +321,7 @@ pub struct CallGraph {
     #[serde(default)]
     pub(crate) edge_evidence: Vector<CallEdgeEvidence>,
     #[serde(default)]
-    pub(crate) uncertain_calls: Vector<UncertainCall>,
+    pub(crate) uncertain_calls: BTreeSet<UncertainCall>,
     #[serde(default, with = "function_id_btree_map")]
     pub(crate) effect_assessments:
         BTreeMap<FunctionId, crate::analysis::effect_evidence::EffectAssessment>,
@@ -314,9 +342,72 @@ pub struct CallGraph {
 
     // Fuzzy matching indexes (not serialized - rebuilt on load)
     #[serde(skip)]
-    pub(crate) fuzzy_index: std::collections::HashMap<FuzzyFunctionKey, Vec<FunctionId>>,
+    pub(crate) fuzzy_index: HashMap<FuzzyFunctionKey, Vec<FunctionId>>,
     #[serde(skip)]
-    pub(crate) name_index: std::collections::HashMap<String, Vec<FunctionId>>,
+    pub(crate) name_index: HashMap<String, Vec<FunctionId>>,
+    /// Sorted function ids. Built on first read and cleared when a new id is inserted.
+    #[serde(skip)]
+    ordered_ids: OrderedFunctionIds,
+    /// Internal and external call counts keyed by caller file.
+    #[serde(skip)]
+    caller_file_counts: CallerFileCallCounts,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct FileCallCounts {
+    internal: usize,
+    external: usize,
+}
+
+/// Built on first read. `ready` skips the lock while the cache is empty.
+#[derive(Debug)]
+struct CallerFileCallCounts {
+    ready: AtomicBool,
+    counts: RwLock<Option<Arc<HashMap<PathBuf, FileCallCounts>>>>,
+}
+
+/// Shared sorted ids. Readers during parallel analysis only hold `&CallGraph`.
+#[derive(Debug)]
+struct OrderedFunctionIds(std::sync::RwLock<Option<std::sync::Arc<Vec<FunctionId>>>>);
+
+impl Clone for OrderedFunctionIds {
+    fn clone(&self) -> Self {
+        let ids = self
+            .0
+            .read()
+            .unwrap_or_else(|error| error.into_inner())
+            .clone();
+        Self(std::sync::RwLock::new(ids))
+    }
+}
+
+impl Default for OrderedFunctionIds {
+    fn default() -> Self {
+        Self(std::sync::RwLock::new(None))
+    }
+}
+
+impl Clone for CallerFileCallCounts {
+    fn clone(&self) -> Self {
+        let counts = self
+            .counts
+            .read()
+            .unwrap_or_else(|error| error.into_inner())
+            .clone();
+        Self {
+            ready: AtomicBool::new(counts.is_some()),
+            counts: RwLock::new(counts),
+        }
+    }
+}
+
+impl Default for CallerFileCallCounts {
+    fn default() -> Self {
+        Self {
+            ready: AtomicBool::new(false),
+            counts: RwLock::new(None),
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -429,10 +520,7 @@ mod function_id_map {
         Legacy(StdHashMap<String, V>),
     }
 
-    pub fn serialize<S, V>(
-        map: &crate::collections::HashMap<FunctionId, V>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
+    pub fn serialize<S, V>(map: &HashMap<FunctionId, V>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
         V: Serialize,
@@ -440,9 +528,7 @@ mod function_id_map {
         map.iter().collect::<Vec<_>>().serialize(serializer)
     }
 
-    pub fn deserialize<'de, D, V>(
-        deserializer: D,
-    ) -> Result<crate::collections::HashMap<FunctionId, V>, D::Error>
+    pub fn deserialize<'de, D, V>(deserializer: D) -> Result<HashMap<FunctionId, V>, D::Error>
     where
         D: Deserializer<'de>,
         V: Deserialize<'de>,
@@ -457,9 +543,7 @@ mod function_id_map {
         }
     }
 
-    fn deserialize_legacy<V>(
-        entries: StdHashMap<String, V>,
-    ) -> crate::collections::HashMap<FunctionId, V> {
+    fn deserialize_legacy<V>(entries: StdHashMap<String, V>) -> HashMap<FunctionId, V> {
         entries
             .into_iter()
             .filter_map(|(key, value)| legacy_function_id(&key).map(|id| (id, value)))
@@ -515,7 +599,7 @@ impl CallGraph {
             nodes: HashMap::new(),
             edges: Vector::new(),
             edge_evidence: Vector::new(),
-            uncertain_calls: Vector::new(),
+            uncertain_calls: BTreeSet::new(),
             effect_assessments: BTreeMap::new(),
             effect_assessments_propagated: false,
             possible_caller_index: HashMap::new(),
@@ -524,9 +608,115 @@ impl CallGraph {
             evidence_set: HashSet::new(),
             caller_index: HashMap::new(),
             callee_index: HashMap::new(),
-            fuzzy_index: std::collections::HashMap::new(),
-            name_index: std::collections::HashMap::new(),
+            fuzzy_index: HashMap::new(),
+            name_index: HashMap::new(),
+            ordered_ids: OrderedFunctionIds::default(),
+            caller_file_counts: CallerFileCallCounts::default(),
         }
+    }
+
+    /// Calls whose caller is in `file`: `(internal, external)`.
+    pub(crate) fn calls_from_file(&self, file: &Path) -> (usize, usize) {
+        self.caller_file_call_counts()
+            .get(file)
+            .map(|counts| (counts.internal, counts.external))
+            .unwrap_or((0, 0))
+    }
+
+    fn caller_file_call_counts(&self) -> Arc<HashMap<PathBuf, FileCallCounts>> {
+        if let Some(counts) = self.cached_caller_file_counts() {
+            return counts;
+        }
+        self.store_caller_file_counts()
+    }
+
+    fn cached_caller_file_counts(&self) -> Option<Arc<HashMap<PathBuf, FileCallCounts>>> {
+        self.caller_file_counts
+            .ready
+            .load(AtomicOrdering::Relaxed)
+            .then(|| {
+                self.caller_file_counts
+                    .counts
+                    .read()
+                    .unwrap_or_else(|error| error.into_inner())
+                    .as_ref()
+                    .cloned()
+            })
+            .flatten()
+    }
+
+    fn store_caller_file_counts(&self) -> Arc<HashMap<PathBuf, FileCallCounts>> {
+        let counts = Arc::new(count_calls_by_caller_file(&self.edges));
+        let mut guard = self
+            .caller_file_counts
+            .counts
+            .write()
+            .unwrap_or_else(|error| error.into_inner());
+        if let Some(existing) = guard.as_ref() {
+            self.caller_file_counts
+                .ready
+                .store(true, AtomicOrdering::Relaxed);
+            return Arc::clone(existing);
+        }
+        *guard = Some(Arc::clone(&counts));
+        self.caller_file_counts
+            .ready
+            .store(true, AtomicOrdering::Relaxed);
+        counts
+    }
+
+    pub(crate) fn invalidate_caller_file_counts(&mut self) {
+        if self
+            .caller_file_counts
+            .ready
+            .swap(false, AtomicOrdering::Relaxed)
+        {
+            *self
+                .caller_file_counts
+                .counts
+                .write()
+                .unwrap_or_else(|error| error.into_inner()) = None;
+        }
+    }
+
+    pub(crate) fn ordered_function_ids(&self) -> std::sync::Arc<Vec<FunctionId>> {
+        if let Some(ids) = self.cached_function_ids() {
+            return ids;
+        }
+        self.store_ordered_function_ids()
+    }
+
+    fn cached_function_ids(&self) -> Option<std::sync::Arc<Vec<FunctionId>>> {
+        self.ordered_ids
+            .0
+            .read()
+            .unwrap_or_else(|error| error.into_inner())
+            .as_ref()
+            .cloned()
+    }
+
+    fn store_ordered_function_ids(&self) -> std::sync::Arc<Vec<FunctionId>> {
+        let mut guard = self
+            .ordered_ids
+            .0
+            .write()
+            .unwrap_or_else(|error| error.into_inner());
+        if let Some(ids) = guard.as_ref() {
+            return std::sync::Arc::clone(ids);
+        }
+        let mut ids: Vec<_> = self.nodes.keys().cloned().collect();
+        ids.sort();
+        let ids = std::sync::Arc::new(ids);
+        *guard = Some(std::sync::Arc::clone(&ids));
+        ids
+    }
+
+    pub(crate) fn invalidate_ordered_function_ids(&mut self) {
+        *self
+            .ordered_ids
+            .0
+            .write()
+            .unwrap_or_else(|error| error.into_inner()) = None;
     }
 
     fn rebuild_lookup_indexes(&mut self) {
@@ -546,6 +736,22 @@ impl CallGraph {
         for candidates in self.name_index.values_mut() {
             candidates.sort();
         }
+    }
+}
+
+fn count_calls_by_caller_file(edges: &Vector<FunctionCall>) -> HashMap<PathBuf, FileCallCounts> {
+    edges.iter().fold(HashMap::new(), |mut counts, call| {
+        record_caller_file(&mut counts, call);
+        counts
+    })
+}
+
+fn record_caller_file(counts: &mut HashMap<PathBuf, FileCallCounts>, call: &FunctionCall) {
+    let entry = counts.entry(call.caller.file.clone()).or_default();
+    if call.caller.file == call.callee.file {
+        entry.internal += 1;
+    } else {
+        entry.external += 1;
     }
 }
 

@@ -27,6 +27,7 @@ pub fn build_file_metrics(
         crate::analysis::role_policy::estimate_test_lines(&path, language, &functions, total_lines);
 
     FileMetrics {
+        js_facts: None,
         path,
         language,
         complexity: ComplexityMetrics {

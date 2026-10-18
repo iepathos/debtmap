@@ -89,6 +89,7 @@ pub fn analyze_file_directly(file_path: &Path) -> Result<AnalysisResults> {
 
     // Create AnalysisResults
     Ok(AnalysisResults {
+        js_facts: Default::default(),
         project_path: file_path.parent().unwrap_or(Path::new(".")).to_path_buf(),
         timestamp: Utc::now(),
         complexity: complexity_report,

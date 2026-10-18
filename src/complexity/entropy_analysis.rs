@@ -24,21 +24,35 @@ pub fn detect_repetitive_sequences<T: EntropyToken>(
     tokens: &[T],
     window_size: usize,
 ) -> HashMap<TokenPattern, usize> {
-    let mut pattern_counts = HashMap::new();
-
-    if tokens.len() < window_size {
-        return pattern_counts;
+    if window_size == 0 || tokens.len() < window_size {
+        return HashMap::new();
     }
-
-    for i in 0..=tokens.len() - window_size {
-        let window = &tokens[i..i + window_size];
-        let pattern = TokenPattern::from_tokens(window);
-        *pattern_counts.entry(pattern).or_insert(0) += 1;
+    let ids = token_ids(tokens);
+    // Count by first occurrence so only repeated windows build a pattern.
+    let mut counts = foldhash::HashMap::<&[u32], (usize, usize)>::default();
+    for (start, window) in ids.windows(window_size).enumerate() {
+        counts.entry(window).or_insert((0, start)).0 += 1;
     }
+    counts
+        .into_values()
+        .filter(|&(count, _)| count > 1)
+        .map(|(count, start)| {
+            let pattern = TokenPattern::from_tokens(&tokens[start..start + window_size]);
+            (pattern, count)
+        })
+        .collect()
+}
 
-    // Filter out patterns that appear only once
-    pattern_counts.retain(|_, &mut count| count > 1);
-    pattern_counts
+/// Numbers tokens so equal values share an id.
+fn token_ids<T: EntropyToken>(tokens: &[T]) -> Vec<u32> {
+    let mut ids = foldhash::HashMap::<&str, u32>::default();
+    tokens
+        .iter()
+        .map(|token| {
+            let next = ids.len() as u32;
+            *ids.entry(token.value()).or_insert(next)
+        })
+        .collect()
 }
 
 /// Calculate repetition score based on detected patterns

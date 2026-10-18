@@ -98,6 +98,7 @@ pub fn limit_results(metrics: FileMetrics, limit: usize) -> FileMetrics {
 pub fn combine_file_metrics(metrics: Vec<FileMetrics>) -> FileMetrics {
     metrics.into_iter().fold(
         FileMetrics {
+            js_facts: None,
             path: std::path::PathBuf::new(),
             language: crate::core::Language::Unknown,
             complexity: ComplexityMetrics {
@@ -263,6 +264,7 @@ mod tests {
             .collect();
 
         FileMetrics {
+            js_facts: None,
             path: PathBuf::from(path),
             language: crate::core::Language::Rust,
             complexity: ComplexityMetrics {

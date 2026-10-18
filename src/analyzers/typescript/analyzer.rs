@@ -138,6 +138,7 @@ impl Analyzer for TypeScriptAnalyzer {
                 result
             }
             _ => FileMetrics {
+                js_facts: None,
                 path: PathBuf::new(),
                 language: self.language,
                 complexity: ComplexityMetrics::default(),

@@ -72,6 +72,7 @@ impl Analyzer for GoAnalyzer {
 
 fn empty_go_metrics() -> FileMetrics {
     FileMetrics {
+        js_facts: None,
         path: PathBuf::new(),
         language: Language::Go,
         complexity: ComplexityMetrics::default(),

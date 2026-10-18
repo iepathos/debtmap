@@ -48,6 +48,7 @@ pub mod signature_extractor;
 pub mod solidity;
 pub mod state_field_detector;
 pub mod state_machine_pattern_detector;
+pub mod syntax_tree;
 pub mod test_detector;
 pub mod trait_implementation_tracker;
 pub mod trait_resolver;
@@ -176,6 +177,7 @@ impl Analyzer for NullAnalyzer {
 
     fn analyze(&self, _ast: &Ast) -> FileMetrics {
         FileMetrics {
+            js_facts: None,
             path: std::path::PathBuf::new(),
             language: crate::core::Language::Unknown,
             complexity: crate::core::ComplexityMetrics::default(),
@@ -241,6 +243,7 @@ mod tests {
     #[test]
     fn test_apply_filters() {
         let metrics = FileMetrics {
+            js_facts: None,
             path: PathBuf::from("test.rs"),
             language: crate::core::Language::Rust,
             complexity: crate::core::ComplexityMetrics::default(),
@@ -311,6 +314,7 @@ mod tests {
         let parsers: Vec<Parser> = vec![Box::new(|_| Ok(Ast::Unknown))];
         let transformers: Vec<Transformer> = vec![Box::new(|ast| ast)];
         let calculators: Vec<Calculator> = vec![Box::new(|_| FileMetrics {
+            js_facts: None,
             path: PathBuf::from("test.rs"),
             language: crate::core::Language::Rust,
             complexity: crate::core::ComplexityMetrics::default(),

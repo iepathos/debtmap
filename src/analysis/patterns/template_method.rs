@@ -222,6 +222,7 @@ mod tests {
     fn test_detect_template_method_pattern() {
         let recognizer = TemplateMethodPatternRecognizer::new();
         let file_metrics = FileMetrics {
+            js_facts: None,
             path: PathBuf::from("processor.py"),
             language: Language::Python,
             complexity: ComplexityMetrics::default(),
@@ -247,6 +248,7 @@ mod tests {
     fn test_is_function_used_by_pattern() {
         let recognizer = TemplateMethodPatternRecognizer::new();
         let file_metrics = FileMetrics {
+            js_facts: None,
             path: PathBuf::from("processor.py"),
             language: Language::Python,
             complexity: ComplexityMetrics::default(),

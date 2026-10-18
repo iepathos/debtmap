@@ -1,3 +1,4 @@
+use crate::analyzers::typescript::orchestration::JsFileFacts;
 use crate::{
     builders::parallel_call_graph::{CallGraphPhase, CallGraphProgress},
     config,
@@ -6,8 +7,10 @@ use crate::{
     io, priority,
 };
 use anyhow::{Context, Result};
-use std::collections::HashSet;
+use rayon::prelude::*;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 pub fn build_initial_call_graph(metrics: &[FunctionMetrics]) -> priority::CallGraph {
     let mut call_graph = priority::CallGraph::new();
@@ -141,9 +144,12 @@ pub fn process_typescript_files_for_call_graph(
     project_path: &Path,
     call_graph: &mut priority::CallGraph,
     js_ts_files: Option<&[PathBuf]>,
+    facts: &HashMap<PathBuf, Arc<JsFileFacts>>,
 ) -> Result<()> {
     use crate::analyzers::typescript::parser::parse_source;
-    use crate::analyzers::typescript::project_call_graph::extract_project_call_graph;
+    use crate::analyzers::typescript::project_call_graph::{
+        ModuleCallFacts, extract_project_call_graph,
+    };
     use crate::core::ast::JsLanguageVariant;
 
     // Discover or use provided files
@@ -165,36 +171,35 @@ pub fn process_typescript_files_for_call_graph(
 
     log::info!("Processing {} JS/TS files for call graph", files.len());
 
-    let mut asts = Vec::new();
-    for file_path in &files {
-        // Read file content
-        let content = match io::read_file(file_path) {
-            Ok(c) => c,
-            Err(e) => {
-                log::debug!("Failed to read file {:?}: {}", file_path, e);
-                continue;
-            }
-        };
-
-        // Determine language variant from extension
+    let parse = |file_path: &PathBuf| {
+        let content = io::read_file(file_path)
+            .map_err(|e| log::debug!("Failed to read file {:?}: {}", file_path, e))
+            .ok()?;
         let variant = match file_path.extension().and_then(|e| e.to_str()) {
             Some("ts" | "tsx" | "mts" | "cts") => JsLanguageVariant::TypeScript,
             Some("jsx") => JsLanguageVariant::Jsx,
             _ => JsLanguageVariant::JavaScript,
         };
-
-        // Parse the file
-        let ast = match parse_source(&content, file_path, variant) {
-            Ok(ast) => ast,
-            Err(e) => {
-                log::debug!("Failed to parse {:?}: {}", file_path, e);
-                continue;
-            }
-        };
-
-        asts.push(ast);
-    }
-    call_graph.merge(extract_project_call_graph(&asts));
+        parse_source(&content, file_path, variant)
+            .map_err(|e| log::debug!("Failed to parse {:?}: {}", file_path, e))
+            .ok()
+            .map(|ast| ModuleCallFacts::from_ast(&ast))
+    };
+    let parsed: HashMap<_, _> = files
+        .par_iter()
+        .filter(|path| !facts.contains_key(*path))
+        .filter_map(|path| Some((path, parse(path)?)))
+        .collect();
+    let modules: Vec<_> = files
+        .iter()
+        .filter_map(|path| {
+            facts
+                .get(path)
+                .map(|f| &f.call_graph)
+                .or_else(|| parsed.get(path))
+        })
+        .collect();
+    call_graph.merge(extract_project_call_graph(&modules));
 
     log::info!(
         "Merged JS/TS call graph: {} total functions",

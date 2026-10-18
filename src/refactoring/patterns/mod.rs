@@ -579,6 +579,7 @@ mod tests {
 
     fn create_test_file() -> FileMetrics {
         FileMetrics {
+            js_facts: None,
             path: PathBuf::from("test.rs"),
             language: Language::Rust,
             complexity: ComplexityMetrics {

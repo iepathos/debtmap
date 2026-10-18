@@ -5,7 +5,7 @@
 use crate::core::ast::PythonAst;
 use anyhow::{Context, Result};
 use std::path::Path;
-use tree_sitter::{Language as TsLanguage, Parser, Tree};
+use tree_sitter::{Language as TsLanguage, Parser};
 
 /// Get the tree-sitter language for Python
 fn get_language() -> TsLanguage {
@@ -36,27 +36,9 @@ pub fn parse_source(content: &str, path: &Path) -> Result<PythonAst> {
     })
 }
 
-/// Check if a parse tree has errors
-pub fn has_parse_errors(tree: &Tree) -> bool {
-    tree.root_node().has_error()
-}
+pub use crate::analyzers::syntax_tree::has_parse_errors;
 
-/// Get text for a tree-sitter node
-pub fn node_text<'a>(node: &tree_sitter::Node, source: &'a str) -> &'a str {
-    let start = node.start_byte();
-    let end = node.end_byte();
-    &source[start..end]
-}
-
-/// Get the line number for a tree-sitter node (1-indexed)
-pub fn node_line(node: &tree_sitter::Node) -> usize {
-    node.start_position().row + 1
-}
-
-/// Get the column number for a tree-sitter node (1-indexed)
-pub fn node_column(node: &tree_sitter::Node) -> usize {
-    node.start_position().column + 1
-}
+pub use crate::analyzers::syntax_tree::{node_column, node_line, node_text};
 
 #[cfg(test)]
 mod tests {

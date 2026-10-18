@@ -306,6 +306,7 @@ mod tests {
         }];
 
         AnalysisResults {
+            js_facts: Default::default(),
             project_path: PathBuf::from("/test/project"),
             timestamp: Utc::now(),
             complexity: ComplexityReport {

@@ -383,6 +383,7 @@ vendor_code = "suppress_debt"
     fn file_metrics(path: &str, language: Language) -> FileMetrics {
         let path = std::path::PathBuf::from(path);
         FileMetrics {
+            js_facts: None,
             path: path.clone(),
             language,
             complexity: Default::default(),
@@ -468,6 +469,7 @@ vendor_code = "suppress_debt"
             },
         ];
         let metrics = FileMetrics {
+            js_facts: None,
             path,
             language: Language::Go,
             complexity: Default::default(),

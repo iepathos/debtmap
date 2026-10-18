@@ -6,6 +6,7 @@ use std::path::PathBuf;
 #[test]
 fn test_output_json_format() {
     let results = AnalysisResults {
+        js_facts: Default::default(),
         project_path: PathBuf::from("/test/project"),
         timestamp: Utc::now(),
         complexity: ComplexityReport {
@@ -82,6 +83,7 @@ fn test_output_json_format() {
 #[test]
 fn test_output_markdown_format() {
     let results = AnalysisResults {
+        js_facts: Default::default(),
         project_path: PathBuf::from("/test/project"),
         timestamp: Utc::now(),
         complexity: ComplexityReport {

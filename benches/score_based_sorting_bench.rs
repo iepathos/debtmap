@@ -5,7 +5,6 @@
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use debtmap::data_flow::DataFlowGraph;
-use debtmap::priority::call_graph::CallGraph;
 use debtmap::priority::filter_predicates::FilterStatistics;
 use debtmap::priority::scoring::scaling::{ScalingConfig, calculate_final_score};
 use debtmap::priority::semantic_classifier::FunctionRole;
@@ -181,7 +180,7 @@ fn bench_sorting_various_sizes(c: &mut Criterion) {
             total_debt_score: 0.0,
             debt_density: 0.0,
             total_lines_of_code: 0,
-            call_graph: CallGraph::new(),
+            call_graph: Default::default(),
             data_flow_graph: DataFlowGraph::new(),
             overall_coverage: None,
             has_coverage_data: false,
@@ -247,7 +246,7 @@ fn bench_worst_case_sorting(c: &mut Criterion) {
         total_debt_score: 0.0,
         debt_density: 0.0,
         total_lines_of_code: 0,
-        call_graph: CallGraph::new(),
+        call_graph: Default::default(),
         data_flow_graph: DataFlowGraph::new(),
         overall_coverage: None,
         has_coverage_data: false,
@@ -315,7 +314,7 @@ fn bench_mixed_debt_types(c: &mut Criterion) {
         total_debt_score: 0.0,
         debt_density: 0.0,
         total_lines_of_code: 0,
-        call_graph: CallGraph::new(),
+        call_graph: Default::default(),
         data_flow_graph: DataFlowGraph::new(),
         overall_coverage: None,
         has_coverage_data: false,
@@ -372,7 +371,7 @@ fn bench_with_risk_boosts(c: &mut Criterion) {
         total_debt_score: 0.0,
         debt_density: 0.0,
         total_lines_of_code: 0,
-        call_graph: CallGraph::new(),
+        call_graph: Default::default(),
         data_flow_graph: DataFlowGraph::new(),
         overall_coverage: None,
         has_coverage_data: false,

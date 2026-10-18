@@ -158,6 +158,7 @@ pub fn perform_unified_analysis_with_options(
         parallel: options.parallel,
         jobs: options.jobs,
         extracted_data: options.extracted_data,
+        js_facts: options.results.js_facts.clone(),
         reference_time: options.reference_time,
     });
     result.suppression_audit = result
@@ -270,7 +271,7 @@ fn build_extracted_call_graph(
 ) -> (HashSet<FunctionId>, HashSet<FunctionId>) {
     info!("Building call graph from extracted data (spec 214)");
     let (graph, exclusions, fn_pointers) =
-        parallel_call_graph::build_call_graph_from_extracted(call_graph.clone(), extracted);
+        parallel_call_graph::build_call_graph_from_extracted(std::mem::take(call_graph), extracted);
     *call_graph = graph;
     (exclusions, fn_pointers)
 }
@@ -296,6 +297,7 @@ fn process_js_ts_call_graph(
         project_path,
         call_graph,
         Some(&js_ts_files),
+        &results.js_facts,
     ) {
         warn!("Failed to process TypeScript call graph: {}", e);
     }
@@ -445,6 +447,10 @@ struct DebtScoringOptions<'a> {
     jobs: usize,
     extracted_data:
         Option<std::collections::HashMap<PathBuf, crate::extraction::ExtractedFileData>>,
+    js_facts: std::collections::HashMap<
+        PathBuf,
+        std::sync::Arc<crate::analyzers::typescript::orchestration::JsFileFacts>,
+    >,
     reference_time: chrono::DateTime<chrono::Utc>,
 }
 
@@ -472,6 +478,7 @@ fn run_debt_scoring_stage(options: DebtScoringOptions<'_>) -> UnifiedAnalysis {
             options.parallel,
             options.jobs,
             options.extracted_data,
+            options.js_facts,
             options.reference_time,
         );
         debug!(
@@ -520,6 +527,7 @@ pub fn create_unified_analysis_with_exclusions(
         false,
         0,
         None, // Compatibility path uses metric facts without hidden source I/O
+        Default::default(),
         reference_time,
     )
 }
@@ -547,6 +555,10 @@ fn create_unified_analysis_with_exclusions_and_timing(
     extracted_data: Option<
         std::collections::HashMap<PathBuf, crate::extraction::ExtractedFileData>,
     >,
+    js_facts: std::collections::HashMap<
+        PathBuf,
+        std::sync::Arc<crate::analyzers::typescript::orchestration::JsFileFacts>,
+    >,
     reference_time: chrono::DateTime<chrono::Utc>,
 ) -> UnifiedAnalysis {
     create_scheduled_analysis(
@@ -564,6 +576,7 @@ fn create_unified_analysis_with_exclusions_and_timing(
         risk_analyzer,
         project_path,
         extracted_data,
+        js_facts,
         reference_time,
     )
 }
@@ -585,6 +598,10 @@ fn create_scheduled_analysis(
     project_path: &Path,
     extracted_data: Option<
         std::collections::HashMap<PathBuf, crate::extraction::ExtractedFileData>,
+    >,
+    js_facts: std::collections::HashMap<
+        PathBuf,
+        std::sync::Arc<crate::analyzers::typescript::orchestration::JsFileFacts>,
     >,
     reference_time: chrono::DateTime<chrono::Utc>,
 ) -> UnifiedAnalysis {
@@ -612,6 +629,7 @@ fn create_scheduled_analysis(
             risk_analyzer,
             project_path,
             extracted_data,
+            js_facts,
             options,
         )
     })
@@ -655,6 +673,10 @@ fn execute_parallel_analysis(
     extracted_data: Option<
         std::collections::HashMap<PathBuf, crate::extraction::ExtractedFileData>,
     >,
+    js_facts: std::collections::HashMap<
+        PathBuf,
+        std::sync::Arc<crate::analyzers::typescript::orchestration::JsFileFacts>,
+    >,
     options: parallel_unified_analysis::ParallelUnifiedAnalysisOptions,
 ) -> UnifiedAnalysis {
     use parallel_unified_analysis::ParallelUnifiedAnalysisBuilder;
@@ -667,6 +689,7 @@ fn execute_parallel_analysis(
     if let Some(extracted) = extracted_data {
         builder = builder.with_extracted_data(extracted);
     }
+    builder = builder.with_js_facts(js_facts);
 
     if let Some(analyzer) = risk_analyzer {
         builder = builder.with_risk_analyzer(analyzer);
@@ -729,61 +752,36 @@ fn god_object_suppression_record(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
-pub(super) fn finalize_file_item_with_content(
-    unified: &mut UnifiedAnalysis,
-    mut file_item: crate::priority::FileDebtItem,
-    raw_functions: &[crate::core::FunctionMetrics],
-    coverage_data: Option<&risk::lcov::LcovData>,
-    risk_analyzer: Option<&risk::RiskAnalyzer>,
-    project_path: &Path,
-    call_graph: &CallGraph,
-    file_content: Option<&str>,
-) -> crate::priority::FileDebtItem {
-    let god_analysis = file_item
-        .metrics
-        .god_object_analysis
-        .clone()
-        .filter(|analysis| analysis.is_god_object);
-
-    if let Some(god_analysis) = god_analysis {
-        add_god_object_item(
-            unified,
-            &mut file_item,
-            &god_analysis,
-            raw_functions,
-            coverage_data,
-            risk_analyzer,
-            project_path,
-            call_graph,
-            file_content,
-        );
-    }
-
-    enrich_file_item_with_dependencies(file_item, &unified.items)
+pub(super) enum GodObjectPlan {
+    None,
+    Suppressed(AppliedSuppression),
+    Item(Box<(UnifiedDebtItem, crate::organization::GodObjectAnalysis)>),
 }
 
+/// Read-only god object work for one file. It reads only that file's items,
+/// so files can be planned in parallel and applied afterwards in file order.
 #[allow(clippy::too_many_arguments)]
-fn add_god_object_item(
-    unified: &mut UnifiedAnalysis,
-    file_item: &mut crate::priority::FileDebtItem,
-    god_analysis: &crate::organization::GodObjectAnalysis,
+pub(super) fn plan_god_object(
+    unified: &UnifiedAnalysis,
+    file_item: &crate::priority::FileDebtItem,
     raw_functions: &[crate::core::FunctionMetrics],
     coverage_data: Option<&risk::lcov::LcovData>,
     risk_analyzer: Option<&risk::RiskAnalyzer>,
     project_path: &Path,
     call_graph: &CallGraph,
     file_content: Option<&str>,
-) {
+) -> GodObjectPlan {
+    let Some(god_analysis) = file_item
+        .metrics
+        .god_object_analysis
+        .as_ref()
+        .filter(|analysis| analysis.is_god_object)
+    else {
+        return GodObjectPlan::None;
+    };
     if let Some(record) = god_object_suppression_for_file(file_item, god_analysis, file_content) {
-        unified.suppression_audit =
-            std::mem::take(&mut unified.suppression_audit).merged(SuppressionAudit {
-                applied: vec![record],
-            });
-        file_item.metrics.god_object_analysis = None;
-        return;
+        return GodObjectPlan::Suppressed(record);
     }
-
     let (god_item, enriched) = build_god_object_item(
         &file_item.metrics.path,
         &file_item.metrics,
@@ -795,14 +793,36 @@ fn add_god_object_item(
         unified,
         call_graph,
     );
+    GodObjectPlan::Item(Box::new((god_item, enriched)))
+}
 
-    for item in unified.items.iter_mut() {
-        if item.location.file == file_item.metrics.path {
-            item.god_object_indicators = Some(enriched.clone());
+pub(super) fn apply_god_object(
+    unified: &mut UnifiedAnalysis,
+    mut file_item: crate::priority::FileDebtItem,
+    plan: GodObjectPlan,
+) -> crate::priority::FileDebtItem {
+    match plan {
+        GodObjectPlan::None => {}
+        GodObjectPlan::Suppressed(record) => {
+            unified.suppression_audit =
+                std::mem::take(&mut unified.suppression_audit).merged(SuppressionAudit {
+                    applied: vec![record],
+                });
+            file_item.metrics.god_object_analysis = None;
+        }
+        GodObjectPlan::Item(plan) => {
+            let (god_item, enriched) = *plan;
+            for item in unified
+                .items
+                .iter_mut()
+                .filter(|item| item.location.file == file_item.metrics.path)
+            {
+                item.god_object_indicators = Some(enriched.clone());
+            }
+            unified.add_item(god_item);
         }
     }
-
-    unified.add_item(god_item);
+    enrich_file_item_with_dependencies(file_item, &unified.items)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1052,7 +1072,7 @@ fn build_call_graph_with_progress(
     let (graph, exclusions, used_funcs) =
         parallel_call_graph::build_call_graph_parallel_with_files(
             project_path,
-            call_graph.clone(),
+            std::mem::take(call_graph),
             thread_count,
             rust_files,
             |progress| {

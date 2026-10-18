@@ -70,6 +70,7 @@ impl Analyzer for SolidityAnalyzer {
 
 fn empty_solidity_metrics() -> FileMetrics {
     FileMetrics {
+        js_facts: None,
         path: PathBuf::new(),
         language: Language::Solidity,
         complexity: ComplexityMetrics::default(),

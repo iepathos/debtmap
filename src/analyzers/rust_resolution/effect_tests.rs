@@ -52,7 +52,7 @@ fn direct_calls_record_exact_project_dependencies() {
         let dependencies: Vec<_> = assessment.dependencies().collect();
         assert_eq!(dependencies.len(), 1);
         assert_eq!(dependencies[0].target, target);
-        assert_eq!(dependencies[0].provenance.owner, caller);
+        assert_eq!(*dependencies[0].provenance.owner, caller);
     }
 }
 

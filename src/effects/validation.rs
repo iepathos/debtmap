@@ -1675,6 +1675,7 @@ mod tests {
     fn create_test_file_metrics() -> FileMetrics {
         use crate::core::{ComplexityMetrics, Language};
         FileMetrics {
+            js_facts: None,
             path: std::path::PathBuf::from("test.rs"),
             language: Language::Rust,
             complexity: ComplexityMetrics::default(),

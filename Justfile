@@ -202,6 +202,10 @@ test-slow:
         test_context_aware_on_entire_codebase
     cargo nextest run --profile slow --run-ignored only --test ui_tests
 
+# Compare --jobs 1 and --jobs 2 reports on pinned open-source repositories (needs network)
+test-real-repos:
+    cargo nextest run --profile slow --run-ignored only --test real_repository_equivalence_test
+
 # Run bounded scale and timing tests
 test-stress:
     cargo nextest run --profile stress --run-ignored only --lib \

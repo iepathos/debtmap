@@ -7,68 +7,90 @@ use super::call_graph::{
 use super::module_links::{
     ImportBinding, ImportName, ReExport, extract_imports, extract_reexports,
 };
+use crate::analysis::role_policy::RoleEvidence;
 use crate::core::ast::TypeScriptAst;
 use crate::priority::call_graph::{
     CallEdgeProvenance, CallGraph, CallSite, CallType, FunctionId, ResolutionOutcome,
 };
+use rayon::prelude::*;
 use std::collections::HashSet;
 use std::path::{Component, Path, PathBuf};
 
+/// What project call resolution needs from one file, extracted while it is parsed.
 #[derive(Debug)]
-struct Module<'a> {
-    ast: &'a TypeScriptAst,
+pub struct ModuleCallFacts {
+    path: PathBuf,
     functions: Vec<FunctionWithCalls>,
+    /// Role evidence of each function, including framework registrations in the source.
+    evidence: Vec<RoleEvidence>,
     imports: Vec<ImportBinding>,
     reexports: Vec<ReExport>,
 }
 
-pub(crate) fn extract_project_call_graph(asts: &[TypeScriptAst]) -> CallGraph {
-    let modules = asts.iter().map(module_from_ast).collect::<Vec<_>>();
-    let mut graph = graph_with_functions(&modules);
-    for module in &modules {
-        add_module_edges(&mut graph, module, &modules);
+impl ModuleCallFacts {
+    pub fn from_ast(ast: &TypeScriptAst) -> Self {
+        let functions = extract_functions_with_calls(ast);
+        let evidence = functions
+            .iter()
+            .map(|function| function_evidence(function, &ast.source))
+            .collect();
+        Self {
+            path: ast.path.clone(),
+            functions,
+            evidence,
+            imports: extract_imports(ast),
+            reexports: extract_reexports(ast),
+        }
     }
-    graph
 }
 
-fn module_from_ast(ast: &TypeScriptAst) -> Module<'_> {
-    Module {
-        ast,
-        functions: extract_functions_with_calls(ast),
-        imports: extract_imports(ast),
-        reexports: extract_reexports(ast),
-    }
+fn function_evidence(function: &FunctionWithCalls, source: &str) -> RoleEvidence {
+    let framework = crate::analysis::role_policy::framework_evidence_for_source(
+        crate::core::Language::from_path(&function.file),
+        source,
+        &function.name,
+    );
+    crate::analysis::role_policy::merge_evidence(&function_role_evidence(function), &framework)
 }
 
-fn graph_with_functions(modules: &[Module<'_>]) -> CallGraph {
+pub(crate) fn extract_project_call_graph(modules: &[&ModuleCallFacts]) -> CallGraph {
+    let resolutions: Vec<_> = modules
+        .par_iter()
+        .map(|module| module_resolutions(module, modules))
+        .collect();
+    resolutions.into_iter().flatten().fold(
+        graph_with_functions(modules),
+        |mut graph, (caller, outcome)| {
+            graph.add_resolution(caller, CallType::Direct, outcome);
+            graph
+        },
+    )
+}
+
+fn graph_with_functions(modules: &[&ModuleCallFacts]) -> CallGraph {
     modules.iter().fold(CallGraph::new(), |mut graph, module| {
-        for function in &module.functions {
-            let framework = crate::analysis::role_policy::framework_evidence_for_source(
-                crate::core::Language::from_path(&function.file),
-                &module.ast.source,
-                &function.name,
-            );
-            let evidence = crate::analysis::role_policy::merge_evidence(
-                &function_role_evidence(function),
-                &framework,
-            );
-            graph.add_function_with_evidence(function_id(function), evidence, 1, 10);
+        for (function, evidence) in module.functions.iter().zip(&module.evidence) {
+            graph.add_function_with_evidence(function_id(function), evidence.clone(), 1, 10);
         }
         graph
     })
 }
 
-fn add_module_edges(graph: &mut CallGraph, module: &Module<'_>, modules: &[Module<'_>]) {
-    for caller in &module.functions {
-        let owner = caller.name.split_once("::").map(|(owner, _)| owner);
-        for call in sorted_calls(caller) {
-            graph.add_resolution(
-                function_id(caller),
-                CallType::Direct,
-                resolve_call(module, modules, &call, owner),
-            );
-        }
-    }
+fn module_resolutions(
+    module: &ModuleCallFacts,
+    modules: &[&ModuleCallFacts],
+) -> Vec<(FunctionId, ResolutionOutcome)> {
+    module
+        .functions
+        .iter()
+        .flat_map(|caller| {
+            let owner = caller.name.split_once("::").map(|(owner, _)| owner);
+            sorted_calls(caller).into_iter().map(move |call| {
+                let outcome = resolve_call(module, modules, &call, owner);
+                (function_id(caller), outcome)
+            })
+        })
+        .collect()
 }
 
 fn sorted_calls(caller: &FunctionWithCalls) -> Vec<ExtractedCall> {
@@ -78,8 +100,8 @@ fn sorted_calls(caller: &FunctionWithCalls) -> Vec<ExtractedCall> {
 }
 
 fn resolve_call(
-    module: &Module<'_>,
-    modules: &[Module<'_>],
+    module: &ModuleCallFacts,
+    modules: &[&ModuleCallFacts],
     call: &ExtractedCall,
     owner: Option<&str>,
 ) -> ResolutionOutcome {
@@ -100,12 +122,12 @@ fn resolve_call(
             100,
         ),
     };
-    outcome(candidates, call, &module.ast.path, provenance, confidence)
+    outcome(candidates, call, &module.path, provenance, confidence)
 }
 
 fn resolve_identifier(
-    module: &Module<'_>,
-    modules: &[Module<'_>],
+    module: &ModuleCallFacts,
+    modules: &[&ModuleCallFacts],
     name: &str,
 ) -> (Vec<FunctionId>, CallEdgeProvenance, u8) {
     let local = local_candidates(module, name);
@@ -129,8 +151,8 @@ fn resolve_identifier(
 }
 
 fn resolve_namespace_member(
-    module: &Module<'_>,
-    modules: &[Module<'_>],
+    module: &ModuleCallFacts,
+    modules: &[&ModuleCallFacts],
     receiver: &str,
     property: &str,
 ) -> Vec<FunctionId> {
@@ -142,7 +164,7 @@ fn resolve_namespace_member(
         .collect()
 }
 
-fn local_candidates(module: &Module<'_>, name: &str) -> Vec<FunctionId> {
+fn local_candidates(module: &ModuleCallFacts, name: &str) -> Vec<FunctionId> {
     module
         .functions
         .iter()
@@ -152,8 +174,8 @@ fn local_candidates(module: &Module<'_>, name: &str) -> Vec<FunctionId> {
 }
 
 fn exported_candidates(
-    origin: &Module<'_>,
-    modules: &[Module<'_>],
+    origin: &ModuleCallFacts,
+    modules: &[&ModuleCallFacts],
     source: &str,
     name: &str,
 ) -> Vec<FunctionId> {
@@ -165,12 +187,12 @@ fn exported_candidates(
 }
 
 fn resolve_export(
-    module: &Module<'_>,
-    modules: &[Module<'_>],
+    module: &ModuleCallFacts,
+    modules: &[&ModuleCallFacts],
     name: &str,
     visited: &mut HashSet<(PathBuf, String)>,
 ) -> Vec<FunctionId> {
-    if !visited.insert((module.ast.path.clone(), name.to_string())) {
+    if !visited.insert((module.path.clone(), name.to_string())) {
         return Vec::new();
     }
     let mut candidates = module
@@ -192,24 +214,18 @@ fn resolve_export(
 }
 
 fn source_modules<'a>(
-    origin: &Module<'_>,
-    modules: &'a [Module<'_>],
+    origin: &ModuleCallFacts,
+    modules: &[&'a ModuleCallFacts],
     source: &str,
-) -> Vec<&'a Module<'a>> {
+) -> Vec<&'a ModuleCallFacts> {
     if !source.starts_with('.') {
         return Vec::new();
     }
-    let base = lexical_path(
-        &origin
-            .ast
-            .path
-            .parent()
-            .unwrap_or(Path::new(""))
-            .join(source),
-    );
+    let base = lexical_path(&origin.path.parent().unwrap_or(Path::new("")).join(source));
     modules
         .iter()
-        .filter(|module| module_matches(&base, &module.ast.path))
+        .filter(|module| module_matches(&base, &module.path))
+        .copied()
         .collect()
 }
 
@@ -286,7 +302,7 @@ mod tests {
             ast("src/helper.ts", "export function helper() { return 1; }"),
         ];
 
-        let graph = extract_project_call_graph(&asts);
+        let graph = graph_of(&asts);
         let run = find(&graph, "run");
         let callees = graph.get_callees(run);
 
@@ -305,7 +321,7 @@ mod tests {
             "function helper() {} function run() { helper(); }",
         )];
 
-        let graph = extract_project_call_graph(&asts);
+        let graph = graph_of(&asts);
         let evidence = graph.edge_evidence().next().unwrap();
 
         assert_eq!(evidence.provenance, CallEdgeProvenance::AstDirect);
@@ -317,7 +333,7 @@ mod tests {
     fn exported_function_is_public_api_not_entry_point() {
         let asts = vec![ast("src/api.ts", "export function fetchUser() {}")];
 
-        let graph = extract_project_call_graph(&asts);
+        let graph = graph_of(&asts);
         let function = find(&graph, "fetchUser");
         let roles = graph.get_roles(function).unwrap();
 
@@ -339,7 +355,7 @@ mod tests {
             "function listUsers() {} router.get('/users', listUsers);",
         )];
 
-        let graph = extract_project_call_graph(&asts);
+        let graph = graph_of(&asts);
         let roles = graph.get_roles(find(&graph, "listUsers")).unwrap();
 
         assert!(roles.is_framework_managed);
@@ -355,7 +371,7 @@ mod tests {
             ast("src/util.js", "export function help() { return 1; }"),
         ];
 
-        let graph = extract_project_call_graph(&asts);
+        let graph = graph_of(&asts);
         let callees = graph.get_callees(find(&graph, "run"));
 
         assert_eq!(callees.len(), 1);
@@ -373,10 +389,15 @@ mod tests {
             ast("src/lib.js", "export function helper() {}"),
         ];
 
-        let graph = extract_project_call_graph(&asts);
+        let graph = graph_of(&asts);
 
         assert!(graph.get_callees(find(&graph, "run")).is_empty());
         assert_eq!(graph.edge_evidence().count(), 0);
+    }
+
+    fn graph_of(asts: &[TypeScriptAst]) -> CallGraph {
+        let facts: Vec<_> = asts.iter().map(ModuleCallFacts::from_ast).collect();
+        extract_project_call_graph(&facts.iter().collect::<Vec<_>>())
     }
 
     fn ast(path: &str, source: &str) -> TypeScriptAst {

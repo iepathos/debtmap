@@ -589,6 +589,7 @@ mod tests {
         use chrono::Utc;
 
         let results = AnalysisResults {
+            js_facts: Default::default(),
             project_path: PathBuf::from("test_project"),
             timestamp: Utc::now(),
             complexity: ComplexityResults {

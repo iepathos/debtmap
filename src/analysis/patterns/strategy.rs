@@ -257,6 +257,7 @@ mod tests {
     fn test_detect_strategy_pattern() {
         let recognizer = StrategyPatternRecognizer::new();
         let file_metrics = FileMetrics {
+            js_facts: None,
             path: PathBuf::from("payment.py"),
             language: Language::Python,
             complexity: ComplexityMetrics::default(),
@@ -283,6 +284,7 @@ mod tests {
     fn test_is_function_used_by_pattern() {
         let recognizer = StrategyPatternRecognizer::new();
         let file_metrics = FileMetrics {
+            js_facts: None,
             path: PathBuf::from("payment.py"),
             language: Language::Python,
             complexity: ComplexityMetrics::default(),
@@ -372,6 +374,7 @@ mod tests {
     fn test_is_function_used_by_pattern_no_dot_in_name() {
         let recognizer = StrategyPatternRecognizer::new();
         let file_metrics = FileMetrics {
+            js_facts: None,
             path: PathBuf::from("payment.py"),
             language: Language::Python,
             complexity: ComplexityMetrics::default(),
@@ -397,6 +400,7 @@ mod tests {
     fn test_is_function_used_by_pattern_no_classes() {
         let recognizer = StrategyPatternRecognizer::new();
         let file_metrics = FileMetrics {
+            js_facts: None,
             path: PathBuf::from("payment.py"),
             language: Language::Python,
             complexity: ComplexityMetrics::default(),
@@ -418,6 +422,7 @@ mod tests {
     fn test_is_function_used_by_pattern_class_not_found() {
         let recognizer = StrategyPatternRecognizer::new();
         let file_metrics = FileMetrics {
+            js_facts: None,
             path: PathBuf::from("payment.py"),
             language: Language::Python,
             complexity: ComplexityMetrics::default(),
@@ -457,6 +462,7 @@ mod tests {
         };
 
         let file_metrics = FileMetrics {
+            js_facts: None,
             path: PathBuf::from("payment.py"),
             language: Language::Python,
             complexity: ComplexityMetrics::default(),
@@ -510,6 +516,7 @@ mod tests {
         };
 
         let file_metrics = FileMetrics {
+            js_facts: None,
             path: PathBuf::from("test.py"),
             language: Language::Python,
             complexity: ComplexityMetrics::default(),
@@ -531,6 +538,7 @@ mod tests {
     fn test_is_function_used_by_pattern_method_not_abstract() {
         let recognizer = StrategyPatternRecognizer::new();
         let file_metrics = FileMetrics {
+            js_facts: None,
             path: PathBuf::from("payment.py"),
             language: Language::Python,
             complexity: ComplexityMetrics::default(),
@@ -578,6 +586,7 @@ mod tests {
         };
 
         let file_metrics = FileMetrics {
+            js_facts: None,
             path: PathBuf::from("payment.py"),
             language: Language::Python,
             complexity: ComplexityMetrics::default(),
@@ -634,6 +643,7 @@ mod tests {
         };
 
         let file_metrics = FileMetrics {
+            js_facts: None,
             path: PathBuf::from("serializer.py"),
             language: Language::Python,
             complexity: ComplexityMetrics::default(),

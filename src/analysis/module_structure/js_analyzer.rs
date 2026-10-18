@@ -2,7 +2,7 @@
 //!
 //! Provides parser-backed analysis of JavaScript and TypeScript source files.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap};
 use std::path::Path;
 
 use super::types::{
@@ -12,7 +12,7 @@ use super::types::{
 use crate::analyzers::typescript::dependencies::extract_dependencies;
 use crate::analyzers::typescript::parser::{node_line, node_text, parse_source};
 use crate::analyzers::typescript::visitor::class_analysis::extract_classes;
-use crate::analyzers::typescript::visitor::function_analysis::extract_functions;
+use crate::analyzers::typescript::visitor::function_analysis::extract_function_outlines;
 use crate::core::ast::JsLanguageVariant;
 use tree_sitter::Node;
 
@@ -38,7 +38,7 @@ fn analyze_script_file(
     };
 
     let classes = extract_classes(&ast);
-    let functions = extract_functions(&ast, true);
+    let functions = extract_function_outlines(&ast);
     let dependencies = build_dependency_graph(
         file_path,
         &components_for_graph(&classes, &functions),
@@ -150,7 +150,7 @@ fn build_dependency_graph(
     let dependency_names: Vec<String> = dependencies
         .iter()
         .map(|dependency| dependency.name.clone())
-        .collect::<HashSet<_>>()
+        .collect::<BTreeSet<_>>()
         .into_iter()
         .collect();
     components.extend(dependency_names.iter().cloned());

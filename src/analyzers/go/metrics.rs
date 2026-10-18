@@ -19,6 +19,7 @@ pub fn build_file_metrics(
     let complexity = complexity_totals(functions);
 
     FileMetrics {
+        js_facts: None,
         path,
         language: Language::Go,
         complexity,
