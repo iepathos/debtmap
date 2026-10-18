@@ -19,8 +19,8 @@ use crate::analysis::io_detection::{IoDetector, IoProfile, Language, Responsibil
 use crate::analysis::purity_analysis::{PurityAnalyzer, PurityLevel};
 use crate::analysis::type_flow_tracker::TypeFlowTracker;
 use crate::analysis::type_signatures::{TypeSignature, TypeSignatureAnalyzer};
+use foldhash::{HashMap, HashMapExt};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Unified responsibility category
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

@@ -822,7 +822,7 @@ mod tests {
 
     #[test]
     fn hash_in_hashset_works() {
-        use std::collections::HashSet;
+        use foldhash::{HashSet, HashSetExt};
 
         let mut set = HashSet::new();
         set.insert(DebtType::Todo {

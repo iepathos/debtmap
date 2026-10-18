@@ -4,9 +4,9 @@
 //! in the call graph based on their structural position.
 
 use crate::priority::call_graph::{CallGraph, FunctionId};
+use foldhash::{HashMap, HashMapExt};
 use petgraph::algo::dijkstra;
 use petgraph::graph::{DiGraph, NodeIndex};
-use std::collections::HashMap;
 
 /// Compute betweenness centrality for a function
 ///

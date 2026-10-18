@@ -6,6 +6,7 @@
 
 use super::{Implementation, PatternInstance, PatternType, UsageSite};
 use crate::analysis::call_graph::TraitRegistry;
+use foldhash::HashSetExt;
 use std::sync::Arc;
 
 pub struct RustTraitPatternRecognizer {
@@ -28,7 +29,7 @@ impl RustTraitPatternRecognizer {
 
         let unresolved_calls = self.trait_registry.get_unresolved_trait_calls();
 
-        let mut trait_names = std::collections::HashSet::new();
+        let mut trait_names = foldhash::HashSet::new();
         for call in unresolved_calls.iter() {
             if call.trait_name != "Unknown" {
                 trait_names.insert(call.trait_name.clone());

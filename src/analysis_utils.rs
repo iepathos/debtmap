@@ -128,7 +128,7 @@ pub fn extract_all_debt_items(file_metrics: &[FileMetrics]) -> Vec<DebtItem> {
 /// Extract file contexts from file metrics for test file detection (spec 166)
 pub fn extract_file_contexts(
     file_metrics: &[FileMetrics],
-) -> std::collections::HashMap<PathBuf, crate::analysis::FileContext> {
+) -> foldhash::HashMap<PathBuf, crate::analysis::FileContext> {
     use crate::analysis::FileContextDetector;
 
     file_metrics
@@ -195,7 +195,7 @@ pub fn apply_debt_suppressions(
 
 pub fn apply_debt_suppressions_with_contexts(
     items: Vec<DebtItem>,
-    contexts: &std::collections::HashMap<PathBuf, crate::debt::suppression::SuppressionContext>,
+    contexts: &foldhash::HashMap<PathBuf, crate::debt::suppression::SuppressionContext>,
 ) -> crate::debt::suppression_audit::SuppressionOutcome<DebtItem> {
     let (emitted, applied) = items.into_iter().fold(
         (Vec::new(), Vec::new()),
@@ -225,7 +225,7 @@ pub fn apply_debt_suppressions_with_contexts(
 
 fn suppression_contexts_for_items(
     items: &[DebtItem],
-) -> std::collections::HashMap<PathBuf, crate::debt::suppression::SuppressionContext> {
+) -> foldhash::HashMap<PathBuf, crate::debt::suppression::SuppressionContext> {
     let mut files = items
         .iter()
         .map(|item| item.file.clone())

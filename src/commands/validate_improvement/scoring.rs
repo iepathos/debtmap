@@ -5,6 +5,7 @@
 
 use super::types::TrendAnalysis;
 use crate::comparison::types::{ComparisonResult, TargetComparison};
+use foldhash::HashMapExt;
 
 use super::types::{ProjectSummary, TargetSummary, ValidationResult};
 
@@ -126,7 +127,7 @@ mod tests {
             status: "complete".to_string(),
             improvements: vec![],
             remaining_issues: vec![],
-            gaps: std::collections::HashMap::new(),
+            gaps: foldhash::HashMap::new(),
             target_summary: None,
             project_summary: ProjectSummary {
                 total_debt_before: 100.0,
@@ -151,7 +152,7 @@ mod tests {
             status: "incomplete".to_string(),
             improvements: vec![],
             remaining_issues: vec![],
-            gaps: std::collections::HashMap::new(),
+            gaps: foldhash::HashMap::new(),
             target_summary: None,
             project_summary: ProjectSummary {
                 total_debt_before: 100.0,

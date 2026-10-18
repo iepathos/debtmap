@@ -3,7 +3,7 @@
 //! Tests that verify the semantic naming feature works end-to-end.
 
 use debtmap::organization::semantic_naming::SemanticNameGenerator;
-use std::collections::HashSet;
+use foldhash::HashSet;
 
 #[test]
 fn test_no_generic_names_in_output() {

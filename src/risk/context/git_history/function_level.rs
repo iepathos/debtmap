@@ -26,8 +26,8 @@ use super::git2_provider::{CommitStats, Git2Repository};
 use anyhow::Context as _;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
+use foldhash::{HashSet, HashSetExt};
 use regex::Regex;
-use std::collections::HashSet;
 use std::path::Path;
 #[cfg(test)]
 use std::process::Command;

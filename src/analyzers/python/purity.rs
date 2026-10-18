@@ -3,7 +3,7 @@
 //! This module provides purity detection for Python functions.
 
 use crate::extraction::{PurityAnalysisData, PurityLevel};
-use std::collections::HashSet;
+use foldhash::{HashMapExt, HashSet, HashSetExt};
 use tree_sitter::Node;
 
 struct ImpurityReport {
@@ -97,7 +97,7 @@ impl<'a> PythonPurityAnalyzer<'a> {
             },
             upvalue_mutations: report.reasons,
             total_mutations: if is_pure { 0 } else { 1 },
-            var_names: std::collections::HashMap::new(),
+            var_names: foldhash::HashMap::new(),
             confidence,
             purity_level: report.level,
         }

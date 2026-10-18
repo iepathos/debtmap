@@ -4,6 +4,7 @@
 //! that should use logarithmic complexity scaling instead of linear.
 
 use crate::collections::{HashMap, HashSet};
+use foldhash::HashSetExt;
 use std::time::SystemTime;
 use syn::{File, Item, ItemFn, ItemImpl, Path as SynPath};
 

@@ -5,7 +5,7 @@
 
 use crate::core::FunctionMetrics;
 use crate::priority::call_graph::FunctionId;
-use std::collections::HashSet;
+use foldhash::{HashSet, HashSetExt};
 
 /// Filter out test functions from metrics (pure).
 ///

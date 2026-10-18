@@ -8,6 +8,7 @@ use crate::analyzers::trait_implementation_tracker::{
 };
 use crate::collections::{HashMap, HashSet, Vector};
 use crate::priority::call_graph::FunctionId;
+use foldhash::{HashMapExt, HashSetExt};
 use std::sync::Arc;
 
 /// Method resolution order following Rust's rules

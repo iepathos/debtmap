@@ -1,6 +1,6 @@
 //! Single-pass structural extraction for Solidity source files.
 
-use std::collections::HashMap;
+use foldhash::HashMap;
 use tree_sitter::Node;
 
 use crate::analyzers::solidity::parser::{node_line, node_text};

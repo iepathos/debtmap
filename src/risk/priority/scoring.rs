@@ -1,6 +1,7 @@
 use super::{TestTarget, module_detection::ModuleType};
 use crate::collections::HashMap;
 use crate::core::ComplexityMetrics;
+use foldhash::HashMapExt;
 use std::path::Path;
 
 pub struct CriticalityScorer {

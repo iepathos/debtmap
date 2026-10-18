@@ -1,4 +1,5 @@
 use crate::core::refined::{DebtDensity, RiskScore, WeightFactor};
+use foldhash::HashMapExt;
 use serde::{Deserialize, Serialize};
 
 /// God object detection thresholds
@@ -330,7 +331,7 @@ pub struct FileSizeThresholds {
 
     /// File-specific overrides using glob patterns
     #[serde(default)]
-    pub overrides: std::collections::HashMap<String, usize>,
+    pub overrides: foldhash::HashMap<String, usize>,
 }
 
 impl Default for FileSizeThresholds {
@@ -343,7 +344,7 @@ impl Default for FileSizeThresholds {
             proc_macro: default_proc_macro_threshold(),
             build_script: default_build_script_threshold(),
             min_lines_per_function: default_min_lines_per_function(),
-            overrides: std::collections::HashMap::new(),
+            overrides: foldhash::HashMap::new(),
         }
     }
 }

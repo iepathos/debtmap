@@ -7,8 +7,8 @@ use crate::complexity::entropy_analysis::{calculate_repetition_score, calculate_
 use crate::complexity::entropy_core::{
     EntropyConfig, EntropyScore, EntropyToken, LanguageEntropyAnalyzer, TokenCategory,
 };
+use foldhash::{HashSet, HashSetExt};
 use sha2::{Digest, Sha256};
-use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 use tree_sitter::Node;
 

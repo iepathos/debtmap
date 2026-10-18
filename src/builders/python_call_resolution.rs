@@ -3,7 +3,7 @@
 use crate::core::Language;
 use crate::extraction::{ExtractedFileData, ImportInfo, ImportKind};
 use crate::priority::call_graph::FunctionId;
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::path::{Path, PathBuf};
 
 #[derive(Default)]

@@ -8,9 +8,9 @@
 //! - Architectural layer
 
 use super::{ArchitecturalLayer, Method, Visibility};
+use foldhash::HashSet;
 #[cfg(test)]
-use std::collections::HashMap;
-use std::collections::HashSet;
+use foldhash::{HashMap, HashMapExt};
 
 /// Weights for different similarity signals
 #[derive(Debug, Clone)]

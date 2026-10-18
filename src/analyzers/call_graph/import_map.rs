@@ -6,7 +6,7 @@
 //! - aliased imports (use x as y)
 //! - glob imports (use module::*)
 
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::path::{Path, PathBuf};
 
 /// Tracks imports and re-exports for call resolution
@@ -204,14 +204,14 @@ mod tests {
         let file = PathBuf::from("test.rs");
 
         let code = r#"
-            use std::collections::HashMap;
+            use foldhash::{HashMap};
         "#;
         let ast = parse_code(code);
         map.analyze_imports(&file, &ast);
 
         let resolved = map.resolve_import(&file, "HashMap");
         assert!(resolved.is_some());
-        assert_eq!(resolved.unwrap()[0], "std::collections::HashMap");
+        assert_eq!(resolved.unwrap()[0], "foldhash::HashMap");
     }
 
     #[test]
@@ -220,14 +220,14 @@ mod tests {
         let file = PathBuf::from("test.rs");
 
         let code = r#"
-            use std::collections::HashMap as Map;
+            use foldhash::HashMap as Map;
         "#;
         let ast = parse_code(code);
         map.analyze_imports(&file, &ast);
 
         let resolved = map.resolve_import(&file, "Map");
         assert!(resolved.is_some());
-        assert_eq!(resolved.unwrap()[0], "std::collections::HashMap");
+        assert_eq!(resolved.unwrap()[0], "foldhash::HashMap");
     }
 
     #[test]
@@ -236,7 +236,7 @@ mod tests {
         let file = PathBuf::from("test.rs");
 
         let code = r#"
-            use std::collections::{HashMap, HashSet};
+            use foldhash::{HashMap, HashSet};
         "#;
         let ast = parse_code(code);
         map.analyze_imports(&file, &ast);
@@ -366,7 +366,7 @@ mod tests {
         let file = PathBuf::from("test.rs");
 
         let code = r#"
-            use std::collections::HashMap;
+            use foldhash::{HashMap};
             use std::collections::*;
         "#;
         let ast = parse_code(code);
@@ -376,6 +376,6 @@ mod tests {
         let resolved = map.resolve_import(&file, "HashMap");
         assert!(resolved.is_some());
         let paths = resolved.unwrap();
-        assert!(paths.contains(&"std::collections::HashMap".to_string()));
+        assert!(paths.contains(&"foldhash::HashMap".to_string()));
     }
 }

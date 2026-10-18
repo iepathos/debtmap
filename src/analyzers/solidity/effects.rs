@@ -1,10 +1,11 @@
 //! EVM-relevant state and purity effect analysis for Solidity functions.
 
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet};
 
 use tree_sitter::Node;
 
 use crate::analyzers::solidity::parser::node_text;
+use crate::analyzers::syntax_tree::walk_nodes;
 use crate::core::PurityLevel;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -246,14 +247,6 @@ fn is_value_transfer(node: Node, source: &str) -> bool {
     node.child_by_field_name("function")
         .and_then(|function| function.child_by_field_name("property"))
         .is_some_and(|property| matches!(node_text(&property, source), "transfer" | "send"))
-}
-
-fn walk_nodes(node: Node, visit: &mut impl FnMut(Node)) {
-    visit(node);
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        walk_nodes(child, visit);
-    }
 }
 
 #[cfg(test)]

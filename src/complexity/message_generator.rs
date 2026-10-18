@@ -455,7 +455,7 @@ if key == "option1" {
 }
 
 // After: Lookup table
-let table = HashMap::from([
+let table = crate::collections::map_from([
     ("option1", value1),
     ("option2", value2),
 ]);

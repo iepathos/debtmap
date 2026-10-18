@@ -31,6 +31,9 @@ pub fn extract_validate_params(command: Commands) -> Result<ValidateConfig> {
         no_parallel,
         jobs,
         show_splits,
+        parse_cache_mb: _,
+        resolution_cache_mb: _,
+        canonical_cache_mb: _,
     } = command
     {
         Ok(ValidateConfig {
@@ -128,6 +131,9 @@ mod tests {
             ast_functional_analysis: false,
             functional_analysis_profile: None,
             show_splits: false,
+            parse_cache_mb: 0,
+            resolution_cache_mb: 0,
+            canonical_cache_mb: 0,
             no_tui: false,
             quiet: false,
             show_filter_stats: false,
@@ -161,6 +167,9 @@ mod tests {
             no_parallel: false,
             jobs: 4,
             show_splits: true,
+            parse_cache_mb: 0,
+            resolution_cache_mb: 0,
+            canonical_cache_mb: 0,
         };
 
         let result = extract_validate_params(validate_command);
@@ -205,6 +214,9 @@ mod tests {
             no_parallel: false,
             jobs: 0,
             show_splits: false,
+            parse_cache_mb: 0,
+            resolution_cache_mb: 0,
+            canonical_cache_mb: 0,
         };
 
         let result = extract_validate_params(validate_command);

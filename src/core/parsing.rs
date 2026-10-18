@@ -24,6 +24,8 @@
 //! }
 //! ```
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 /// Reset the proc-macro2 SourceMap to prevent overflow when parsing many files.
 ///
 /// **IMPORTANT**: Call this AFTER you've extracted all line numbers from
@@ -48,6 +50,21 @@
 #[inline]
 pub fn reset_span_locations() {
     proc_macro2::extra::invalidate_current_thread_spans();
+}
+
+/// Default source budget for syntax trees retained between call graph passes.
+pub const DEFAULT_PARSE_CACHE_MB: usize = 64;
+
+static PARSE_CACHE_BYTES: AtomicUsize = AtomicUsize::new(DEFAULT_PARSE_CACHE_MB << 20);
+
+/// Set how many megabytes of Rust source may stay parsed between passes (0 disables).
+pub fn set_parse_cache_mb(megabytes: usize) {
+    PARSE_CACHE_BYTES.store(megabytes.saturating_mul(1 << 20), Ordering::Relaxed);
+}
+
+/// Source byte budget shared by all workers that retain parsed syntax trees.
+pub fn parse_cache_bytes() -> usize {
+    PARSE_CACHE_BYTES.load(Ordering::Relaxed)
 }
 
 #[cfg(test)]

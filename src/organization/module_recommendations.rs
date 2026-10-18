@@ -2,7 +2,7 @@
 ///
 /// This module implements Spec 188: generating high-quality module split recommendations
 /// that eliminate "misc" categories, enforce balanced sizing, and provide clear responsibilities.
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 
 use crate::organization::behavioral_decomposition::{BehaviorCategory, MethodCluster};
 

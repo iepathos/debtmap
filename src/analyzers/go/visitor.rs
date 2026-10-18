@@ -2,9 +2,10 @@ use crate::analyzers::go::advanced::detect_advanced_signals;
 use crate::analyzers::go::parser::{node_line, node_text};
 use crate::analyzers::go::purity::analyze_purity;
 use crate::analyzers::go::types::{GoAnalysis, GoFunction, GoFunctionKind};
+use crate::analyzers::syntax_tree::{children, function_length};
 use crate::core::PurityLevel;
 use crate::core::ast::GoAst;
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashSet};
 use std::path::Path;
 use tree_sitter::Node;
 
@@ -345,13 +346,6 @@ fn first_child_text(node: Node, kind: &str, ast: &GoAst) -> Option<String> {
     None
 }
 
-fn function_length(node: Node) -> usize {
-    node.end_position()
-        .row
-        .saturating_sub(node.start_position().row)
-        + 1
-}
-
 fn visibility_for(name: &str) -> Option<String> {
     name.rsplit('.')
         .next()
@@ -478,11 +472,6 @@ fn child_sum_with_depth(node: Node, depth: u32) -> u32 {
         .into_iter()
         .map(|child| cognitive_complexity(child, depth))
         .sum()
-}
-
-fn children(node: Node) -> Vec<Node> {
-    let mut cursor = node.walk();
-    node.children(&mut cursor).collect()
 }
 
 fn collect_calls(node: Node, ast: &GoAst, context: &CallContext<'_>) -> Vec<String> {

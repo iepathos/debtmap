@@ -12,6 +12,7 @@
 
 use super::{filter::Filter, search::SearchState, sort::SortCriteria};
 use crate::priority::UnifiedAnalysis;
+use foldhash::HashSetExt;
 
 /// Manages filtering, sorting, and search state.
 ///
@@ -235,7 +236,7 @@ mod property_tests {
             let state = QueryState::new(count);
             let indices = state.filtered_indices();
 
-            let mut seen = std::collections::HashSet::new();
+            let mut seen = foldhash::HashSet::new();
             for &idx in indices {
                 prop_assert!(
                     seen.insert(idx),

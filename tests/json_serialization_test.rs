@@ -1,6 +1,7 @@
 use debtmap::core::Language;
 use debtmap::data_flow::DataFlowGraph;
-use debtmap::priority::{CallGraph, FilterStatistics, ImpactMetrics, UnifiedAnalysis};
+use debtmap::priority::{FilterStatistics, ImpactMetrics, UnifiedAnalysis};
+use foldhash::HashMapExt;
 
 #[test]
 fn test_unified_analysis_json_serialization() {
@@ -17,13 +18,13 @@ fn test_unified_analysis_json_serialization() {
         total_debt_score: 0.0,
         debt_density: 0.0,
         total_lines_of_code: 0,
-        call_graph: CallGraph::new(),
+        call_graph: Default::default(),
         data_flow_graph: DataFlowGraph::new(),
         overall_coverage: None,
         has_coverage_data: false,
         timings: None,
         stats: FilterStatistics::new(),
-        analyzed_files: std::collections::HashMap::new(),
+        analyzed_files: foldhash::HashMap::new(),
         suppression_audit: Default::default(),
     };
 

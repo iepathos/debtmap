@@ -1,9 +1,9 @@
 use crate::analysis::role_policy::{CodeRoles, RoleEvidence, evidence_from_roles, merge_evidence};
+use crate::collections::{DashMap, DashSet};
 use crate::priority::call_graph::{
     CallEdgeEvidence, CallEdgeProvenance, CallGraph, CallType, FunctionCall, FunctionId,
     UncertainCall,
 };
-use dashmap::{DashMap, DashSet};
 use rayon::prelude::*;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -68,12 +68,12 @@ struct NodeInfo {
 impl ParallelCallGraph {
     pub fn new(total_files: usize) -> Self {
         Self {
-            nodes: Arc::new(DashMap::new()),
-            edges: Arc::new(DashSet::new()),
-            evidence: Arc::new(DashSet::new()),
-            uncertain_calls: Arc::new(DashSet::new()),
-            caller_index: Arc::new(DashMap::new()),
-            callee_index: Arc::new(DashMap::new()),
+            nodes: Arc::new(DashMap::default()),
+            edges: Arc::new(DashSet::default()),
+            evidence: Arc::new(DashSet::default()),
+            uncertain_calls: Arc::new(DashSet::default()),
+            caller_index: Arc::new(DashMap::default()),
+            callee_index: Arc::new(DashMap::default()),
             stats: Arc::new(ParallelStats::new(total_files)),
         }
     }

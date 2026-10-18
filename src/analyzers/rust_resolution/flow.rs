@@ -1,6 +1,6 @@
 //! Side-effect discovery for conservative loop-carried facts, respecting local shadows.
 use super::index::{Context, WorkspaceIndex};
-use std::collections::HashSet;
+use foldhash::{HashSet, HashSetExt};
 use syn::{
     Expr, Pat,
     visit::{self, Visit},

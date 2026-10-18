@@ -2,7 +2,7 @@ use super::{
     MaintainabilityImpact, OrganizationAntiPattern, OrganizationDetector, PrimitiveUsageContext,
 };
 use crate::common::{SourceLocation, capitalize_first};
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use syn::{self, visit::Visit};
 
 pub struct PrimitiveObsessionDetector {

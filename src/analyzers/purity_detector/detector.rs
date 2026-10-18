@@ -3,7 +3,7 @@
 //! The PurityDetector analyzes Rust functions to determine their purity level
 //! through static analysis.
 
-use dashmap::DashMap;
+use crate::collections::DashMap;
 use std::sync::Arc;
 use syn::{Block, Expr, ExprClosure, ExprMethodCall, ItemFn, Local, Pat, Stmt, visit::Visit};
 
@@ -63,7 +63,7 @@ impl Default for PurityDetector {
 impl PurityDetector {
     /// Create a new PurityDetector with no macro definitions
     pub fn new() -> Self {
-        Self::with_macro_definitions(Arc::new(DashMap::new()))
+        Self::with_macro_definitions(Arc::new(DashMap::default()))
     }
 
     /// Create a new PurityDetector with the given macro definitions

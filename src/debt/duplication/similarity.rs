@@ -1,5 +1,7 @@
 use crate::core::{DuplicationBlock, DuplicationLocation};
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use foldhash::HashSet;
+use rayon::slice::ParallelSliceMut;
+use std::collections::{BTreeMap, BTreeSet};
 
 mod blocks;
 #[cfg(test)]
@@ -9,12 +11,14 @@ use blocks::{exact_blocks_not_in_pairs, fuzzy_block, sort_blocks};
 
 pub(super) struct SimilarityChunk {
     normalized: String,
+    hash: u64,
     pub location: DuplicationLocation,
 }
 
 impl SimilarityChunk {
     pub fn new(normalized: String, location: DuplicationLocation) -> Self {
         Self {
+            hash: xxhash_rust::xxh64::xxh64(normalized.as_bytes(), 0),
             normalized,
             location,
         }
@@ -49,19 +53,13 @@ pub(super) fn group_similar_chunks(
     blocks
 }
 
-fn exact_hash_blocks(chunks: Vec<SimilarityChunk>, min_lines: usize) -> Vec<DuplicationBlock> {
-    let buckets = chunks.into_iter().fold(
-        BTreeMap::<u64, Vec<SimilarityChunk>>::new(),
-        |mut buckets, chunk| {
-            let hash = xxhash_rust::xxh64::xxh64(chunk.normalized.as_bytes(), 0);
-            buckets.entry(hash).or_default().push(chunk);
-            buckets
-        },
-    );
-    let mut blocks: Vec<_> = buckets
-        .into_iter()
-        .filter(|(_, chunks)| chunks.len() > 1)
-        .flat_map(|(hash, chunks)| verified_exact_blocks(hash, chunks, min_lines))
+fn exact_hash_blocks(mut chunks: Vec<SimilarityChunk>, min_lines: usize) -> Vec<DuplicationBlock> {
+    // Stable, so chunks sharing a hash keep their file and line order.
+    chunks.par_sort_by_key(|chunk| chunk.hash);
+    let mut blocks: Vec<_> = chunks
+        .chunk_by(|left, right| left.hash == right.hash)
+        .filter(|bucket| bucket.len() > 1)
+        .flat_map(|bucket| verified_exact_blocks(bucket[0].hash, bucket, min_lines))
         .collect();
     sort_blocks(&mut blocks);
     blocks
@@ -69,18 +67,18 @@ fn exact_hash_blocks(chunks: Vec<SimilarityChunk>, min_lines: usize) -> Vec<Dupl
 
 fn verified_exact_blocks(
     hash: u64,
-    chunks: Vec<SimilarityChunk>,
+    chunks: &[SimilarityChunk],
     min_lines: usize,
 ) -> Vec<DuplicationBlock> {
     chunks
-        .into_iter()
+        .iter()
         .fold(
-            BTreeMap::<String, Vec<DuplicationLocation>>::new(),
+            BTreeMap::<&str, Vec<DuplicationLocation>>::new(),
             |mut contents, chunk| {
                 contents
-                    .entry(chunk.normalized)
+                    .entry(&chunk.normalized)
                     .or_default()
-                    .push(chunk.location);
+                    .push(chunk.location.clone());
                 contents
             },
         )

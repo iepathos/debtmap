@@ -1,5 +1,5 @@
 use anyhow::Result;
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet};
 
 use crate::comparison::location_matcher::LocationMatcher;
 use crate::comparison::types::*;
@@ -571,13 +571,13 @@ mod tests {
             total_debt_score: total_score,
             debt_density: 0.0,
             total_lines_of_code: 1000,
-            call_graph: crate::priority::CallGraph::new(),
+            call_graph: Default::default(),
             data_flow_graph: crate::data_flow::DataFlowGraph::new(),
             overall_coverage: None,
             has_coverage_data: false,
             timings: None,
             stats: crate::priority::FilterStatistics::new(),
-            analyzed_files: std::collections::HashMap::new(),
+            analyzed_files: foldhash::HashMap::new(),
             suppression_audit: Default::default(),
         }
     }

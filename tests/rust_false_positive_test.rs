@@ -6,7 +6,7 @@ use debtmap::priority::call_graph::FunctionId;
 use debtmap::priority::scoring::classification::{
     classify_debt_type_with_exclusions, is_dead_code_with_exclusions,
 };
-use std::collections::HashSet;
+use foldhash::{HashSet, HashSetExt};
 use std::path::PathBuf;
 
 #[test]
@@ -14,7 +14,7 @@ fn test_rust_method_with_same_name_as_function_not_false_positive() {
     // Test case for the false positive where DependencyGraph::calculate_coupling_metrics
     // is flagged as dead code even though it's used in multiple places
     let rust_code = r#"
-use std::collections::HashMap;
+use foldhash::{HashMap};
 
 pub struct DependencyGraph {
     modules: Vec<String>,
@@ -108,7 +108,7 @@ mod tests {
 
     // Check if it's marked as dead code
     let framework_exclusions_im = HashSet::new();
-    let framework_exclusions_std: std::collections::HashSet<FunctionId> =
+    let framework_exclusions_std: foldhash::HashSet<FunctionId> =
         framework_exclusions_im.clone().into_iter().collect();
     let is_dead = is_dead_code_with_exclusions(
         method_func,

@@ -2,7 +2,7 @@
 
 use debtmap::organization::domain_patterns::{FileContext, MethodInfo};
 use debtmap::organization::{DomainPattern, DomainPatternDetector, cluster_methods_by_domain};
-use std::collections::HashSet;
+use foldhash::{HashSet, HashSetExt};
 
 #[test]
 fn test_observer_pattern_cluster_detection() {

@@ -1,14 +1,15 @@
 //! Cross-file call resolution for handling method calls across modules
 
 use super::types::{CallGraph, FunctionCall, FunctionId};
+use foldhash::HashMapExt;
 #[allow(unused_imports)]
 use std::path::{Path, PathBuf};
 
 impl CallGraph {
     /// Build a map of all functions by name
     #[allow(dead_code)]
-    fn build_function_name_map(&self) -> std::collections::HashMap<String, Vec<FunctionId>> {
-        let mut functions_by_name = std::collections::HashMap::new();
+    fn build_function_name_map(&self) -> foldhash::HashMap<String, Vec<FunctionId>> {
+        let mut functions_by_name = foldhash::HashMap::new();
 
         // Sort keys for deterministic map building (Spec 214 fix)
         let mut sorted_keys: Vec<_> = self.nodes.keys().collect();
@@ -219,6 +220,7 @@ impl CallGraph {
             evidence.call.callee = resolved_callee.clone();
             self.evidence_set.insert(evidence.clone());
         }
+        self.invalidate_caller_file_counts();
     }
 
     /// Resolve cross-file function calls using parallel processing
@@ -356,6 +358,7 @@ impl CallGraph {
         self.edges.dedup();
         self.edge_evidence.sort();
         self.edge_evidence.dedup();
+        self.invalidate_caller_file_counts();
     }
 }
 
@@ -363,7 +366,7 @@ impl CallGraph {
 mod tests {
     use super::*;
     use crate::priority::call_graph::CallType;
-    use std::collections::HashSet;
+    use foldhash::HashSet;
     use std::sync::Arc;
     use std::thread;
 

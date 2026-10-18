@@ -8,7 +8,7 @@ fn graphs() -> [CallGraph; 2] {
     let source = "pub fn caller(a: Missing) { a.hit(); helper(); a.hit(); } fn helper() {}";
     let mut data = UnifiedFileExtractor::extract(Path::new("src/lib.rs"), source).unwrap();
     data.rust_source = None;
-    let files = HashMap::from([(data.path.clone(), data)]);
+    let files = debtmap::collections::map_from([(data.path.clone(), data)]);
     [
         build_call_graph_from_extracted(CallGraph::new(), &files).0,
         build_call_graph(&files),

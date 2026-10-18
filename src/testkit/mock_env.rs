@@ -26,7 +26,7 @@ use crate::errors::AnalysisError;
 use crate::io::traits::{Cache, CoverageData, CoverageLoader, FileCoverage, FileSystem};
 use crate::progress::implementations::{RecordingProgressSink, SilentProgressSink};
 use crate::progress::traits::{HasProgress, ProgressSink};
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 

@@ -3,7 +3,7 @@ use super::{
     RecognizedPattern,
 };
 use crate::core::FunctionMetrics;
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 
 /// Pattern analysis and tracking
 pub struct PatternTracker {

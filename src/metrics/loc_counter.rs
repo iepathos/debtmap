@@ -30,7 +30,7 @@
 //! - Comment markers inside string literals are not detected (would require full parsing)
 //! - Raw strings with comment markers (e.g., `r#"/* not a comment */"#`) may be miscounted
 
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 

@@ -10,7 +10,7 @@ use crate::core::{FunctionMetrics, Language};
 use crate::extraction::ExtractedFileData;
 use crate::priority::file_metrics::{FileDebtItem, FileDebtMetrics};
 use crate::risk::lcov::LcovData;
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::path::{Path, PathBuf};
 
 /// Pure function to group functions by file.
@@ -271,7 +271,7 @@ fn detect_god_object_from_content(
                 recommended_splits: Vec::new(),
                 confidence: crate::organization::GodObjectConfidence::Probable,
                 responsibilities: Vec::new(),
-                responsibility_method_counts: std::collections::HashMap::new(),
+                responsibility_method_counts: foldhash::HashMap::new(),
                 purity_distribution: None,
                 module_structure: None,
                 detection_type: crate::organization::DetectionType::GodFile,

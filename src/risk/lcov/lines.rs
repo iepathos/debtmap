@@ -1,6 +1,7 @@
 //! Executable line observations, shared by exact AST coverage queries.
 use crate::risk::path_normalization::normalize_path_components;
-use std::collections::{BTreeMap, HashMap};
+use foldhash::HashMap;
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Default)]

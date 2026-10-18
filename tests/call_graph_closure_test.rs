@@ -276,7 +276,7 @@ fn helper3(x: i32) {}
 #[test]
 fn test_extract_module_pattern() {
     let code = r#"
-use std::collections::HashSet;
+use foldhash::{HashSet};
 
 pub fn build_module_dependency_map(deps: Vec<Dependency>) {
     let dependencies: HashSet<String> = deps

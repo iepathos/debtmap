@@ -52,8 +52,8 @@ use crate::risk::function_name_matching::{
     MatchConfidence, MatchableFunction, find_matching_function,
 };
 use crate::risk::path_normalization::{MatchStrategy, find_matching_path};
+use foldhash::{HashMap, HashMapExt};
 use rayon::prelude::*;
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 type FunctionCoverageMatch = (f64, MatchConfidence);

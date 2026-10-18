@@ -3,7 +3,7 @@
 use crate::core::{FunctionMetrics, Language};
 use crate::priority::CallGraph;
 use crate::priority::call_graph::{CallEdgeProvenance, CallType, FunctionId, ResolutionOutcome};
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::path::{Path, PathBuf};
 
 type PackageSymbol = (PathBuf, String);

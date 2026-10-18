@@ -4,7 +4,8 @@ use debtmap::builders::{
     parallel_call_graph::ParallelCallGraphBuilder,
 };
 use debtmap::priority::call_graph::{CallGraph, CallSite, FunctionCall, FunctionId};
-use std::collections::{BTreeMap, HashSet};
+use foldhash::HashSet;
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 type Paths = BTreeMap<PathBuf, PathBuf>;

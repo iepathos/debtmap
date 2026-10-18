@@ -1,5 +1,5 @@
 use crate::core::{CircularDependency, Dependency, ModuleDependency};
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 
 /// Dependency graph for analyzing module relationships
 #[derive(Debug, Clone)]
@@ -118,19 +118,29 @@ impl DependencyGraph {
 
     /// Calculate coupling metrics for all modules
     pub fn calculate_coupling_metrics(&self) -> Vec<ModuleDependency> {
+        let mut dependents = self.dependents_index();
         self.modules
             .iter()
-            .map(|module| {
-                let dependencies = self.get_dependencies(module);
-                let dependents = self.get_dependents(module);
-
-                ModuleDependency {
-                    module: module.clone(),
-                    dependencies,
-                    dependents,
-                }
+            .map(|module| ModuleDependency {
+                module: module.clone(),
+                dependencies: self.get_dependencies(module),
+                dependents: dependents.remove(module.as_str()).unwrap_or_default(),
             })
             .collect()
+    }
+
+    /// Dependents of every module in one pass, in the order `get_dependents` yields them.
+    fn dependents_index(&self) -> HashMap<&str, Vec<String>> {
+        let mut index: HashMap<&str, Vec<String>> = HashMap::new();
+        for (other, deps) in &self.adjacency {
+            for dep in deps.iter().filter(|dep| *dep != other) {
+                let list = index.entry(dep.as_str()).or_default();
+                if list.last() != Some(other) {
+                    list.push(other.clone());
+                }
+            }
+        }
+        index
     }
 
     /// Get the number of modules in the graph
@@ -216,6 +226,25 @@ fn extract_module_name(path: &std::path::Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn coupling_dependents_match_get_dependents() {
+        let mut graph = DependencyGraph::new();
+        for (from, to) in [
+            ("a", "b"),
+            ("a", "c"),
+            ("a", "b"),
+            ("b", "b"),
+            ("c", "b"),
+            ("d", "a"),
+        ] {
+            graph.add_dependency(from.into(), to.into());
+        }
+
+        for metrics in graph.calculate_coupling_metrics() {
+            assert_eq!(metrics.dependents, graph.get_dependents(&metrics.module));
+        }
+    }
 
     #[test]
     fn test_circular_dependency_detection() {

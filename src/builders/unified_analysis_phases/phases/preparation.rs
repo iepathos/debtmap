@@ -4,7 +4,7 @@ use crate::core::FunctionMetrics;
 use crate::data_flow::{DataFlowGraph, PurityInfo};
 use crate::extraction::ExtractedFileData;
 use crate::priority::call_graph::{CallGraph, FunctionId};
-use std::collections::HashMap;
+use foldhash::HashMap;
 use std::path::PathBuf;
 
 /// Build one data-flow graph for either execution mode.
@@ -13,10 +13,10 @@ use std::path::PathBuf;
 /// is built from the call graph and metric purity without hidden file I/O.
 pub fn build_data_flow_graph(
     metrics: &[FunctionMetrics],
-    call_graph: &CallGraph,
+    call_graph: &std::sync::Arc<CallGraph>,
     extracted_data: Option<&HashMap<PathBuf, ExtractedFileData>>,
 ) -> DataFlowGraph {
-    let mut graph = DataFlowGraph::from_call_graph(call_graph.clone());
+    let mut graph = DataFlowGraph::from_call_graph(std::sync::Arc::clone(call_graph));
     populate_extracted_facts(&mut graph, extracted_data);
     populate_metric_purity(&mut graph, metrics);
     graph
@@ -32,8 +32,8 @@ fn populate_extracted_facts(
 }
 
 fn populate_metric_purity(graph: &mut DataFlowGraph, metrics: &[FunctionMetrics]) {
-    let assessments =
-        crate::analysis::purity_propagation::propagate_graph_assessments(graph.call_graph());
+    let call_graph = graph.shared_call_graph();
+    let assessments = crate::analysis::purity_propagation::propagate_graph_assessments(&call_graph);
     for metric in metrics {
         let function = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line)
             .with_column(metric.column);
@@ -91,7 +91,7 @@ mod tests {
         let function =
             FunctionId::new(file, metric.name.clone(), metric.line).with_column(metric.column);
 
-        let graph = build_data_flow_graph(&[metric], &CallGraph::new(), None);
+        let graph = build_data_flow_graph(&[metric], &Default::default(), None);
 
         let purity = graph.get_purity_info(&function).expect("purity fact");
         assert!(purity.is_pure);
@@ -111,7 +111,7 @@ mod tests {
             crate::analysis::effect_evidence::EffectAssessment::complete(),
         );
 
-        let graph = build_data_flow_graph(&[metric], &calls, None);
+        let graph = build_data_flow_graph(&[metric], &calls.into(), None);
 
         assert_eq!(
             graph
@@ -155,7 +155,7 @@ mod tests {
             FunctionMetrics::new("callee".into(), file, 8),
         ];
 
-        let graph = build_data_flow_graph(&metrics, &calls, None);
+        let graph = build_data_flow_graph(&metrics, &calls.into(), None);
 
         assert_eq!(
             graph

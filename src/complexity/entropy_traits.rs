@@ -137,7 +137,7 @@ pub trait AnalyzerHelpers {
             return 0.0;
         }
 
-        let unique_patterns: std::collections::HashSet<_> = patterns.iter().collect();
+        let unique_patterns: foldhash::HashSet<_> = patterns.iter().collect();
         unique_patterns.len() as f64 / patterns.len() as f64
     }
 }

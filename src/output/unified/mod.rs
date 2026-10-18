@@ -68,7 +68,7 @@ pub use types::{
 pub const UNIFIED_FORMAT_VERSION: &str = "4.0";
 pub const LEGACY_UNIFIED_FORMAT_VERSION: &str = "3.0";
 
-use std::collections::HashMap;
+use foldhash::HashMap;
 
 /// Statistics accumulated from iterating over unified debt items
 #[derive(Debug, Default)]

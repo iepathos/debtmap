@@ -3,7 +3,7 @@
 //! These functions aggregate metrics and debt items without side effects.
 
 use crate::core::FunctionMetrics;
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::path::PathBuf;
 
 /// Group functions by file path (pure).

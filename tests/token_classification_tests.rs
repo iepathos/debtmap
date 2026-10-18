@@ -1,5 +1,7 @@
 #[cfg(test)]
 mod tests {
+    use foldhash::HashMapExt;
+
     use debtmap::complexity::entropy::EntropyAnalyzer;
     use debtmap::complexity::token_classifier::*;
     use syn::parse_str;
@@ -647,7 +649,7 @@ mod tests {
         assert_eq!(original_weight, 0.1);
 
         // Update weights
-        let mut new_weights = std::collections::HashMap::new();
+        let mut new_weights = foldhash::HashMap::new();
         new_weights.insert(TokenClass::LocalVar(VarType::Iterator), 0.5);
         classifier.update_weights(new_weights);
 

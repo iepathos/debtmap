@@ -4,7 +4,7 @@
 //! including scorers, config providers, priority calculators, and formatters.
 
 use anyhow::Result;
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::sync::RwLock;
 
 use crate::core::injection::{AppContainer, AppContainerBuilder, RustAnalyzerAdapter};

@@ -4,7 +4,7 @@
 use debtmap::analyzers::call_graph::debug::{CallGraphDebugger, DebugConfig, DebugFormat};
 use debtmap::analyzers::call_graph::validation::CallGraphValidator;
 use debtmap::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
-use std::collections::HashSet;
+use foldhash::{HashSet, HashSetExt};
 use std::path::PathBuf;
 
 /// Create a test call graph with known structure

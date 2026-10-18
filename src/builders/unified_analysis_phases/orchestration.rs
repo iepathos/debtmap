@@ -20,7 +20,7 @@ use crate::priority::call_graph::{CallGraph, FunctionId};
 use crate::priority::{UnifiedAnalysis, UnifiedAnalysisUtils};
 use crate::risk::RiskAnalyzer;
 use crate::risk::lcov::LcovData;
-use std::collections::HashSet;
+use foldhash::HashSet;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
@@ -52,12 +52,13 @@ pub fn run_purity_propagation(
     metrics: &[FunctionMetrics],
     call_graph: &CallGraph,
 ) -> Vec<FunctionMetrics> {
-    run_purity_propagation_with_assessments(metrics, call_graph).0
+    run_purity_propagation_with_assessments(metrics, &mut call_graph.clone()).0
 }
 
+/// Borrows `call_graph` for the propagation and leaves it unchanged.
 pub(crate) fn run_purity_propagation_with_assessments(
     metrics: &[FunctionMetrics],
-    call_graph: &CallGraph,
+    call_graph: &mut CallGraph,
 ) -> (
     Vec<FunctionMetrics>,
     Option<
@@ -66,7 +67,7 @@ pub(crate) fn run_purity_propagation_with_assessments(
 ) {
     // Create RustCallGraph wrapper
     let rust_graph = RustCallGraph {
-        base_graph: call_graph.clone(),
+        base_graph: std::mem::take(call_graph),
         trait_registry: TraitRegistry::new(),
         function_pointer_tracker: FunctionPointerTracker::new(),
         framework_patterns: FrameworkPatternDetector::new(),
@@ -81,15 +82,18 @@ pub(crate) fn run_purity_propagation_with_assessments(
     let mut propagator = PurityPropagator::new(adapter, purity_analyzer);
 
     // Run propagation - failures are expected when external dependencies are called
-    if let Err(e) = propagator.propagate(metrics) {
-        log::debug!("Purity propagation skipped (external deps): {}", e);
-        return (metrics.to_vec(), None);
-    }
-
-    (
-        propagator.apply_results(metrics),
-        Some(propagator.assessments()),
-    )
+    let result = match propagator.propagate(metrics) {
+        Ok(()) => (
+            propagator.apply_results(metrics),
+            Some(propagator.assessments()),
+        ),
+        Err(e) => {
+            log::debug!("Purity propagation skipped (external deps): {}", e);
+            (metrics.to_vec(), None)
+        }
+    };
+    *call_graph = propagator.into_call_graph();
+    result
 }
 
 /// Create unified analysis from analysis results (orchestrates pure functions).
@@ -108,7 +112,8 @@ pub fn create_unified_analysis(
     let start = Instant::now();
 
     // Initialize unified analysis
-    let mut unified = UnifiedAnalysis::new(call_graph.clone());
+    let shared_graph = std::sync::Arc::new(call_graph.clone());
+    let mut unified = UnifiedAnalysis::new(std::sync::Arc::clone(&shared_graph));
 
     // Populate purity analysis
     unified.populate_purity_analysis(enriched_metrics);
@@ -121,7 +126,7 @@ pub fn create_unified_analysis(
         scoring::setup_debt_aggregator(enriched_metrics, Some(&ctx.results.technical_debt.items));
 
     // Create data flow graph
-    let data_flow_graph = DataFlowGraph::from_call_graph(call_graph.clone());
+    let data_flow_graph = DataFlowGraph::from_call_graph(shared_graph);
 
     // Build file line count cache (spec 195: I/O at boundary, once per unique file)
     let file_line_counts = scoring::build_file_line_count_cache(enriched_metrics);
@@ -403,7 +408,7 @@ fn process_file_analysis(
 /// Register LOC counts for analyzed files.
 fn register_file_loc_counts(
     unified: &mut UnifiedAnalysis,
-    file_groups: &std::collections::HashMap<std::path::PathBuf, Vec<FunctionMetrics>>,
+    file_groups: &foldhash::HashMap<std::path::PathBuf, Vec<FunctionMetrics>>,
 ) {
     use crate::metrics::loc_counter::LocCounter;
 
@@ -418,6 +423,7 @@ fn register_file_loc_counts(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use foldhash::HashMapExt;
 
     #[test]
     fn test_analysis_timings_default() {
@@ -469,7 +475,7 @@ mod tests {
             recommended_splits: vec![],
             confidence: GodObjectConfidence::Probable,
             responsibilities: vec!["data".to_string()],
-            responsibility_method_counts: std::collections::HashMap::new(),
+            responsibility_method_counts: foldhash::HashMap::new(),
             purity_distribution: None,
             module_structure: None,
             detection_type: DetectionType::GodFile,
@@ -524,7 +530,7 @@ fn main() {}
             recommended_splits: vec![],
             confidence: GodObjectConfidence::Probable,
             responsibilities: vec!["data".to_string()],
-            responsibility_method_counts: std::collections::HashMap::new(),
+            responsibility_method_counts: foldhash::HashMap::new(),
             purity_distribution: None,
             module_structure: None,
             detection_type: DetectionType::GodFile,
@@ -579,7 +585,7 @@ fn main() {}
             recommended_splits: vec![],
             confidence: GodObjectConfidence::Probable,
             responsibilities: vec!["data".to_string()],
-            responsibility_method_counts: std::collections::HashMap::new(),
+            responsibility_method_counts: foldhash::HashMap::new(),
             purity_distribution: None,
             module_structure: None,
             detection_type: DetectionType::GodClass,
@@ -643,7 +649,7 @@ pub struct MergeQueueManager {
             recommended_splits: vec![],
             confidence: GodObjectConfidence::Probable,
             responsibilities: vec!["data".to_string()],
-            responsibility_method_counts: std::collections::HashMap::new(),
+            responsibility_method_counts: foldhash::HashMap::new(),
             purity_distribution: None,
             module_structure: None,
             detection_type: DetectionType::GodFile,
@@ -701,7 +707,7 @@ fn main() {}
             recommended_splits: vec![],
             confidence: GodObjectConfidence::Probable,
             responsibilities: vec!["data".to_string()],
-            responsibility_method_counts: std::collections::HashMap::new(),
+            responsibility_method_counts: foldhash::HashMap::new(),
             purity_distribution: None,
             module_structure: None,
             detection_type: DetectionType::GodClass,

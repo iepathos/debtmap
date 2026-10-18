@@ -9,7 +9,7 @@ use debtmap::core::types::{
     AnalysisResult, DebtCategory, DebtItem, FunctionInfo, Language, ModuleInfo, ProjectMetrics,
     Severity, SourceLocation,
 };
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::path::PathBuf;
 use std::sync::Arc;
 

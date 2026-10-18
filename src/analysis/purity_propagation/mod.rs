@@ -30,10 +30,11 @@ use crate::analysis::effect_evidence::{
     EffectAssessment, EffectClassification, ObservedEffect, UnresolvedBehavior, UnresolvedReason,
 };
 use crate::analysis::purity_analysis::{PurityAnalysis, PurityAnalyzer, PurityLevel};
+use crate::collections::DashMap;
 use crate::core::FunctionMetrics;
-use crate::priority::call_graph::FunctionId;
+use crate::priority::call_graph::{CallGraph, FunctionId};
 use anyhow::Result;
-use dashmap::DashMap;
+use rayon::prelude::*;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Result of purity propagation for a function
@@ -119,31 +120,36 @@ impl PurityPropagator {
     /// Create a new purity propagator
     pub fn new(call_graph: PurityCallGraphAdapter, purity_analyzer: PurityAnalyzer) -> Self {
         Self {
-            cache: DashMap::new(),
+            cache: DashMap::default(),
             call_graph,
             purity_analyzer,
         }
     }
 
+    /// Return the call graph the propagator was built from.
+    pub fn into_call_graph(self) -> CallGraph {
+        self.call_graph.into_call_graph()
+    }
+
     /// Propagate purity information through all functions
     pub fn propagate(&mut self, functions: &[FunctionMetrics]) -> Result<()> {
         self.cache.clear();
-        let mut intrinsic = BTreeMap::new();
-        for func in functions {
-            let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line)
-                .with_column(func.column);
-            let initial = self.analyze_intrinsic_purity(func, &func_id)?;
-            intrinsic.insert(func_id, initial);
+        let mut confidences = BTreeMap::new();
+        let mut assessments = BTreeMap::new();
+        let initial = functions
+            .par_iter()
+            .map(|func| {
+                let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line)
+                    .with_column(func.column);
+                Ok((self.analyze_intrinsic_purity(func, &func_id)?, func_id))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        for (initial, func_id) in initial {
+            confidences.insert(func_id.clone(), initial.confidence);
+            assessments.insert(func_id, initial.assessment);
         }
-        let assessments = intrinsic
-            .iter()
-            .map(|(id, result)| (id.clone(), result.assessment.clone()))
-            .collect();
         for (id, assessment) in propagate_assessment_map(&assessments) {
-            let confidence = intrinsic
-                .get(&id)
-                .map(|result| result.confidence)
-                .unwrap_or(1.0);
+            let confidence = confidences.get(&id).copied().unwrap_or(1.0);
             self.cache
                 .insert(id, result_from_assessment(assessment, confidence));
         }
@@ -194,24 +200,18 @@ impl PurityPropagator {
 /// Propagate the same typed summaries used by scoring and reporting.
 pub(crate) fn propagate_graph_assessments(
     graph: &crate::priority::call_graph::CallGraph,
-) -> BTreeMap<FunctionId, EffectAssessment> {
+) -> std::borrow::Cow<'_, BTreeMap<FunctionId, EffectAssessment>> {
     if graph.effect_assessments_are_propagated() {
-        return graph
-            .effect_assessments()
-            .map(|(id, assessment)| (id.clone(), assessment.clone()))
-            .collect();
+        return std::borrow::Cow::Borrowed(&graph.effect_assessments);
     }
-    let intrinsic = graph
-        .effect_assessments()
-        .map(|(id, assessment)| (id.clone(), assessment.clone()))
-        .collect();
-    propagate_assessment_map(&intrinsic)
+    std::borrow::Cow::Owned(propagate_assessment_map(&graph.effect_assessments))
 }
 
 fn propagate_assessment_map(
     intrinsic: &BTreeMap<FunctionId, EffectAssessment>,
 ) -> BTreeMap<FunctionId, EffectAssessment> {
-    let mut current = intrinsic.clone();
+    // Only assessments that change are stored; the rest are read from `intrinsic`.
+    let mut updated = BTreeMap::<FunctionId, EffectAssessment>::new();
     let dependents = intrinsic.iter().fold(
         BTreeMap::<FunctionId, BTreeSet<FunctionId>>::new(),
         |mut result, (caller, assessment)| {
@@ -235,21 +235,28 @@ fn propagate_assessment_map(
             let assessment = base
                 .dependencies()
                 .fold(base.clone(), |result, dependency| {
-                    let summary = current
+                    let summary = updated
                         .get(&dependency.target)
+                        .or_else(|| intrinsic.get(&dependency.target))
                         .map(|callee| dependency_assessment(dependency, callee))
                         .unwrap_or_else(|| missing_dependency(dependency));
                     result.merge(&summary)
                 });
-            if current.get(&id) != Some(&assessment) {
-                current.insert(id.clone(), assessment);
+            if updated.get(&id).unwrap_or(base) != &assessment {
+                updated.insert(id.clone(), assessment);
                 if let Some(callers) = dependents.get(&id) {
                     pending.extend(callers.intersection(&component).cloned());
                 }
             }
         }
     }
-    current
+    intrinsic
+        .iter()
+        .map(|(id, assessment)| {
+            let assessment = updated.remove(id).unwrap_or_else(|| assessment.clone());
+            (id.clone(), assessment)
+        })
+        .collect()
 }
 
 /// Callee-first components; recursion is solved only by monotonically joining facts.

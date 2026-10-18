@@ -1,7 +1,7 @@
 use crate::analysis::multi_signal_aggregation::ResponsibilityCategory;
 use crate::analysis::rust_patterns::context::RustFunctionContext;
+use foldhash::{HashMap, HashMapExt};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum StandardTrait {

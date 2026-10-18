@@ -8,7 +8,7 @@
 //!
 //! Used by `PurityDetector` to classify mutations as local vs external.
 
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use syn::FnArg;
 
 /// Tracks variables in scope during AST traversal

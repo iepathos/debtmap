@@ -5,7 +5,7 @@
 
 use crate::core::FunctionMetrics;
 use crate::priority::call_graph::{CallGraph, FunctionId};
-use std::collections::HashSet;
+use foldhash::{HashSet, HashSetExt};
 use std::path::Path;
 
 /// Build initial call graph from function metrics (pure).

@@ -9,7 +9,7 @@
 use super::normalizer::{CanonicalType, TypeNormalizer};
 use super::patterns::{TypeMatcher, TypePattern, TypePatternLibrary};
 use crate::analysis::multi_signal_aggregation::ResponsibilityCategory;
-use dashmap::DashMap;
+use crate::collections::DashMap;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
@@ -70,7 +70,7 @@ impl TypeSignatureAnalyzer {
         Self {
             pattern_library: TypePatternLibrary::default_patterns(),
             normalizer: TypeNormalizer::new(),
-            cache: DashMap::new(),
+            cache: DashMap::default(),
         }
     }
 

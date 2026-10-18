@@ -58,7 +58,7 @@ pub use analysis::{
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::{HashMap, HashSet};
+    use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
     use syn::ItemImpl;
 
     #[test]
@@ -858,7 +858,7 @@ mod tests {
             "set_state".to_string(),
         ];
 
-        let adjacency = HashMap::from([
+        let adjacency = crate::collections::map_from([
             // Rendering cluster has internal calls
             (
                 ("render_text".to_string(), "paint_highlights".to_string()),
@@ -875,7 +875,7 @@ mod tests {
         let clusters = result.clusters;
 
         // REQUIREMENT 1: All methods must be accounted for
-        let clustered_methods: std::collections::HashSet<String> =
+        let clustered_methods: foldhash::HashSet<String> =
             clusters.iter().flat_map(|c| &c.methods).cloned().collect();
 
         for method in &methods {
@@ -1078,7 +1078,7 @@ mod tests {
         let category_names: Vec<String> = clusters.keys().map(|cat| cat.display_name()).collect();
 
         // Check for duplicates (case-insensitive comparison)
-        let mut seen_lower = std::collections::HashSet::new();
+        let mut seen_lower = foldhash::HashSet::new();
         let mut duplicates = Vec::new();
 
         for name in &category_names {

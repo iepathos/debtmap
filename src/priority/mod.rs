@@ -20,6 +20,7 @@
 //! - **Performance**: Async misuse, collection inefficiency
 //! - **Code Quality**: Complexity hotspots, duplication
 
+use foldhash::HashMapExt;
 pub mod architecture_recognition;
 pub mod call_graph;
 pub mod caller_classification;
@@ -100,7 +101,7 @@ pub struct UnifiedAnalysis {
     pub total_debt_score: f64,
     pub debt_density: f64,
     pub total_lines_of_code: usize,
-    pub call_graph: CallGraph,
+    pub call_graph: std::sync::Arc<CallGraph>,
     pub data_flow_graph: crate::data_flow::DataFlowGraph,
     pub overall_coverage: Option<f64>,
     #[serde(default)]
@@ -114,7 +115,7 @@ pub struct UnifiedAnalysis {
     /// All analyzed files with their line counts (Spec 201)
     /// Used for accurate total LOC calculation including files without debt items
     #[serde(skip)]
-    pub analyzed_files: std::collections::HashMap<PathBuf, usize>,
+    pub analyzed_files: foldhash::HashMap<PathBuf, usize>,
     /// Unified finding suppressions applied after scoring.
     #[serde(skip)]
     pub suppression_audit: crate::debt::suppression_audit::SuppressionAudit,
@@ -475,9 +476,10 @@ pub struct TieredDisplay {
 }
 
 impl UnifiedAnalysis {
-    pub fn new(call_graph: CallGraph) -> Self {
-        // Create DataFlowGraph from the CallGraph
-        let data_flow_graph = crate::data_flow::DataFlowGraph::from_call_graph(call_graph.clone());
+    pub fn new(call_graph: impl Into<std::sync::Arc<CallGraph>>) -> Self {
+        let call_graph = call_graph.into();
+        let data_flow_graph =
+            crate::data_flow::DataFlowGraph::from_call_graph(std::sync::Arc::clone(&call_graph));
 
         Self {
             items: Vector::new(),
@@ -497,7 +499,7 @@ impl UnifiedAnalysis {
             has_coverage_data: false,
             timings: None,
             stats: FilterStatistics::new(),
-            analyzed_files: std::collections::HashMap::new(),
+            analyzed_files: foldhash::HashMap::new(),
             suppression_audit: crate::debt::suppression_audit::SuppressionAudit::default(),
         }
     }
@@ -559,7 +561,7 @@ impl UnifiedAnalysis {
     fn log_scoring_debug(
         &self,
         total_debt_score: f64,
-        god_object_files: &std::collections::HashSet<PathBuf>,
+        god_object_files: &foldhash::HashSet<PathBuf>,
     ) {
         if std::env::var("DEBTMAP_DEBUG_SCORING").is_err() {
             return;

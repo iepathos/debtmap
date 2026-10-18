@@ -16,7 +16,7 @@
 //!
 //! ```rust,no_run
 //! use debtmap::debt::public_api_detector::{PublicApiDetector, PublicApiConfig, FunctionDef, FileContext, Language};
-//! use std::collections::HashMap;
+//! use foldhash::{HashMap, HashMapExt};
 //! use std::path::PathBuf;
 //!
 //! let detector = PublicApiDetector::new(PublicApiConfig::default());
@@ -50,7 +50,7 @@
 //! }
 //! ```
 
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::path::PathBuf;
 
 /// Configuration for public API detection

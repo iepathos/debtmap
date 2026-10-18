@@ -3,7 +3,7 @@
 //! boundary rules when exact AST bounds are unavailable.
 
 use super::types::FunctionCoverage;
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 
 /// Coverage data for a single function (intermediate result).
 ///

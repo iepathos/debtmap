@@ -6,7 +6,7 @@
 /// - **FieldAccessTracker**: Analyzes which fields each method accesses
 /// - **Service extraction**: Identifies methods that can be extracted to service objects
 /// - **Trait extraction**: Suggests trait-based decomposition for behavioral clusters
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use syn::{Expr, ExprField, ImplItemFn, ItemImpl, visit::Visit};
 
 use super::types::{BehaviorCategory, FieldAccessStats, MethodCluster, capitalize_first};

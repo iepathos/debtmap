@@ -6,6 +6,7 @@
 use crate::collections::{HashMap, HashSet, Vector};
 use crate::priority::call_graph::FunctionId;
 use anyhow::Result;
+use foldhash::{HashMapExt, HashSetExt};
 use std::path::{Path, PathBuf};
 use syn::spanned::Spanned;
 use syn::visit::Visit;
@@ -108,6 +109,13 @@ pub struct ModuleImport {
     pub line: usize,
 }
 
+/// One file's module facts, computed without shared tracker state.
+pub(crate) struct ModuleFileFacts {
+    boundary: ModuleBoundary,
+    calls: Vec<CrossModuleCall>,
+    imports: Vec<ModuleImport>,
+}
+
 /// Tracker for cross-module dependencies and public APIs
 #[derive(Debug, Clone)]
 pub struct CrossModuleTracker {
@@ -147,46 +155,46 @@ impl CrossModuleTracker {
 
     /// Accumulate owned module metadata without revisiting previous batches.
     pub(crate) fn collect_workspace(&mut self, workspace_files: &[(PathBuf, File)]) -> Result<()> {
-        // First pass: Build module structure
         for (file_path, ast) in workspace_files {
-            let module_path = self.infer_module_path(file_path);
-            self.file_to_module
-                .insert(file_path.clone(), module_path.clone());
+            let facts = self.file_facts(file_path, ast);
+            self.apply_file_facts(facts);
+        }
+        Ok(())
+    }
 
-            let mut visitor = ModuleVisitor::new(file_path.clone(), module_path.clone());
-            visitor.visit_file(ast);
-
-            // Add module boundary
-            let boundary = ModuleBoundary {
-                module_path: module_path.clone(),
-                file_path: file_path.clone(),
+    /// Module facts of one file, independent of facts from other files.
+    pub(crate) fn file_facts(&self, file_path: &Path, ast: &File) -> ModuleFileFacts {
+        let module_path = self.infer_module_path(file_path);
+        let mut visitor = ModuleVisitor::new(file_path.to_path_buf(), module_path.clone());
+        visitor.visit_file(ast);
+        let mut calls = CrossModuleCallVisitor::new(module_path.clone());
+        calls.visit_file(ast);
+        ModuleFileFacts {
+            boundary: ModuleBoundary {
                 parent_module: self.infer_parent_module(&module_path),
+                module_path,
+                file_path: file_path.to_path_buf(),
                 submodules: visitor.submodules.into_iter().collect(),
                 public_exports: visitor.public_exports.into_iter().collect(),
-            };
-
-            self.module_boundaries.insert(module_path, boundary);
+            },
+            calls: calls.cross_module_calls,
+            imports: calls.module_imports,
         }
+    }
 
-        // Second pass: Analyze imports and cross-module calls
-        for (file_path, ast) in workspace_files {
-            let module_path = self.file_to_module.get(file_path).unwrap().clone();
-
-            let mut call_visitor = CrossModuleCallVisitor::new(module_path.clone());
-            call_visitor.visit_file(ast);
-
-            // Add cross-module calls
-            for call in call_visitor.cross_module_calls {
-                self.cross_module_calls.push(call);
-            }
-
-            // Add module imports
-            for import in call_visitor.module_imports {
-                self.module_imports.push(import);
-            }
-        }
-
-        Ok(())
+    /// Add one file's module boundary, calls and imports.
+    pub(crate) fn apply_file_facts(&mut self, facts: ModuleFileFacts) {
+        let ModuleFileFacts {
+            boundary,
+            calls,
+            imports,
+        } = facts;
+        self.file_to_module
+            .insert(boundary.file_path.clone(), boundary.module_path.clone());
+        self.cross_module_calls.extend(calls);
+        self.module_imports.extend(imports);
+        self.module_boundaries
+            .insert(boundary.module_path.clone(), boundary);
     }
 
     /// Finalize public APIs once all workspace files have been collected.

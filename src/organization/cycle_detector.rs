@@ -3,7 +3,7 @@
 /// This module detects cycles in the dependency graph between proposed module splits
 /// using depth-first search.
 use crate::organization::god_object::types::ModuleSplit;
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
 
 /// Detect circular dependencies in module splits
 ///

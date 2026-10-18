@@ -2,7 +2,8 @@
 //!
 //! Provides parser-backed analysis of Python source files.
 
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet};
+use std::collections::BTreeSet;
 use std::path::Path;
 
 use super::types::{
@@ -113,7 +114,7 @@ fn build_dependency_graph(
     let import_names: Vec<String> = imports
         .iter()
         .map(|import| import.path.clone())
-        .collect::<HashSet<_>>()
+        .collect::<BTreeSet<_>>()
         .into_iter()
         .collect();
     graph_components.extend(import_names.iter().cloned());

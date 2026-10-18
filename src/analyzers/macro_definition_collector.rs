@@ -11,7 +11,7 @@
 //! - Thread-safe concurrent collection via `DashMap`
 //! - Integrates with `PurityDetector` for macro classification
 
-use dashmap::DashMap;
+use crate::collections::DashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use syn::visit::Visit;
@@ -95,7 +95,7 @@ pub fn collect_definitions(file: &File, file_path: &Path, definitions: MacroDefi
 ///
 /// This function processes all files in parallel using rayon for performance.
 pub fn collect_project_macros(files: &[(PathBuf, syn::File)]) -> MacroDefinitions {
-    let definitions = Arc::new(DashMap::new());
+    let definitions = Arc::new(DashMap::default());
 
     // Sequential collection for now (parallel version requires rayon ParallelSlice)
     // Performance impact is minimal since macro collection is very fast
@@ -123,7 +123,7 @@ mod tests {
         "#;
 
         let ast = syn::parse_file(code).unwrap();
-        let definitions = Arc::new(DashMap::new());
+        let definitions = Arc::new(DashMap::default());
         collect_definitions(&ast, Path::new("test.rs"), definitions.clone());
 
         assert_eq!(definitions.len(), 2);
@@ -180,7 +180,7 @@ mod tests {
         "#;
 
         let ast = syn::parse_file(code).unwrap();
-        let definitions = Arc::new(DashMap::new());
+        let definitions = Arc::new(DashMap::default());
         let path = PathBuf::from("src/macros.rs");
         collect_definitions(&ast, &path, definitions.clone());
 
@@ -198,7 +198,7 @@ mod tests {
         "#;
 
         let ast = syn::parse_file(code).unwrap();
-        let definitions = Arc::new(DashMap::new());
+        let definitions = Arc::new(DashMap::default());
         collect_definitions(&ast, Path::new("test.rs"), definitions.clone());
 
         assert_eq!(definitions.len(), 0);
@@ -218,7 +218,7 @@ mod tests {
         "#;
 
         let ast = syn::parse_file(code).unwrap();
-        let definitions = Arc::new(DashMap::new());
+        let definitions = Arc::new(DashMap::default());
         collect_definitions(&ast, Path::new("test.rs"), definitions.clone());
 
         assert_eq!(definitions.len(), 1);

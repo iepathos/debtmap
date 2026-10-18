@@ -76,7 +76,7 @@ fn collect_callables<'tree>(
     config: &SolidityLanguageConfig,
     contract_name: Option<String>,
     contracts: &[ContractInfo],
-    modifiers: &std::collections::HashMap<String, Node<'tree>>,
+    modifiers: &foldhash::HashMap<String, Node<'tree>>,
     functions: &mut Vec<SolidityFunction>,
 ) {
     let current_contract = contract_name.or_else(|| ancestor_contract_name(node, ast));

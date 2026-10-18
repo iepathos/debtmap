@@ -4,7 +4,7 @@
 //! and produce validation components. Functions return data rather
 //! than mutating state.
 
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 
 use crate::comparison::types::{ComparisonResult, RegressionItem, TargetComparison, TargetStatus};
 

@@ -2,6 +2,7 @@
 
 use crate::core::traits::{Analyzer, ConfigProvider, Formatter, PriorityCalculator, Scorer};
 use anyhow::Result;
+use foldhash::HashMapExt;
 use std::sync::Arc;
 
 /// Main application container using dependency injection
@@ -280,7 +281,7 @@ impl Analyzer for RustAnalyzerAdapter {
 
 /// Service locator pattern for runtime resolution
 pub struct ServiceLocator {
-    services: std::collections::HashMap<std::any::TypeId, Box<dyn std::any::Any + Send + Sync>>,
+    services: foldhash::HashMap<std::any::TypeId, Box<dyn std::any::Any + Send + Sync>>,
 }
 
 impl Default for ServiceLocator {
@@ -293,7 +294,7 @@ impl ServiceLocator {
     /// Create a new service locator
     pub fn new() -> Self {
         Self {
-            services: std::collections::HashMap::new(),
+            services: foldhash::HashMap::new(),
         }
     }
 

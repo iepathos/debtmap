@@ -4,7 +4,7 @@
 //! to reduce complexity and improve testability.
 
 use super::{DebtType, FileDebtItem, UnifiedDebtItem};
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet};
 use std::path::PathBuf;
 
 /// Accumulated metrics from function-level debt items.

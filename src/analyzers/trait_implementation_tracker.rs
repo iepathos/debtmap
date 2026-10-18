@@ -7,6 +7,7 @@ use crate::collections::{HashMap, HashSet, Vector};
 /// - Blanket implementations
 /// - Associated types and methods
 use crate::priority::call_graph::FunctionId;
+use foldhash::HashMapExt;
 use std::path::PathBuf;
 use syn::visit::Visit;
 use syn::{

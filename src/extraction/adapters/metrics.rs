@@ -14,6 +14,7 @@ use crate::core::{
     FunctionMetrics, Language, Priority,
 };
 use crate::extraction::types::{ExtractedFileData, ExtractedFunctionData, PurityLevel};
+use foldhash::HashMapExt;
 use std::path::Path;
 
 /// Convert extracted function data to FunctionMetrics.
@@ -306,7 +307,7 @@ fn line_for_struct(extracted: &ExtractedFileData, name: &str) -> usize {
 ///
 /// A flat vector of all `FunctionMetrics` across all files.
 pub fn all_metrics_from_extracted(
-    extracted: &std::collections::HashMap<std::path::PathBuf, ExtractedFileData>,
+    extracted: &foldhash::HashMap<std::path::PathBuf, ExtractedFileData>,
 ) -> Vec<FunctionMetrics> {
     extracted.values().flat_map(all_function_metrics).collect()
 }
@@ -321,7 +322,7 @@ pub fn all_metrics_from_extracted(
 ///
 /// A vector of `FileMetrics` for all extracted files.
 pub fn all_file_metrics_from_extracted(
-    extracted: &std::collections::HashMap<std::path::PathBuf, ExtractedFileData>,
+    extracted: &foldhash::HashMap<std::path::PathBuf, ExtractedFileData>,
 ) -> Vec<FileMetrics> {
     extracted.values().map(to_file_metrics).collect()
 }
@@ -336,7 +337,7 @@ pub fn all_file_metrics_from_extracted(
 ///
 /// Tuple of (total_cyclomatic, total_cognitive, max_nesting, function_count)
 pub fn aggregate_complexity(
-    extracted: &std::collections::HashMap<std::path::PathBuf, ExtractedFileData>,
+    extracted: &foldhash::HashMap<std::path::PathBuf, ExtractedFileData>,
 ) -> (u32, u32, u32, usize) {
     let mut total_cyclomatic: u32 = 0;
     let mut total_cognitive: u32 = 0;
@@ -529,7 +530,7 @@ mod tests {
 
     #[test]
     fn test_all_metrics_from_extracted() {
-        let mut extracted = std::collections::HashMap::new();
+        let mut extracted = foldhash::HashMap::new();
         extracted.insert(PathBuf::from("file1.rs"), create_test_file_data());
 
         let mut file2 = create_test_file_data();
@@ -544,7 +545,7 @@ mod tests {
 
     #[test]
     fn test_aggregate_complexity() {
-        let mut extracted = std::collections::HashMap::new();
+        let mut extracted = foldhash::HashMap::new();
         extracted.insert(PathBuf::from("file1.rs"), create_test_file_data());
 
         let (total_cyc, total_cog, max_nest, count) = aggregate_complexity(&extracted);

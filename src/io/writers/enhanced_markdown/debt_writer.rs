@@ -125,13 +125,12 @@ mod tests {
         Location, UnifiedDebtItem, UnifiedScore,
     };
     use chrono::Utc;
-    use std::collections::HashMap;
+    use foldhash::{HashMap, HashMapExt};
     use std::io::Cursor;
     use std::path::PathBuf;
 
     fn create_test_analysis() -> UnifiedAnalysis {
         use crate::data_flow::DataFlowGraph;
-        use crate::priority::call_graph::CallGraph;
 
         use crate::collections::Vector;
 
@@ -232,13 +231,13 @@ mod tests {
             total_debt_score: 0.0,
             debt_density: 0.0,
             total_lines_of_code: 0,
-            call_graph: CallGraph::new(),
+            call_graph: Default::default(),
             data_flow_graph: DataFlowGraph::new(),
             overall_coverage: None,
             has_coverage_data: false,
             timings: None,
             stats: crate::priority::FilterStatistics::new(),
-            analyzed_files: std::collections::HashMap::new(),
+            analyzed_files: foldhash::HashMap::new(),
             suppression_audit: Default::default(),
         }
     }
@@ -295,7 +294,7 @@ mod tests {
                 circular: vec![],
             },
             duplications: vec![],
-            file_contexts: std::collections::HashMap::new(),
+            file_contexts: foldhash::HashMap::new(),
         }
     }
 

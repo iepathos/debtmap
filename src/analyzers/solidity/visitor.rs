@@ -64,7 +64,7 @@ fn callable_from_node(
     config: &SolidityLanguageConfig,
     contract_name: Option<String>,
     contracts: &[crate::analyzers::solidity::types::ContractInfo],
-    modifiers: &std::collections::HashMap<String, Node<'_>>,
+    modifiers: &foldhash::HashMap<String, Node<'_>>,
 ) -> Option<SolidityFunction> {
     let (kind, name) = callable_kind_and_name(node, ast, contract_name.as_deref())?;
     let body = node.child_by_field_name("body")?;

@@ -6,7 +6,7 @@
 /// - Low complexity in implementation methods
 ///
 /// These patterns indicate opportunities for macro-ification or code generation.
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet};
 use syn::{self, visit::Visit};
 
 /// Analyzer for trait implementation patterns

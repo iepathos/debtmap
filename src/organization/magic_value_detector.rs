@@ -3,7 +3,7 @@ use super::{
     ValueContext,
 };
 use crate::common::SourceLocation;
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use syn::{self, visit::Visit};
 
 pub struct MagicValueDetector {

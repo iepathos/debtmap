@@ -9,8 +9,8 @@
 use crate::core::FunctionMetrics;
 use crate::priority::call_graph::CallGraph;
 use crate::risk::lcov::LcovData;
+use foldhash::HashSet;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 use std::path::PathBuf;
 
 /// Analysis workflow phases.

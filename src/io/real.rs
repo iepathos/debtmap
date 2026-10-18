@@ -18,7 +18,7 @@
 
 use crate::errors::AnalysisError;
 use crate::io::traits::{Cache, CoverageData, CoverageLoader, FileCoverage, FileSystem};
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::fs;
 use std::path::Path;
 use std::sync::RwLock;

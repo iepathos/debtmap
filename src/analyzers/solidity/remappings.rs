@@ -1,6 +1,6 @@
 //! Foundry remapping parsing and Solidity import path resolution.
 
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use std::path::{Component, Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -189,10 +189,10 @@ fn group_files_by_project_root(files: &[PathBuf]) -> HashMap<PathBuf, Vec<PathBu
     }
 
     if let Some(root) = shared_configured_root(files) {
-        return HashMap::from([(root, files.to_vec())]);
+        return crate::collections::map_from([(root, files.to_vec())]);
     }
 
-    HashMap::from([(common_ancestor_root(files), files.to_vec())])
+    crate::collections::map_from([(common_ancestor_root(files), files.to_vec())])
 }
 
 fn shared_configured_root(files: &[PathBuf]) -> Option<PathBuf> {

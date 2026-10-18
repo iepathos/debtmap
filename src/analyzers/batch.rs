@@ -37,9 +37,9 @@ use crate::effects::{
 };
 use crate::env::{AnalysisEnv, RealEnv};
 use crate::errors::AnalysisError;
+use foldhash::{HashMap, HashMapExt, HashSet};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use stillwater::effect::prelude::*;

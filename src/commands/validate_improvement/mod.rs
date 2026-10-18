@@ -54,7 +54,7 @@ pub mod types;
 pub use types::{OutputFormat, ValidateImprovementConfig, ValidationResult};
 
 use anyhow::Result;
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 
 use crate::comparison::types::ComparisonResult;
 

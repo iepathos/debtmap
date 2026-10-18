@@ -41,6 +41,7 @@
 //! let back_to_analysis: AnalysisError = anyhow_err.into();
 //! ```
 
+use foldhash::{HashMapExt, HashSetExt};
 // Submodules for Spec 202 - Error Collection and Reporting
 pub mod collection;
 pub mod partition;
@@ -577,9 +578,8 @@ pub fn format_error_report(errors: &[AnalysisError]) -> String {
 /// Returns a map of error category to list of errors in that category.
 pub fn group_errors_by_category(
     errors: &[AnalysisError],
-) -> std::collections::HashMap<&'static str, Vec<&AnalysisError>> {
-    let mut groups: std::collections::HashMap<&'static str, Vec<&AnalysisError>> =
-        std::collections::HashMap::new();
+) -> foldhash::HashMap<&'static str, Vec<&AnalysisError>> {
+    let mut groups: foldhash::HashMap<&'static str, Vec<&AnalysisError>> = foldhash::HashMap::new();
 
     for error in errors {
         groups.entry(error.category()).or_default().push(error);
@@ -626,7 +626,7 @@ pub struct ErrorSummary {
     /// Total number of errors
     pub total_count: usize,
     /// Count by category
-    pub by_category: std::collections::HashMap<String, usize>,
+    pub by_category: foldhash::HashMap<String, usize>,
     /// Unique file paths mentioned in errors
     pub affected_files: Vec<PathBuf>,
     /// The original errors
@@ -636,10 +636,8 @@ pub struct ErrorSummary {
 impl ErrorSummary {
     /// Create an error summary from a list of errors.
     pub fn from_errors(errors: Vec<AnalysisError>) -> Self {
-        let mut by_category: std::collections::HashMap<String, usize> =
-            std::collections::HashMap::new();
-        let mut affected_files: std::collections::HashSet<PathBuf> =
-            std::collections::HashSet::new();
+        let mut by_category: foldhash::HashMap<String, usize> = foldhash::HashMap::new();
+        let mut affected_files: foldhash::HashSet<PathBuf> = foldhash::HashSet::new();
 
         for error in &errors {
             *by_category.entry(error.category().to_string()).or_insert(0) += 1;

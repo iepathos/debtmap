@@ -26,7 +26,7 @@ fn create_test_project(num_files: usize, functions_per_file: usize) -> (TempDir,
     std::fs::create_dir_all(&src_dir).unwrap();
 
     for i in 1..=num_files {
-        let mut content = String::from("use std::collections::HashMap;\n\n");
+        let mut content = String::from("use foldhash::{HashMap};\n\n");
 
         for j in 1..=functions_per_file {
             content.push_str(&format!(

@@ -6,6 +6,7 @@
 use crate::core::FunctionMetrics;
 use crate::priority::call_graph::CallGraph;
 use crate::priority::{DebtType, UnifiedDebtItem};
+use foldhash::HashMapExt;
 use std::path::PathBuf;
 
 /// Data flowing through the analysis pipeline.
@@ -110,17 +111,17 @@ impl PipelineData {
 #[derive(Clone, Debug)]
 pub struct CoverageData {
     /// Coverage percentage by file
-    pub file_coverage: std::collections::HashMap<PathBuf, f64>,
+    pub file_coverage: foldhash::HashMap<PathBuf, f64>,
 
     /// Line coverage information
-    pub line_coverage: std::collections::HashMap<PathBuf, Vec<bool>>,
+    pub line_coverage: foldhash::HashMap<PathBuf, Vec<bool>>,
 }
 
 impl CoverageData {
     pub fn new() -> Self {
         Self {
-            file_coverage: std::collections::HashMap::new(),
-            line_coverage: std::collections::HashMap::new(),
+            file_coverage: foldhash::HashMap::new(),
+            line_coverage: foldhash::HashMap::new(),
         }
     }
 }
@@ -135,7 +136,7 @@ impl Default for CoverageData {
 #[derive(Clone, Debug)]
 pub struct PurityScores {
     /// Purity score for each function (0.0 = impure, 1.0 = pure)
-    pub scores: std::collections::HashMap<String, f64>,
+    pub scores: foldhash::HashMap<String, f64>,
 
     /// Functions identified as pure
     pub pure_functions: Vec<String>,
@@ -147,7 +148,7 @@ pub struct PurityScores {
 impl PurityScores {
     pub fn new() -> Self {
         Self {
-            scores: std::collections::HashMap::new(),
+            scores: foldhash::HashMap::new(),
             pure_functions: Vec::new(),
             io_functions: Vec::new(),
         }

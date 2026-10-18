@@ -1,7 +1,7 @@
 use super::super::priority::TestTarget;
 use chrono::{DateTime, Utc};
+use foldhash::{HashMap, HashMapExt};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ROILearningSystem {

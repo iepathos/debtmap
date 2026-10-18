@@ -11,6 +11,7 @@
 //! - Different implementations for CLI vs TUI
 //! - Pure guards that don't need environments
 
+use foldhash::HashMapExt;
 use std::io;
 use std::path::Path;
 
@@ -145,7 +146,7 @@ pub struct MockAnalysisEnv {
     pub infos: Vec<String>,
 
     /// Mock file system contents.
-    pub files: std::collections::HashMap<std::path::PathBuf, Vec<u8>>,
+    pub files: foldhash::HashMap<std::path::PathBuf, Vec<u8>>,
 }
 
 #[cfg(test)]
@@ -157,7 +158,7 @@ impl MockAnalysisEnv {
             progress_updates: vec![],
             warnings: vec![],
             infos: vec![],
-            files: std::collections::HashMap::new(),
+            files: foldhash::HashMap::new(),
         }
     }
 

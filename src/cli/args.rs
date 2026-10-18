@@ -220,6 +220,21 @@ pub enum Commands {
         #[arg(long = "jobs", short = 'j', default_value = "0", env = "DEBTMAP_JOBS")]
         jobs: usize,
 
+        /// Megabytes of Rust source whose syntax trees are kept between call-graph passes (0 = reparse).
+        /// Retained trees use more memory than this budget. Other languages ignore this flag.
+        #[arg(long = "parse-cache-mb", default_value_t = crate::core::parsing::DEFAULT_PARSE_CACHE_MB, env = "DEBTMAP_PARSE_CACHE_MB")]
+        parse_cache_mb: usize,
+
+        /// Megabytes of cached Rust path resolutions and reexport expansions (0 = recompute).
+        /// Other languages ignore this flag.
+        #[arg(long = "resolution-cache-mb", default_value_t = crate::analyzers::rust_resolution::index::DEFAULT_RESOLUTION_CACHE_MB, env = "DEBTMAP_RESOLUTION_CACHE_MB")]
+        resolution_cache_mb: usize,
+
+        /// Megabytes of cached canonical file paths (0 = do not cache).
+        /// Applies to Rust, Python, JavaScript, TypeScript, Go, and Solidity.
+        #[arg(long = "canonical-cache-mb", default_value_t = crate::priority::call_graph::DEFAULT_CANONICAL_CACHE_MB, env = "DEBTMAP_CANONICAL_CACHE_MB")]
+        canonical_cache_mb: usize,
+
         /// Disable multi-pass analysis (use single-pass for performance)
         #[arg(long = "no-multi-pass")]
         no_multi_pass: bool,
@@ -389,6 +404,21 @@ pub enum Commands {
         /// Environment variable DEBTMAP_JOBS can also be used to set this value.
         #[arg(long = "jobs", short = 'j', default_value = "0", env = "DEBTMAP_JOBS")]
         jobs: usize,
+
+        /// Megabytes of Rust source whose syntax trees are kept between call-graph passes (0 = reparse).
+        /// Retained trees use more memory than this budget. Other languages ignore this flag.
+        #[arg(long = "parse-cache-mb", default_value_t = crate::core::parsing::DEFAULT_PARSE_CACHE_MB, env = "DEBTMAP_PARSE_CACHE_MB")]
+        parse_cache_mb: usize,
+
+        /// Megabytes of cached Rust path resolutions and reexport expansions (0 = recompute).
+        /// Other languages ignore this flag.
+        #[arg(long = "resolution-cache-mb", default_value_t = crate::analyzers::rust_resolution::index::DEFAULT_RESOLUTION_CACHE_MB, env = "DEBTMAP_RESOLUTION_CACHE_MB")]
+        resolution_cache_mb: usize,
+
+        /// Megabytes of cached canonical file paths (0 = do not cache).
+        /// Applies to Rust, Python, JavaScript, TypeScript, Go, and Solidity.
+        #[arg(long = "canonical-cache-mb", default_value_t = crate::priority::call_graph::DEFAULT_CANONICAL_CACHE_MB, env = "DEBTMAP_CANONICAL_CACHE_MB")]
+        canonical_cache_mb: usize,
 
         /// Show detailed module split recommendations for god objects and large files.
         /// This experimental feature suggests how to decompose large files into
@@ -697,6 +727,65 @@ mod tests {
             Commands::Analyze { .. } => {}
             _ => panic!("Expected Analyze command from test args"),
         }
+    }
+
+    #[test]
+    fn memory_budget_flags_name_their_languages() {
+        use clap::Parser;
+
+        let defaults = Cli::parse_from(["debtmap", "analyze", "."]);
+        match defaults.command {
+            Commands::Analyze {
+                parse_cache_mb,
+                resolution_cache_mb,
+                canonical_cache_mb,
+                ..
+            } => {
+                assert_eq!(parse_cache_mb, crate::core::parsing::DEFAULT_PARSE_CACHE_MB);
+                assert_eq!(
+                    resolution_cache_mb,
+                    crate::analyzers::rust_resolution::index::DEFAULT_RESOLUTION_CACHE_MB
+                );
+                assert_eq!(
+                    canonical_cache_mb,
+                    crate::priority::call_graph::DEFAULT_CANONICAL_CACHE_MB
+                );
+            }
+            _ => panic!("Expected Analyze command"),
+        }
+
+        let overridden = Cli::parse_from([
+            "debtmap",
+            "validate",
+            ".",
+            "--parse-cache-mb",
+            "0",
+            "--resolution-cache-mb",
+            "8",
+            "--canonical-cache-mb",
+            "1",
+        ]);
+        match overridden.command {
+            Commands::Validate {
+                parse_cache_mb,
+                resolution_cache_mb,
+                canonical_cache_mb,
+                ..
+            } => {
+                assert_eq!(parse_cache_mb, 0);
+                assert_eq!(resolution_cache_mb, 8);
+                assert_eq!(canonical_cache_mb, 1);
+            }
+            _ => panic!("Expected Validate command"),
+        }
+
+        let help = Cli::try_parse_from(["debtmap", "analyze", "--help"])
+            .expect_err("help exits")
+            .to_string();
+        assert!(help.contains("parse-cache-mb"));
+        assert!(help.contains("resolution-cache-mb"));
+        assert!(help.contains("canonical-cache-mb"));
+        assert!(help.contains("Rust, Python, JavaScript, TypeScript, Go, and Solidity"));
     }
 
     #[test]

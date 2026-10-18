@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use foldhash::HashMap;
 use syn::{ReturnType as SynReturnType, Type, Visibility};
 
 /// Registry of function signatures and their return types

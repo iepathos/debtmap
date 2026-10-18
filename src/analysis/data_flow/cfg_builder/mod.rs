@@ -31,7 +31,7 @@ mod control_flow;
 mod extraction;
 mod rvalue;
 
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet};
 
 use syn::{Block, Expr, Local, Stmt};
 

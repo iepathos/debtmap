@@ -37,6 +37,20 @@ impl DeclarationCollector {
         }
     }
 
+    /// Append a partition's records. Partitions must be absorbed in source order.
+    pub fn absorb(&mut self, other: Self) {
+        let index = other.index;
+        self.edges.extend(other.edges);
+        self.index.declarations.extend(index.declarations);
+        self.index.module_paths.extend(index.module_paths);
+        self.index.values.extend(index.values);
+        self.index.callables.extend(index.callables);
+        self.index.imports.extend(index.imports);
+        self.index
+            .macro_declarations
+            .extend(index.macro_declarations);
+    }
+
     pub fn finish(mut self) -> WorkspaceIndex {
         let known = self.known.into_values().flatten().collect();
         self.index.establish_modules(known, self.edges);
@@ -45,6 +59,7 @@ impl DeclarationCollector {
         self.index.index_module_files();
         self.index.index_declarations();
         self.index.finish_callables();
+        self.index.resolved_paths.clear();
         self.index
     }
 }
@@ -103,6 +118,11 @@ impl WorkspaceIndex {
     fn finish_callables(&mut self) {
         // Free names must be available during namespace-aware owner expansion.
         self.callables.sort_by(|left, right| left.id.cmp(&right.id));
+        self.callable_workspaces = self
+            .callables
+            .iter()
+            .map(|call| self.workspace_of(&call.context.file))
+            .collect();
         self.index_callable_names();
         let resolved: Vec<_> = self
             .callables

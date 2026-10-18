@@ -5,7 +5,8 @@
 
 use crate::organization::god_object::types::{ModuleSplit, StageType};
 use crate::organization::type_based_clustering::{MethodSignature, TypeInfo};
-use std::collections::{HashMap, HashSet, VecDeque};
+use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
+use std::collections::VecDeque;
 
 /// Analyzes data flow patterns in god objects to detect pipeline structures
 pub struct DataFlowAnalyzer;

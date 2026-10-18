@@ -6,7 +6,7 @@ use debtmap::builders::parallel_call_graph::build_call_graph_from_extracted;
 use debtmap::extraction::adapters::metrics::all_function_metrics;
 use debtmap::extraction::{ExtractedFileData, UnifiedFileExtractor};
 use debtmap::priority::call_graph::CallGraph;
-use std::collections::HashMap;
+use foldhash::HashMap;
 use std::path::PathBuf;
 
 const UNIQUE: &str = "fn target() {} fn caller() { target(); }";
@@ -40,7 +40,7 @@ fn assert_unique(graph: &CallGraph) {
 fn unique_legacy_cached_records_upgrade_to_source_columns() {
     let data = legacy_data(UNIQUE);
     let base = build_initial_call_graph(&all_function_metrics(&data));
-    let extracted = HashMap::from([(data.path.clone(), data)]);
+    let extracted = debtmap::collections::map_from([(data.path.clone(), data)]);
     let (graph, _, _) = build_call_graph_from_extracted(base, &extracted);
     assert_unique(&graph);
     assert_unique(&debtmap::extraction::adapters::call_graph::build_call_graph(&extracted));
@@ -71,7 +71,7 @@ fn tied_legacy_metrics_never_attach_to_either_source_definition() {
     let data = legacy_data(TIED);
     assert_eq!(data.functions.len(), 2);
     let base = build_initial_call_graph(&all_function_metrics(&data));
-    let extracted = HashMap::from([(data.path.clone(), data)]);
+    let extracted = debtmap::collections::map_from([(data.path.clone(), data)]);
     let (graph, _, _) = build_call_graph_from_extracted(base, &extracted);
     let exact: Vec<_> = graph
         .get_all_functions()
@@ -114,7 +114,7 @@ fn canonical_cached_merge_keeps_base_metrics_and_source_role_evidence() {
     }
     let (graph, _, _) = build_call_graph_from_extracted(
         build_initial_call_graph(&metrics),
-        &HashMap::from([(path, data)]),
+        &debtmap::collections::map_from([(path, data)]),
     );
     assert_eq!(graph.node_count(), 2);
     for id in graph.get_all_functions() {

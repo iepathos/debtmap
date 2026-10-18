@@ -21,6 +21,11 @@ impl WorkspaceIndex {
                 Some((file.clone(), *id))
             })
             .collect();
+        self.declaration_workspaces = self
+            .declarations
+            .iter()
+            .map(|declaration| self.workspace_of(&declaration.id.file))
+            .collect();
     }
 }
 
@@ -83,9 +88,10 @@ mod tests {
         );
         files.push(context_only);
         let root_only = PathBuf::from("root_only");
-        index
-            .roots
-            .insert(root_only.clone(), HashSet::from([PathBuf::from("root_a")]));
+        index.roots.insert(
+            root_only.clone(),
+            HashSet::from_iter([PathBuf::from("root_a")]),
+        );
         files.push(root_only);
         index.index_workspace_membership();
         for left in &files {

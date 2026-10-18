@@ -26,8 +26,8 @@
 //! ```
 
 use crate::analysis::io_detection::{IoDetector, IoProfile, Language, SideEffect};
+use foldhash::{HashMap, HashMapExt};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Purity level classification
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

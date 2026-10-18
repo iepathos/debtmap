@@ -11,8 +11,8 @@
 
 use crate::analyzers::type_registry::MethodSignature;
 use crate::organization::god_object::types::ModuleSplit;
+use foldhash::{HashMap, HashMapExt, HashSetExt};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Anti-pattern detector for analyzing module splits
 pub struct AntiPatternDetector {
@@ -348,7 +348,7 @@ impl AntiPatternDetector {
             .collect();
 
         // Collect all distinct non-primitive types from parameters and return types
-        let mut types = std::collections::HashSet::new();
+        let mut types = foldhash::HashSet::new();
 
         for signature in &split_methods {
             // Collect parameter types

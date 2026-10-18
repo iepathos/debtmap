@@ -45,10 +45,11 @@ mod tests;
 mod values;
 
 use adjustments::*;
+use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use helpers::*;
 use matching::*;
-use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 const EXPANSION_LIMIT: usize = 32;
 pub type Substitutions = HashMap<String, TypeFact>;
@@ -165,6 +166,9 @@ pub struct WorkspaceIndex {
     contexts: HashMap<PathBuf, Vec<Context>>,
     roots: HashMap<PathBuf, HashSet<PathBuf>>,
     workspace_membership: HashMap<PathBuf, usize>,
+    /// Workspace of each declaration and callable, by position.
+    declaration_workspaces: Vec<Option<usize>>,
+    callable_workspaces: Vec<Option<usize>>,
     type_paths: HashMap<Vec<String>, Vec<usize>>,
     declaration_positions: HashMap<DeclarationId, usize>,
     callable_names: HashMap<String, Vec<usize>>,
@@ -172,6 +176,49 @@ pub struct WorkspaceIndex {
     callable_positions: HashMap<PathBuf, HashMap<(usize, Option<usize>), usize>>,
     imports_context: HashMap<Context, Vec<usize>>,
     imports_module: HashMap<Vec<String>, Vec<usize>>,
+    /// Memoized path resolution; only valid once the index is no longer mutated.
+    resolved_paths: ResolvedPaths,
+    /// Reexport expansions shared by every file in one workspace.
+    reexports: ReexportPaths,
+}
+
+type ResolvedPaths = dashmap::DashMap<
+    (Vec<String>, Context, paths::Namespace),
+    Vec<Vec<String>>,
+    foldhash::fast::RandomState,
+>;
+
+type ReexportKey = (
+    Vec<String>,
+    Option<usize>,
+    Option<PathBuf>,
+    paths::Namespace,
+    u8,
+);
+
+type ReexportPaths = dashmap::DashMap<ReexportKey, Vec<Vec<String>>, foldhash::fast::RandomState>;
+
+/// Megabytes of resolved Rust paths and reexport expansions retained per process.
+pub const DEFAULT_RESOLUTION_CACHE_MB: usize = 256;
+
+static RESOLUTION_BUDGET: AtomicUsize = AtomicUsize::new(DEFAULT_RESOLUTION_CACHE_MB << 20);
+static RESOLUTION_USED: AtomicUsize = AtomicUsize::new(0);
+
+/// Cap the Rust resolution memos. `0` recomputes every lookup.
+pub fn set_resolution_cache_mb(megabytes: usize) {
+    RESOLUTION_BUDGET.store(megabytes.saturating_mul(1 << 20), Ordering::Relaxed);
+    RESOLUTION_USED.store(0, Ordering::Relaxed);
+}
+
+pub(super) fn reserve_resolution_cache(bytes: usize) -> bool {
+    let budget = RESOLUTION_BUDGET.load(Ordering::Relaxed);
+    budget > 0
+        && RESOLUTION_USED
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |used| {
+                let next = used.saturating_add(bytes);
+                (next <= budget).then_some(next)
+            })
+            .is_ok()
 }
 
 impl WorkspaceIndex {

@@ -6,7 +6,7 @@
 use super::types::{
     GapDetail, ImprovedItems, ItemInfo, NewItems, ResolvedItems, UnchangedCritical,
 };
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 
 // =============================================================================
 // Improvement Message Builders

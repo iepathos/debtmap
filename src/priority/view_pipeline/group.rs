@@ -4,7 +4,7 @@
 //! and computing combined scores.
 
 use crate::priority::view::{LocationGroup, SortCriteria, ViewItem};
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::path::PathBuf;
 
 /// Computes location groups from items.

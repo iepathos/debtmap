@@ -7,6 +7,7 @@ use debtmap::analysis::io_detection::Language;
 use debtmap::analysis::multi_signal_aggregation::{
     ResponsibilityAggregator, ResponsibilityCategory, SignalSet,
 };
+use foldhash::HashMapExt;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
@@ -244,8 +245,8 @@ fn test_category_specific_accuracy() {
 
     println!("\n=== Category-Specific Accuracy ===");
 
-    let mut category_stats: std::collections::HashMap<ResponsibilityCategory, (usize, usize)> =
-        std::collections::HashMap::new();
+    let mut category_stats: foldhash::HashMap<ResponsibilityCategory, (usize, usize)> =
+        foldhash::HashMap::new();
 
     for test_case in &corpus.test_cases {
         let expected = test_case.parse_expected_category();

@@ -6,8 +6,8 @@
 //! - Generics and nested types
 //! - Trait objects and impl Trait
 
+use foldhash::{HashMap, HashMapExt};
 use quote::ToTokens;
-use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
 /// Canonical type representation (normalized)
@@ -43,8 +43,8 @@ impl TypeNormalizer {
         aliases.insert("std::result::Result".into(), "Result".into());
         aliases.insert("std::option::Option".into(), "Option".into());
         aliases.insert("std::vec::Vec".into(), "Vec".into());
-        aliases.insert("std::collections::HashMap".into(), "HashMap".into());
-        aliases.insert("std::collections::HashSet".into(), "HashSet".into());
+        aliases.insert("foldhash::HashMap".into(), "HashMap".into());
+        aliases.insert("foldhash::HashSet".into(), "HashSet".into());
         aliases.insert("std::collections::BTreeMap".into(), "BTreeMap".into());
         aliases.insert("std::collections::BTreeSet".into(), "BTreeSet".into());
 

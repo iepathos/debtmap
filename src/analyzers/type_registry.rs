@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::path::PathBuf;
 use syn::{Field, Fields, Item, ItemStruct, Path, PathSegment, Type, TypePath, TypeReference};
 
@@ -398,10 +398,10 @@ mod tests {
 
     #[test]
     fn test_extract_type_name_from_qualified_path() {
-        let path: syn::Path = parse_quote!(std::collections::HashMap);
+        let path: syn::Path = parse_quote!(foldhash::HashMap);
         assert_eq!(
             GlobalTypeRegistry::extract_type_name_from_path(&path),
-            "std::collections::HashMap"
+            "foldhash::HashMap"
         );
     }
 

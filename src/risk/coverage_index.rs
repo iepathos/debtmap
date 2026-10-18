@@ -3,7 +3,8 @@ use super::function_name_matching::{
 };
 use super::lcov::{FunctionCoverage, LcovData, normalize_demangled_name, strip_trailing_generics};
 use super::path_normalization::normalize_path_components;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet};
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 

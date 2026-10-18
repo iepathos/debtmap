@@ -8,6 +8,7 @@ use crate::risk::roi::effort::{AdvancedEffortModel, ComplexityLevel};
 use crate::risk::roi::learning::{ROIActual, ROIPrediction};
 use crate::risk::roi::reduction::AdvancedRiskReductionModel;
 use chrono::Utc;
+use foldhash::HashMapExt;
 use std::path::PathBuf;
 
 fn create_test_target(

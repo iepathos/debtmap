@@ -23,11 +23,16 @@ impl WorkspaceIndex {
         context: &Context,
         dotted: bool,
     ) -> Lookup<'_> {
+        let peer = self.workspace_peer(&context.file);
         let candidates = self
-            .named_callables(name)
+            .callable_names
+            .get(name)
+            .into_iter()
+            .flatten()
+            .filter(|&&p| peer(&self.callables[p].context.file, self.callable_workspaces[p]))
+            .map(|&p| &self.callables[p])
             .filter(|call| call.owner.is_some() && (!dotted || call.has_receiver()))
             .filter(|call| call.kind != CallableKind::TraitDeclaration)
-            .filter(|call| self.same_workspace(&context.file, &call.context.file))
             .filter(|call| self.receiver_admits(receiver, call, context))
             .collect::<Vec<_>>();
         let justified = candidates.len() == 1

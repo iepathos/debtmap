@@ -3,8 +3,8 @@
 //! This module contains pure data types with no behavior beyond
 //! serialization and construction.
 
+use foldhash::HashMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// Output format for validation results.

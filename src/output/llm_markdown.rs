@@ -16,7 +16,7 @@ use crate::output::unified::{
 use crate::priority::UnifiedAnalysis;
 use crate::tui::results::detail_pages::overview::format_debt_type_name;
 use anyhow::Result;
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;

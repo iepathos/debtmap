@@ -1,7 +1,7 @@
 use super::{GodObjectAnalysis, GodObjectConfidence};
 use chrono::{DateTime, Utc};
+use foldhash::{HashMap, HashMapExt};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// Metrics tracking for god object detection over time

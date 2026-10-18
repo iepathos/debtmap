@@ -1,5 +1,5 @@
 /// Macro expansion and parsing functionality for call graph extraction
-use std::collections::HashMap;
+use foldhash::HashMap;
 use syn::parse::Parser;
 use syn::punctuated::Punctuated;
 use syn::token::Comma;

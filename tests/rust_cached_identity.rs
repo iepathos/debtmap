@@ -5,7 +5,8 @@ use debtmap::core::FunctionMetrics;
 use debtmap::extraction::UnifiedFileExtractor;
 use debtmap::extraction::adapters::metrics::to_function_metrics;
 use debtmap::priority::call_graph::FunctionId;
-use std::collections::{BTreeSet, HashMap};
+use foldhash::HashMap;
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 #[test]
@@ -24,8 +25,10 @@ fn same_line_inline_modules_share_exact_metric_and_graph_identities() {
         4,
         "Metrics must preserve declaration identity"
     );
-    let (graph, _, _) =
-        build_call_graph_from_extracted(base, &HashMap::from([(path.clone(), data)]));
+    let (graph, _, _) = build_call_graph_from_extracted(
+        base,
+        &debtmap::collections::map_from([(path.clone(), data)]),
+    );
     assert_eq!(graph.node_count(), 4, "No orphan summary aliases");
     for module in ["left", "right"] {
         let caller = metric_id(&metrics, &format!("{module}::caller"));
@@ -58,7 +61,7 @@ fn nested_modules_and_same_line_free_functions_keep_qualified_names() {
         .collect();
     let (graph, _, _) = build_call_graph_from_extracted(
         build_initial_call_graph(&metrics),
-        &HashMap::from([(path.clone(), data)]),
+        &debtmap::collections::map_from([(path.clone(), data)]),
     );
     assert_eq!(graph.node_count(), 3);
     let caller = metric_id(&metrics, "outer::inner::caller");

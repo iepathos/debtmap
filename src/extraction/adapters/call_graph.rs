@@ -19,7 +19,7 @@
 
 use crate::extraction::types::{CallSite, CallType as ExtractedCallType, ExtractedFileData};
 use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::path::PathBuf;
 
 /// Build a CallGraph from extracted file data.

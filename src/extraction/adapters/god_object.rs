@@ -30,7 +30,7 @@ use crate::organization::god_object::{
     TraitMethodSummary, classify_all_methods,
 };
 
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::path::Path;
 
 /// Internal struct for per-struct metric calculation.

@@ -1,7 +1,7 @@
 use crate::core::AnalysisResults;
 use crate::priority::UnifiedAnalysis;
 use anyhow::Result;
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::io::Write;
 use std::path::Path;
 
@@ -243,7 +243,7 @@ mod tests {
                 circular: vec![],
             },
             duplications: vec![],
-            file_contexts: std::collections::HashMap::new(),
+            file_contexts: foldhash::HashMap::new(),
         }
     }
 

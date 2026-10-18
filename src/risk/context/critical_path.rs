@@ -2,6 +2,7 @@ use super::{AnalysisTarget, Context, ContextDetails, ContextProvider};
 use crate::collections::{HashSet, Vector};
 use crate::priority::call_graph::CallGraph;
 use anyhow::Result;
+use foldhash::HashSetExt;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 

@@ -351,7 +351,7 @@ mod tests {
         let detector = BoilerplateDetector::default();
         let metrics = TraitPatternMetrics {
             impl_block_count: 100,
-            unique_traits: std::collections::HashSet::from(["Flag".to_string()]),
+            unique_traits: crate::collections::set_from(["Flag".to_string()]),
             most_common_trait: Some(("Flag".to_string(), 100)),
             method_uniformity: 0.95,
             shared_methods: vec![
@@ -375,7 +375,7 @@ mod tests {
         let detector = BoilerplateDetector::default();
         let metrics = TraitPatternMetrics {
             impl_block_count: 5, // Below threshold
-            unique_traits: std::collections::HashSet::from(["Trait1".to_string()]),
+            unique_traits: crate::collections::set_from(["Trait1".to_string()]),
             most_common_trait: Some(("Trait1".to_string(), 5)),
             method_uniformity: 0.4, // Low uniformity
             shared_methods: vec![],

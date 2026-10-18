@@ -2,7 +2,7 @@ use super::{
     ResourceDetector, ResourceField, ResourceImpact, ResourceManagementIssue, ResourceSeverity,
     SourceLocation,
 };
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use std::path::Path;
 use syn::{ImplItem, ItemImpl, ItemStruct, Type, visit::Visit};
 

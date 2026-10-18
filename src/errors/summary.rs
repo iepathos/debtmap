@@ -1,7 +1,7 @@
 //! Error summary generation for batch operations.
 
 use super::collection::{AnalysisFailure, OperationType};
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::path::PathBuf;
 
 /// Summary of errors from batch operations.

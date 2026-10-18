@@ -10,7 +10,7 @@ use crate::priority::call_graph::{
     CallEdgeProvenance, CallGraph, CallSite, CallType, ResolutionOutcome, UncertainCall,
     UncertaintyReason,
 };
-use std::collections::HashMap;
+use foldhash::HashMap;
 use syn::{spanned::Spanned, visit::Visit};
 
 mod closures;
@@ -24,6 +24,8 @@ pub(super) struct Body<'a> {
     pub bindings: Bindings,
     pub substitutions: HashMap<String, TypeFact>,
     pub(super) assessment: EffectAssessment,
+    /// Shared by every provenance recorded for this body.
+    owner: std::sync::Arc<crate::priority::call_graph::FunctionId>,
     pub(super) reachability_only: bool,
     bound_closures: Vec<closures::BoundClosure>,
 }
@@ -46,6 +48,7 @@ impl<'a> Body<'a> {
             bindings: Bindings::default(),
             substitutions,
             assessment: EffectAssessment::complete(),
+            owner: std::sync::Arc::new(callable.id.clone()),
             reachability_only: false,
             bound_closures: Vec::new(),
         }
@@ -81,7 +84,7 @@ impl<'a> Body<'a> {
         }
         let position = span.start();
         let provenance = EffectProvenance::source(
-            self.callable.id.clone(),
+            std::sync::Arc::clone(&self.owner),
             position.line,
             Some(position.column),
         );
@@ -168,7 +171,7 @@ impl<'a> Body<'a> {
             return;
         }
         let mut effect_provenance =
-            EffectProvenance::source(self.callable.id.clone(), site.line, site.column);
+            EffectProvenance::source(std::sync::Arc::clone(&self.owner), site.line, site.column);
         effect_provenance.identity = Some(target.name.clone());
         effect_provenance.dependency = Some(target.clone());
         let assessment = std::mem::replace(&mut self.assessment, EffectAssessment::complete());
@@ -267,7 +270,7 @@ impl<'a> Body<'a> {
     ) -> EffectProvenance {
         let position = expr.span().start();
         let mut provenance = EffectProvenance::source(
-            self.callable.id.clone(),
+            std::sync::Arc::clone(&self.owner),
             position.line,
             Some(position.column),
         );
@@ -308,7 +311,7 @@ impl<'a> Body<'a> {
 
     fn record_unresolved(&mut self, site: &CallSite, query: &str, reason: UnresolvedReason) {
         let mut provenance =
-            EffectProvenance::source(self.callable.id.clone(), site.line, site.column);
+            EffectProvenance::source(std::sync::Arc::clone(&self.owner), site.line, site.column);
         provenance.identity = Some(query.to_string());
         let assessment = std::mem::replace(&mut self.assessment, EffectAssessment::complete());
         self.assessment = assessment.with_unresolved(UnresolvedBehavior {

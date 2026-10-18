@@ -6,7 +6,7 @@
 use crate::analyzers::call_graph_integration;
 use crate::core::FunctionMetrics;
 use crate::priority::call_graph::{CallGraph, FunctionId};
-use std::collections::HashSet;
+use foldhash::HashSet;
 
 /// Configuration for call graph computation.
 #[derive(Debug, Clone, Default)]

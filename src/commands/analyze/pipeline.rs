@@ -7,7 +7,7 @@
 use crate::analysis::FileContext;
 use crate::cli::OutputFormat;
 use crate::priority::{DebtCategory, UnifiedAnalysis, UnifiedAnalysisUtils};
-use std::collections::HashMap;
+use foldhash::HashMap;
 use std::path::PathBuf;
 
 /// Filter unified analysis by debt categories (pure).

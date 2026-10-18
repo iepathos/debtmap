@@ -11,7 +11,8 @@ use super::{
 use crate::collections::Vector;
 use crate::priority::filtering::{ClassifiedItem, FilterConfig, FilterResult};
 use crate::priority::tiers::{TierConfig, classify_tier};
-use std::collections::{BTreeMap, HashMap};
+use foldhash::{HashMap, HashMapExt};
+use std::collections::BTreeMap;
 
 /// Extension trait providing query operations for UnifiedAnalysis
 pub trait UnifiedAnalysisQueries {

@@ -36,7 +36,7 @@ pub mod suppression_audit;
 
 pub use crate::core::Priority;
 use crate::core::{DebtItem, DebtType};
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::path::PathBuf;
 
 pub fn categorize_debt(items: &[DebtItem]) -> HashMap<DebtType, Vec<DebtItem>> {
@@ -68,8 +68,8 @@ pub fn filter_by_type(items: Vec<DebtItem>, debt_type: DebtType) -> Vec<DebtItem
         .collect()
 }
 
-pub fn group_by_file(items: Vec<DebtItem>) -> std::collections::HashMap<PathBuf, Vec<DebtItem>> {
-    use std::collections::HashMap;
+pub fn group_by_file(items: Vec<DebtItem>) -> foldhash::HashMap<PathBuf, Vec<DebtItem>> {
+    use foldhash::HashMap;
 
     items.into_iter().fold(HashMap::new(), |mut acc, item| {
         acc.entry(item.file.clone()).or_default().push(item);

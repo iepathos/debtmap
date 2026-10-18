@@ -372,7 +372,7 @@ mod tests {
     #[test]
     fn test_purity_with_custom_macros() {
         use crate::analyzers::macro_definition_collector::*;
-        use dashmap::DashMap;
+        use crate::collections::DashMap;
         use std::sync::Arc;
 
         let code = r#"
@@ -388,7 +388,7 @@ mod tests {
         "#;
 
         let ast = syn::parse_file(code).unwrap();
-        let definitions = Arc::new(DashMap::new());
+        let definitions = Arc::new(DashMap::default());
         collect_definitions(&ast, std::path::Path::new("test.rs"), definitions.clone());
 
         assert!(definitions.contains_key("my_logger"));
@@ -409,10 +409,10 @@ mod tests {
     #[test]
     fn test_known_vs_unknown_macro_confidence() {
         use crate::analyzers::macro_definition_collector::*;
-        use dashmap::DashMap;
+        use crate::collections::DashMap;
         use std::sync::Arc;
 
-        let definitions = Arc::new(DashMap::new());
+        let definitions = Arc::new(DashMap::default());
         definitions.insert(
             "my_macro".to_string(),
             MacroDefinition {
@@ -450,7 +450,7 @@ mod tests {
     #[test]
     fn test_end_to_end_custom_macro_analysis() {
         use crate::analyzers::macro_definition_collector::*;
-        use dashmap::DashMap;
+        use crate::collections::DashMap;
         use std::sync::Arc;
 
         let code = r#"
@@ -467,7 +467,7 @@ mod tests {
 
         let ast = syn::parse_file(code).unwrap();
 
-        let definitions = Arc::new(DashMap::new());
+        let definitions = Arc::new(DashMap::default());
         collect_definitions(&ast, std::path::Path::new("test.rs"), definitions.clone());
 
         let mut detector = PurityDetector::with_macro_definitions(definitions);
@@ -486,7 +486,7 @@ mod tests {
     #[test]
     fn test_custom_pure_macro_detection() {
         use crate::analyzers::macro_definition_collector::*;
-        use dashmap::DashMap;
+        use crate::collections::DashMap;
         use std::sync::Arc;
 
         let code = r#"
@@ -502,7 +502,7 @@ mod tests {
         "#;
 
         let ast = syn::parse_file(code).unwrap();
-        let definitions = Arc::new(DashMap::new());
+        let definitions = Arc::new(DashMap::default());
         collect_definitions(&ast, std::path::Path::new("test.rs"), definitions.clone());
 
         let mut detector = PurityDetector::with_macro_definitions(definitions);
@@ -521,7 +521,7 @@ mod tests {
     #[test]
     fn test_conditional_custom_macro() {
         use crate::analyzers::macro_definition_collector::*;
-        use dashmap::DashMap;
+        use crate::collections::DashMap;
         use std::sync::Arc;
 
         let code = r#"
@@ -538,7 +538,7 @@ mod tests {
         "#;
 
         let ast = syn::parse_file(code).unwrap();
-        let definitions = Arc::new(DashMap::new());
+        let definitions = Arc::new(DashMap::default());
         collect_definitions(&ast, std::path::Path::new("test.rs"), definitions.clone());
 
         let mut detector = PurityDetector::with_macro_definitions(definitions);
@@ -561,7 +561,7 @@ mod tests {
     #[test]
     fn test_nested_custom_macros() {
         use crate::analyzers::macro_definition_collector::*;
-        use dashmap::DashMap;
+        use crate::collections::DashMap;
         use std::sync::Arc;
 
         let code = r#"
@@ -580,7 +580,7 @@ mod tests {
         "#;
 
         let ast = syn::parse_file(code).unwrap();
-        let definitions = Arc::new(DashMap::new());
+        let definitions = Arc::new(DashMap::default());
         collect_definitions(&ast, std::path::Path::new("test.rs"), definitions.clone());
 
         let mut detector = PurityDetector::with_macro_definitions(definitions);

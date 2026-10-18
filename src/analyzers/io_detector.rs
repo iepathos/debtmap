@@ -1044,7 +1044,7 @@ mod tests {
         // Check unique
         assert_eq!(
             vars.len(),
-            vars.iter().collect::<std::collections::HashSet<_>>().len()
+            vars.iter().collect::<foldhash::HashSet<_>>().len()
         );
     }
 

@@ -87,7 +87,7 @@ mod tests {
     use crate::env::AnalysisEnv;
     use crate::testkit::DebtmapTestEnv;
     use chrono::Utc;
-    use std::collections::HashMap;
+    use foldhash::{HashMap, HashMapExt};
     use std::path::{Path, PathBuf};
 
     fn create_test_results() -> AnalysisResults {

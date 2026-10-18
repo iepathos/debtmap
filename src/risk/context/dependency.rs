@@ -1,6 +1,7 @@
 use super::{AnalysisTarget, Context, ContextDetails, ContextProvider};
 use crate::collections::{HashMap, HashSet, Vector};
 use anyhow::Result;
+use foldhash::{HashMapExt, HashSetExt};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 

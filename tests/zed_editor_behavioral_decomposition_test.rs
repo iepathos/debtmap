@@ -14,7 +14,7 @@ use debtmap::organization::{
     BehaviorCategory, BehavioralCategorizer, FieldAccessTracker, MethodCluster,
     cluster_methods_by_behavior, suggest_trait_extraction,
 };
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::fs;
 use std::path::Path;
 

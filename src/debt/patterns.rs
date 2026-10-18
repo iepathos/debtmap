@@ -1,7 +1,7 @@
 use crate::core::{DebtItem, DebtType, Priority};
 use crate::debt::suppression::SuppressionContext;
+use foldhash::{HashMap, HashMapExt};
 use regex::Regex;
-use std::collections::HashMap;
 use std::path::Path;
 
 pub fn find_todos_and_fixmes(content: &str, file: &Path) -> Vec<DebtItem> {
@@ -232,7 +232,7 @@ pub fn combine_debt_items(items: Vec<Vec<DebtItem>>) -> Vec<DebtItem> {
 }
 
 pub fn deduplicate_debt_items(items: Vec<DebtItem>) -> Vec<DebtItem> {
-    use std::collections::HashSet;
+    use foldhash::{HashSet, HashSetExt};
 
     items
         .into_iter()

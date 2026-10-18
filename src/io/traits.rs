@@ -117,14 +117,14 @@ pub trait CoverageLoader: Send + Sync {
 #[derive(Debug, Clone, Default)]
 pub struct CoverageData {
     /// File path to line coverage mapping
-    file_coverage: std::collections::HashMap<std::path::PathBuf, FileCoverage>,
+    file_coverage: foldhash::HashMap<std::path::PathBuf, FileCoverage>,
 }
 
 /// Coverage data for a single file.
 #[derive(Debug, Clone, Default)]
 pub struct FileCoverage {
     /// Line number to hit count mapping (1-indexed)
-    line_hits: std::collections::HashMap<usize, u64>,
+    line_hits: foldhash::HashMap<usize, u64>,
     /// Total lines that are executable
     pub total_lines: usize,
     /// Total lines that were hit

@@ -20,6 +20,7 @@ use crate::output::unified::{
 };
 use crate::priority::GodObjectIndicators;
 use crate::risk::RiskInsight;
+use foldhash::HashMapExt;
 use std::fmt::Write as FmtWrite;
 use std::io::Write;
 
@@ -952,7 +953,7 @@ mod tests {
                     file: 0,
                     function: 0,
                 },
-                by_category: std::collections::HashMap::new(),
+                by_category: foldhash::HashMap::new(),
                 score_distribution: crate::output::unified::ScoreDistribution {
                     critical: 0,
                     high: 0,

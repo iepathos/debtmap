@@ -1,8 +1,8 @@
 use super::{AnalysisTarget, Context, ContextDetails, ContextProvider};
+use crate::collections::DashMap;
 use crate::core::FunctionMetrics;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -75,7 +75,7 @@ impl GitHistoryProvider {
 
         Ok(Self {
             repo_root: canonical_repo_root,
-            cache: Arc::new(DashMap::new()),
+            cache: Arc::new(DashMap::default()),
             batched_history,
             batched_functions: None,
             blame_cache,

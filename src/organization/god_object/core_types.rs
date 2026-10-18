@@ -81,7 +81,7 @@ pub struct GodObjectAnalysis {
     pub confidence: GodObjectConfidence,
     pub responsibilities: Vec<String>,
     #[serde(default)]
-    pub responsibility_method_counts: std::collections::HashMap<String, usize>,
+    pub responsibility_method_counts: foldhash::HashMap<String, usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub purity_distribution: Option<crate::organization::god_object::PurityDistribution>,
     #[serde(skip_serializing_if = "Option::is_none")]

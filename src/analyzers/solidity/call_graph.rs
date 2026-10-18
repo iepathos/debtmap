@@ -3,7 +3,7 @@
 use crate::analyzers::solidity::calls::{SolidityCallKind, SolidityCallShape, extract_calls};
 use crate::analyzers::solidity::parser::{node_text, parse_source};
 use crate::core::Language;
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 

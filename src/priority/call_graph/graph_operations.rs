@@ -4,8 +4,46 @@ use super::types::{
     CallEdgeEvidence, CallEdgeProvenance, CallGraph, CallType, FunctionCall, FunctionId,
     FunctionNode, ResolutionOutcome,
 };
-use crate::collections::{HashMap, HashSet, Vector};
-use std::path::PathBuf;
+use crate::collections::{HashSet, Vector};
+use foldhash::HashMap;
+use foldhash::HashSetExt;
+use std::cmp::Ordering;
+use std::path::{Path, PathBuf};
+
+impl CallGraph {
+    fn canonical_id(&self, func_id: &FunctionId) -> FunctionId {
+        self.find_function(func_id)
+            .unwrap_or_else(|| func_id.clone())
+    }
+
+    fn exact_callees(&self, func_id: &FunctionId) -> impl Iterator<Item = FunctionId> + '_ {
+        self.callee_index
+            .get(func_id)
+            .into_iter()
+            .flat_map(|ids| ids.iter().cloned())
+    }
+
+    fn exact_callers(&self, func_id: &FunctionId) -> impl Iterator<Item = FunctionId> + '_ {
+        self.caller_index
+            .get(func_id)
+            .into_iter()
+            .flat_map(|ids| ids.iter().cloned())
+    }
+
+    fn sorted_callees(&self, func_id: &FunctionId) -> Vec<FunctionId> {
+        let mut callees: Vec<_> = self.exact_callees(func_id).collect();
+        callees.sort();
+        callees
+    }
+}
+
+fn file_ord(left: &Path, right: &Path) -> Ordering {
+    if left.as_os_str() == right.as_os_str() {
+        Ordering::Equal
+    } else {
+        left.cmp(right)
+    }
+}
 
 impl CallGraph {
     pub fn merge(&mut self, other: CallGraph) {
@@ -102,6 +140,7 @@ impl CallGraph {
         if self.nodes.insert(id.clone(), node).is_some() {
             return;
         }
+        self.invalidate_ordered_function_ids();
 
         // Populate fuzzy index (name + file)
         let fuzzy_key = id.fuzzy_key();
@@ -147,6 +186,7 @@ impl CallGraph {
 
         if self.edge_set.insert(call.clone()) {
             self.edges.push(call);
+            self.invalidate_caller_file_counts();
         }
         if self.evidence_set.insert(evidence.clone()) {
             self.edge_evidence.push(evidence);
@@ -274,11 +314,24 @@ impl CallGraph {
         self.get_callers(func_id).len()
     }
 
-    /// Get all functions in the graph
+    /// Get all functions in the graph, in `FunctionId` order.
     pub fn get_all_functions(&self) -> impl Iterator<Item = &FunctionId> {
-        let mut funcs: Vec<&FunctionId> = self.nodes.keys().collect();
-        funcs.sort();
+        let ordered = self.ordered_function_ids();
+        let mut funcs = Vec::with_capacity(ordered.len());
+        for id in ordered.iter() {
+            if let Some((key, _)) = self.nodes.get_key_value(id) {
+                funcs.push(key);
+            }
+        }
         funcs.into_iter()
+    }
+
+    /// Functions in `file`, in the same order as [`Self::get_all_functions`].
+    pub(crate) fn ids_in_file(&self, file: &Path) -> Vec<FunctionId> {
+        let ids = self.ordered_function_ids();
+        let start = ids.partition_point(|id| file_ord(&id.file, file).is_lt());
+        let end = ids.partition_point(|id| file_ord(&id.file, file).is_le());
+        ids[start..end].to_vec()
     }
 
     /// Get function info
@@ -420,22 +473,20 @@ impl CallGraph {
         func_id: &FunctionId,
         max_depth: usize,
     ) -> HashSet<FunctionId> {
+        let start = self.canonical_id(func_id);
         let mut visited = HashSet::new();
         let mut to_visit = std::collections::VecDeque::new();
-        to_visit.push_back((func_id.clone(), 0));
+        to_visit.push_back((start, 0));
 
         while let Some((current, depth)) = to_visit.pop_front() {
-            if depth >= max_depth || visited.contains(&current) {
+            if depth >= max_depth || !visited.insert(current.clone()) {
                 continue;
             }
-
-            visited.insert(current.clone());
-
-            for callee in self.get_callees(&current) {
-                if !visited.contains(&callee) {
-                    to_visit.push_back((callee, depth + 1));
-                }
-            }
+            to_visit.extend(
+                self.exact_callees(&current)
+                    .filter(|callee| !visited.contains(callee))
+                    .map(|callee| (callee, depth + 1)),
+            );
         }
 
         visited.remove(func_id);
@@ -447,23 +498,21 @@ impl CallGraph {
         func_id: &FunctionId,
         max_depth: usize,
     ) -> HashSet<FunctionId> {
+        let start = self.canonical_id(func_id);
         let mut visited = HashSet::new();
         let mut to_visit = std::collections::VecDeque::new();
-        to_visit.push_back((func_id.clone(), 0));
+        to_visit.push_back((start, 0));
 
         while let Some((current, depth)) = to_visit.pop_front() {
-            if visited.contains(&current) {
+            if !visited.insert(current.clone()) {
                 continue;
             }
-
-            visited.insert(current.clone());
-
             if depth < max_depth {
-                for caller in self.get_callers(&current) {
-                    if !visited.contains(&caller) {
-                        to_visit.push_back((caller, depth + 1));
-                    }
-                }
+                to_visit.extend(
+                    self.exact_callers(&current)
+                        .filter(|caller| !visited.contains(caller))
+                        .map(|caller| (caller, depth + 1)),
+                );
             }
         }
 
@@ -685,9 +734,10 @@ impl CallGraph {
     ///
     /// Uses iterative DFS with explicit stack to avoid stack overflow on large graphs.
     pub fn is_recursive(&self, func_id: &FunctionId) -> bool {
+        let start = self.canonical_id(func_id);
         let mut visited = HashSet::new();
         let mut rec_stack = HashSet::new();
-        self.has_cycle_dfs_iterative(func_id, &mut visited, &mut rec_stack)
+        self.has_cycle_dfs_iterative(&start, &mut visited, &mut rec_stack)
     }
 
     /// Iterative DFS helper to detect cycles.
@@ -725,10 +775,9 @@ impl CallGraph {
                     // Schedule exit (remove from rec_stack) after processing children
                     stack.push(CycleState::Exit(node.clone()));
 
-                    // Process callees - check for cycles and schedule unvisited
-                    for callee in self.get_callees(&node) {
+                    for callee in self.exact_callees(&node) {
                         if rec_stack.contains(&callee) {
-                            return true; // Cycle found
+                            return true;
                         }
                         if !visited.contains(&callee) {
                             stack.push(CycleState::Enter(callee));
@@ -804,8 +853,7 @@ impl CallGraph {
                     // Schedule finish (add to result) after processing children
                     stack.push(TopoState::Finish(node.clone()));
 
-                    // Add unvisited children
-                    for callee in self.get_callees(&node) {
+                    for callee in self.sorted_callees(&node) {
                         if !visited.contains(&callee) {
                             stack.push(TopoState::Visit(callee));
                         }
@@ -876,6 +924,48 @@ mod evidence_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn functions_in_file_follows_sorted_order_and_includes_new_ids() {
+        let mut graph = CallGraph::new();
+        for (file, name, line) in [
+            ("src/a.rs", "later", 2),
+            ("src/b.rs", "other", 1),
+            ("src/a.rs", "early", 1),
+        ] {
+            graph.add_function(
+                FunctionId::new(PathBuf::from(file), name.into(), line),
+                false,
+                false,
+                1,
+                1,
+            );
+        }
+
+        let file = PathBuf::from("src/a.rs");
+        let scanned: Vec<_> = graph
+            .get_all_functions()
+            .filter(|id| id.file == file)
+            .cloned()
+            .collect();
+        assert_eq!(graph.ids_in_file(&file), scanned);
+        assert_eq!(
+            scanned
+                .iter()
+                .map(|id| id.name.as_str())
+                .collect::<Vec<_>>(),
+            ["early", "later"]
+        );
+
+        graph.add_function(
+            FunctionId::new(file.clone(), "added".into(), 3),
+            false,
+            false,
+            1,
+            1,
+        );
+        assert!(graph.ids_in_file(&file).iter().any(|id| id.name == "added"));
+    }
 
     #[test]
     fn test_exact_lookup() {

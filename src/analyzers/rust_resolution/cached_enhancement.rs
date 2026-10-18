@@ -2,7 +2,7 @@
 
 use crate::analysis::call_graph::RustCallGraphBuilder;
 use crate::priority::call_graph::{CallGraph, FunctionId};
-use std::collections::HashSet;
+use foldhash::HashSet;
 use std::path::PathBuf;
 
 pub(crate) struct EnhancedExtraction {
@@ -10,24 +10,6 @@ pub(crate) struct EnhancedExtraction {
     pub available: HashSet<PathBuf>,
     pub framework_exclusions: HashSet<FunctionId>,
     pub function_pointer_used: HashSet<FunctionId>,
-}
-
-pub(super) fn collect(builder: &mut RustCallGraphBuilder, batch: &[(PathBuf, syn::File)]) {
-    for (path, ast) in batch {
-        let result = builder
-            .analyze_trait_dispatch(path, ast)
-            .and_then(|builder| builder.analyze_function_pointers(path, ast))
-            .and_then(|builder| builder.analyze_framework_patterns(path, ast));
-        if let Err(error) = result {
-            log::warn!(
-                "Cannot enhance cached Rust source {}: {error:#}",
-                path.display()
-            );
-        }
-    }
-    if let Err(error) = builder.analyze_cross_module(batch) {
-        log::warn!("Cannot enhance cached Rust module metadata: {error:#}");
-    }
 }
 
 pub(super) fn finish(

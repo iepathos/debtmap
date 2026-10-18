@@ -10,8 +10,8 @@
 //! Line ranges are extracted from `syn::Span` information using the `Spanned` trait.
 //! All line numbers are 1-based, consistent with syn's conventions.
 
-use std::collections::HashMap;
-use std::collections::HashSet;
+use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
+use std::collections::BTreeSet;
 use std::path::Path;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
@@ -94,7 +94,7 @@ fn build_dependency_graph(
             .map(|dependency| (module_name.clone(), dependency.clone())),
     );
 
-    let edge_set: HashSet<(String, String)> =
+    let edge_set: BTreeSet<(String, String)> =
         edges.into_iter().filter(|(from, to)| from != to).collect();
     let edges: Vec<(String, String)> = edge_set.into_iter().collect();
 

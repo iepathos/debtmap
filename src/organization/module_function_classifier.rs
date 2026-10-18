@@ -9,7 +9,7 @@ use crate::analysis::multi_signal_aggregation::{
 };
 use crate::organization::god_object::ModuleFunctionInfo;
 use crate::organization::{ModuleSplit, Priority};
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 
 /// Classified function with multi-signal evidence
 #[derive(Debug, Clone)]
@@ -237,7 +237,7 @@ impl ModuleFunctionClassifier {
 
     /// Aggregate evidence from multiple classified functions
     fn aggregate_evidence(functions: &[ClassifiedFunction]) -> String {
-        use std::collections::HashMap;
+        use foldhash::HashMap;
 
         let mut signal_counts: HashMap<String, usize> = HashMap::new();
         let mut total_confidence = 0.0;

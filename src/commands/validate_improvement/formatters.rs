@@ -90,7 +90,7 @@ pub fn format_markdown(result: &ValidationResult) -> String {
 mod tests {
     use super::*;
     use crate::commands::validate_improvement::types::{GapDetail, ProjectSummary};
-    use std::collections::HashMap;
+    use foldhash::{HashMap, HashMapExt};
 
     fn create_test_result() -> ValidationResult {
         ValidationResult {

@@ -2,7 +2,8 @@
 //!
 //! Provides parser-backed analysis of JavaScript and TypeScript source files.
 
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt};
+use std::collections::BTreeSet;
 use std::path::Path;
 
 use super::types::{
@@ -150,7 +151,7 @@ fn build_dependency_graph(
     let dependency_names: Vec<String> = dependencies
         .iter()
         .map(|dependency| dependency.name.clone())
-        .collect::<HashSet<_>>()
+        .collect::<BTreeSet<_>>()
         .into_iter()
         .collect();
     components.extend(dependency_names.iter().cloned());

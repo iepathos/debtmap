@@ -6,8 +6,8 @@
 
 use crate::priority::call_graph::FunctionId;
 use anyhow::Result;
+use foldhash::{HashMap, HashMapExt};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::path::Path;
 
 use super::PurityResult;

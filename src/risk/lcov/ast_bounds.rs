@@ -1,7 +1,7 @@
 //! Immutable source bounds supplied by the metrics workspace for propagation.
 use crate::core::FunctionMetrics;
 use crate::risk::path_normalization::normalize_path_components;
-use std::collections::HashMap;
+use foldhash::HashMap;
 use std::path::{Path, PathBuf};
 
 type DefinitionBounds = Option<(usize, Option<usize>)>;

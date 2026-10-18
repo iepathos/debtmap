@@ -1,4 +1,6 @@
 //! Lexical declaration paths and namespace-specific import precedence.
+use foldhash::HashSetExt;
+
 use super::*;
 #[path = "path_availability.rs"]
 mod availability;
@@ -7,20 +9,75 @@ mod conflicts;
 #[path = "path_namespaces.rs"]
 mod namespaces;
 
-#[derive(Clone, Copy)]
-enum Namespace {
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub(super) enum Namespace {
     Type,
     Value,
 }
 
+struct Walk {
+    paths: Vec<Vec<String>>,
+    complete: bool,
+}
+
+impl Walk {
+    fn done(paths: Vec<Vec<String>>) -> Self {
+        Self {
+            paths,
+            complete: true,
+        }
+    }
+
+    fn cycle() -> Self {
+        Self {
+            paths: Vec::new(),
+            complete: false,
+        }
+    }
+}
+
+fn resolved_entry_bytes(path: &[String], context: &Context, paths: &[Vec<String>]) -> usize {
+    string_bytes(path)
+        .saturating_add(context.file.as_os_str().len())
+        .saturating_add(string_bytes(&context.module))
+        .saturating_add(paths.iter().map(|path| string_bytes(path)).sum())
+}
+
+fn reexport_entry_bytes(path: &[String], paths: &[Vec<String>]) -> usize {
+    string_bytes(path).saturating_add(paths.iter().map(|path| string_bytes(path)).sum())
+}
+
+fn string_bytes(segments: &[String]) -> usize {
+    segments.iter().map(String::len).sum()
+}
+
+fn segment_namespace(position: usize, len: usize, namespace: Namespace) -> Namespace {
+    if position + 1 < len {
+        Namespace::Type
+    } else {
+        namespace
+    }
+}
+
 impl WorkspaceIndex {
     pub(super) fn same_workspace(&self, left: &Path, right: &Path) -> bool {
-        left == right
-            || self
-                .workspace_membership
-                .get(left)
-                .zip(self.workspace_membership.get(right))
-                .is_some_and(|(left, right)| left == right)
+        self.workspace_peer(left)(right, self.workspace_of(right))
+    }
+
+    pub(super) fn workspace_of(&self, file: &Path) -> Option<usize> {
+        self.workspace_membership.get(file).copied()
+    }
+
+    /// Checks candidates, given their file and workspace, against `file`.
+    pub(super) fn workspace_peer<'a>(
+        &self,
+        file: &'a Path,
+    ) -> impl Fn(&Path, Option<usize>) -> bool + 'a {
+        let id = self.workspace_of(file);
+        move |other, other_id| match id {
+            Some(id) => other_id == Some(id),
+            None => file == other,
+        }
     }
 
     pub(super) fn resolve_paths(&self, path: &[String], context: &Context) -> Vec<Vec<String>> {
@@ -41,10 +98,19 @@ impl WorkspaceIndex {
         context: &Context,
         namespace: Namespace,
     ) -> Vec<Vec<String>> {
-        self.resolve_namespace_paths(path, context, 0, namespace)
+        let key = (path.to_vec(), context.clone(), namespace);
+        if let Some(paths) = self.resolved_paths.get(&key) {
+            return paths.clone();
+        }
+        let paths: Vec<_> = self
+            .resolve_namespace_paths(path, context, 0, namespace)
             .iter()
             .flat_map(|path| self.expand_reexports(path, context, 0, namespace))
-            .collect()
+            .collect();
+        if reserve_resolution_cache(resolved_entry_bytes(path, context, &paths)) {
+            self.resolved_paths.insert(key, paths.clone());
+        }
+        paths
     }
 
     fn resolve_namespace_paths(
@@ -82,14 +148,65 @@ impl WorkspaceIndex {
             return explicit;
         }
         std::iter::once(local)
-            .chain(
-                self.context_imports(context)
-                    .filter(|import| import.glob)
-                    .map(|import| {
-                        qualified_path(&relative_path(&import.path, &context.module), path)
-                    }),
-            )
+            .chain(self.exported_glob_paths(path, context))
             .collect()
+    }
+
+    fn exported_glob_paths(&self, path: &[String], context: &Context) -> Vec<Vec<String>> {
+        self.context_imports(context)
+            .filter(|import| import.glob)
+            .map(|import| relative_path(&import.path, &context.module))
+            .filter(|module| self.exports_name(module, &path[0], context))
+            .map(|module| qualified_path(&module, path))
+            .collect()
+    }
+
+    fn exports_name(&self, module: &[String], name: &str, context: &Context) -> bool {
+        let mut seen = HashSet::new();
+        self.exports_from(module, name, context, &mut seen)
+    }
+
+    fn exports_from(
+        &self,
+        module: &[String],
+        name: &str,
+        context: &Context,
+        seen: &mut HashSet<Vec<String>>,
+    ) -> bool {
+        if !seen.insert(module.to_vec()) {
+            return false;
+        }
+        let candidate = qualified(module, name);
+        self.has_binding(&candidate, context, Namespace::Type)
+            || self.has_binding(&candidate, context, Namespace::Value)
+            || self.reexports_name(module, name, context, seen)
+    }
+
+    fn reexports_name(
+        &self,
+        module: &[String],
+        name: &str,
+        context: &Context,
+        seen: &mut HashSet<Vec<String>>,
+    ) -> bool {
+        self.module_imports(module)
+            .filter(|import| self.same_workspace(&context.file, &import.context.file))
+            .any(|import| self.import_exports_name(import, module, name, context, seen))
+    }
+
+    fn import_exports_name(
+        &self,
+        import: &Import,
+        module: &[String],
+        name: &str,
+        context: &Context,
+        seen: &mut HashSet<Vec<String>>,
+    ) -> bool {
+        if !import.glob {
+            return import.alias == name;
+        }
+        let target = relative_path(&import.path, module);
+        self.exports_from(&target, name, context, seen)
     }
 
     fn import_targets(
@@ -141,36 +258,107 @@ impl WorkspaceIndex {
         depth: usize,
         namespace: Namespace,
     ) -> Vec<Vec<String>> {
+        self.expand_cached(path, context, depth, namespace, &mut Vec::new())
+            .paths
+    }
+
+    fn expand_cached(
+        &self,
+        path: &[String],
+        context: &Context,
+        depth: usize,
+        namespace: Namespace,
+        stack: &mut Vec<Vec<String>>,
+    ) -> Walk {
         if depth >= EXPANSION_LIMIT {
-            return Vec::new();
+            return Walk::done(Vec::new());
         }
+        let key = self.reexport_key(path, context, depth, namespace);
+        if let Some(paths) = self.reexports.get(&key) {
+            return Walk::done(paths.clone());
+        }
+        if stack.iter().any(|seen| seen.as_slice() == path) {
+            return Walk::cycle();
+        }
+        stack.push(path.to_vec());
+        let walk = self.expand_step(path, context, depth, namespace, stack);
+        stack.pop();
+        if walk.complete && reserve_resolution_cache(reexport_entry_bytes(path, &walk.paths)) {
+            self.reexports.insert(key, walk.paths.clone());
+        }
+        walk
+    }
+
+    fn reexport_key(
+        &self,
+        path: &[String],
+        context: &Context,
+        depth: usize,
+        namespace: Namespace,
+    ) -> ReexportKey {
+        let workspace = self.workspace_of(&context.file);
+        let file = workspace.is_none().then(|| context.file.clone());
+        (path.to_vec(), workspace, file, namespace, depth as u8)
+    }
+
+    fn expand_step(
+        &self,
+        path: &[String],
+        context: &Context,
+        depth: usize,
+        namespace: Namespace,
+        stack: &mut Vec<Vec<String>>,
+    ) -> Walk {
         for position in 0..path.len() {
-            let segment_namespace = if position + 1 < path.len() {
-                Namespace::Type
-            } else {
-                namespace
-            };
-            let imports: Vec<_> = self
-                .module_imports(&path[..position])
-                .filter(|import| !import.glob && import.alias == path[position])
-                .filter(|import| self.same_workspace(&context.file, &import.context.file))
-                .flat_map(|import| self.import_targets(import, context, depth, segment_namespace))
-                .map(|prefix| qualified_path(&prefix, &path[position + 1..]))
-                .filter(|expanded| expanded != path)
-                .collect();
-            if !imports.is_empty() {
-                let local = self
-                    .has_binding(&path[..=position], context, segment_namespace)
-                    .then(|| path.to_vec())
-                    .into_iter();
-                return local
-                    .chain(imports.iter().flat_map(|expanded| {
-                        self.expand_reexports(expanded, context, depth + 1, namespace)
-                    }))
-                    .collect();
+            let targets = self.reexport_targets(path, position, context, depth, namespace);
+            if !targets.is_empty() {
+                return self
+                    .follow_reexports(path, position, &targets, context, depth, namespace, stack);
             }
         }
-        vec![path.to_vec()]
+        Walk::done(vec![path.to_vec()])
+    }
+
+    fn reexport_targets(
+        &self,
+        path: &[String],
+        position: usize,
+        context: &Context,
+        depth: usize,
+        namespace: Namespace,
+    ) -> Vec<Vec<String>> {
+        let segment_namespace = segment_namespace(position, path.len(), namespace);
+        self.module_imports(&path[..position])
+            .filter(|import| !import.glob && import.alias == path[position])
+            .filter(|import| self.same_workspace(&context.file, &import.context.file))
+            .flat_map(|import| self.import_targets(import, context, depth, segment_namespace))
+            .map(|prefix| qualified_path(&prefix, &path[position + 1..]))
+            .filter(|expanded| expanded != path)
+            .collect()
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn follow_reexports(
+        &self,
+        path: &[String],
+        position: usize,
+        targets: &[Vec<String>],
+        context: &Context,
+        depth: usize,
+        namespace: Namespace,
+        stack: &mut Vec<Vec<String>>,
+    ) -> Walk {
+        let segment_namespace = segment_namespace(position, path.len(), namespace);
+        let local = self
+            .has_binding(&path[..=position], context, segment_namespace)
+            .then(|| path.to_vec());
+        let mut walk = Walk::done(local.into_iter().collect());
+        for target in targets {
+            let child = self.expand_cached(target, context, depth + 1, namespace, stack);
+            walk.complete &= child.complete;
+            walk.paths.extend(child.paths);
+        }
+        walk
     }
 
     /// Identify established import namespaces; unavailable imports remain conservative.

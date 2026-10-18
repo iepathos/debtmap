@@ -1,3 +1,4 @@
+use foldhash::HashMapExt;
 pub mod module_detection;
 pub mod pipeline;
 pub mod recommendations;

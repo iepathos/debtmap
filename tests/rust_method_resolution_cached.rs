@@ -3,8 +3,9 @@ use debtmap::analyzers::rust_call_graph::extract_call_graph;
 use debtmap::builders::parallel_call_graph::build_call_graph_from_extracted;
 use debtmap::extraction::{ExtractedFileData, UnifiedFileExtractor};
 use debtmap::priority::call_graph::CallGraph;
+use foldhash::HashMap;
 use serde_json::Value;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::process::Command;
 
@@ -22,7 +23,7 @@ fn extracted(source: &str) -> ExtractedFileData {
 fn build(data: ExtractedFileData) -> CallGraph {
     build_call_graph_from_extracted(
         CallGraph::new(),
-        &HashMap::from([(data.path.clone(), data)]),
+        &debtmap::collections::map_from([(data.path.clone(), data)]),
     )
     .0
 }
@@ -69,7 +70,7 @@ fn cached_source_uses_the_same_receiver_constraints_as_ast_extraction() {
 fn adapter_graph_and_counts_preserve_workspace_outcomes() {
     let data = extracted(&source());
     let graph = build(data.clone());
-    let files = HashMap::from([(data.path.clone(), data)]);
+    let files = debtmap::collections::map_from([(data.path.clone(), data)]);
     let adapter = debtmap::extraction::adapters::call_graph::build_call_graph(&files);
     for caller in ["borrowed", "factory", "suffix"] {
         assert_eq!(callees(&adapter, caller), callees(&graph, caller));

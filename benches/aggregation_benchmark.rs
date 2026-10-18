@@ -13,7 +13,7 @@ fn create_test_project() -> (TempDir, PathBuf) {
 
     // Create multiple files with various complexity levels
     for i in 1..=10 {
-        let mut content = String::from("use std::collections::HashMap;\n\n");
+        let mut content = String::from("use foldhash::{HashMap};\n\n");
 
         // Add functions with varying complexity
         for j in 1..=5 {

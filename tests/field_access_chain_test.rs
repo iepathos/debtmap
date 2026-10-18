@@ -3,7 +3,7 @@ use debtmap::analyzers::rust::RustAnalyzer;
 use debtmap::analyzers::rust_call_graph::extract_call_graph;
 use debtmap::priority::call_graph::FunctionId;
 use debtmap::priority::scoring::classification::is_dead_code_with_exclusions;
-use std::collections::HashSet;
+use foldhash::{HashSet, HashSetExt};
 use std::path::PathBuf;
 
 #[test]

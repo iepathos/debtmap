@@ -1,6 +1,7 @@
 //! Source-established out-of-line module relationships.
 
 use super::*;
+use foldhash::HashSetExt;
 
 impl WorkspaceIndex {
     pub(super) fn establish_modules(
@@ -27,7 +28,7 @@ impl WorkspaceIndex {
             });
             self.roots
                 .entry(file.clone())
-                .or_insert_with(|| HashSet::from([file]));
+                .or_insert_with(|| HashSet::from_iter([file]));
         }
     }
 

@@ -1,3 +1,4 @@
+use foldhash::HashMapExt;
 pub mod call_resolution;
 pub mod debug;
 pub mod graph_builder;
@@ -880,12 +881,12 @@ mod tests {
             use std::path::Path;
 
             pub struct LcovData {
-                pub functions: std::collections::HashMap<String, Vec<()>>,
+                pub functions: foldhash::HashMap<String, Vec<()>>,
             }
 
             pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
                 Ok(LcovData {
-                    functions: std::collections::HashMap::new(),
+                    functions: foldhash::HashMap::new(),
                 })
             }
         "#;

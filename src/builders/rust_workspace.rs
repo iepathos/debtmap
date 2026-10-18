@@ -6,11 +6,9 @@ use crate::{
     priority::call_graph::{CallGraph, FunctionId},
 };
 use anyhow::Result;
+use foldhash::HashSet;
 use rayon::prelude::*;
-use std::{
-    collections::HashSet,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 pub(crate) mod identity;
 
@@ -29,20 +27,20 @@ pub(super) fn build(
     });
     let sources = snapshots(paths, parallel);
     let mut enhancement = RustCallGraphBuilder::new();
-    let mut result = Ok(());
-    let mut processed = 0;
-    let (resolved, _) = workspace::extract_sources(&sources, |batch| {
-        if result.is_ok() {
-            result = collect_enhancement(&mut enhancement, batch);
-        }
-        processed += batch.len();
-        progress(CallGraphProgress {
-            phase: CallGraphPhase::ExtractingCalls,
-            current: processed,
-            total: sources.len(),
-        });
+    let workers = if parallel {
+        rayon::current_num_threads()
+    } else {
+        1
+    };
+    let (resolved, _, enhancements) = workspace::extract_sources(&sources, workers);
+    enhancements
+        .into_iter()
+        .for_each(|facts| enhancement.apply_file_enhancements(facts));
+    progress(CallGraphProgress {
+        phase: CallGraphPhase::ExtractingCalls,
+        current: sources.len(),
+        total: sources.len(),
     });
-    result?;
     let graph = identity::merge(graph, resolved);
     progress(CallGraphProgress {
         phase: CallGraphPhase::LinkingModules,
@@ -94,18 +92,4 @@ fn read_snapshot(path: &Path) -> Option<(PathBuf, String)> {
             None
         }
     }
-}
-
-fn collect_enhancement(
-    builder: &mut RustCallGraphBuilder,
-    files: &[workspace::ParsedFile],
-) -> Result<()> {
-    for (path, ast) in files {
-        builder
-            .analyze_trait_dispatch(path, ast)?
-            .analyze_function_pointers(path, ast)?
-            .analyze_framework_patterns(path, ast)?;
-    }
-    builder.analyze_cross_module(files)?;
-    Ok(())
 }

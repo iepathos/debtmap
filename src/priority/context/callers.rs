@@ -9,7 +9,7 @@
 
 use super::types::{ContextRelationship, FileRange, RelatedContext};
 use crate::priority::call_graph::{CallGraph, FunctionId};
-use std::collections::HashSet;
+use foldhash::HashSet;
 use std::path::Path;
 
 /// Extract caller context entries for a debt item's call-graph scope.

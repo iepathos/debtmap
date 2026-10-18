@@ -3,7 +3,7 @@
 //! This module builds and maintains a tree of module relationships,
 //! enabling resolution of relative paths like `super::function`
 
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::path::{Path, PathBuf};
 
 /// Represents the module hierarchy of a Rust project

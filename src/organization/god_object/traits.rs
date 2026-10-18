@@ -33,9 +33,9 @@
 //! | Custom (unknown traits) | 0.4 | Moderate weight for unknown |
 //! | Self-chosen | 1.0 | Full weight, author's design choice |
 
+use foldhash::{HashMap, HashMapExt};
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
-use std::collections::HashMap;
 
 // ============================================================================
 // Core Types

@@ -25,9 +25,9 @@
 //! This provides a 10x+ reduction in blame-related overhead for typical files.
 
 use super::git2_provider::Git2Repository;
+use crate::collections::DashMap;
 use anyhow::Result;
-use dashmap::DashMap;
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -90,7 +90,7 @@ impl FileBlameCache {
     /// Create a new FileBlameCache for a git repository.
     pub fn new(repo_root: PathBuf) -> Self {
         Self {
-            cache: DashMap::new(),
+            cache: DashMap::default(),
             repo_root,
         }
     }

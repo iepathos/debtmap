@@ -2,16 +2,16 @@
 
 use super::{CallGraph, FunctionId, UncertainCall};
 use crate::collections::HashSet;
+use foldhash::HashSetExt;
 
 impl CallGraph {
     /// Retain a call even when no admissible project target is known.
     pub fn record_uncertain_call(&mut self, mut call: UncertainCall) {
         call.candidates.sort();
         call.candidates.dedup();
-        if let Err(position) = self.uncertain_calls.binary_search(&call) {
-            self.index_uncertain_call(&call);
-            self.uncertain_calls.insert(position, call);
-        }
+        // Indexes are sets, so re-indexing a duplicate call is a no-op.
+        self.index_uncertain_call(&call);
+        self.uncertain_calls.insert(call);
     }
 
     fn index_uncertain_call(&mut self, call: &UncertainCall) {

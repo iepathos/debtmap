@@ -21,8 +21,8 @@ use crate::utils::{analysis_helpers, language_parser};
 use crate::{analysis_utils, core::DebtItem};
 use anyhow::{Context, Result};
 use chrono::Utc;
+use foldhash::{HashMap, HashMapExt};
 use rayon::prelude::*;
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use crate::time_span;

@@ -1,6 +1,6 @@
 // This file demonstrates extreme technical debt that results in scores > 10.0
 
-use std::collections::HashMap;
+use foldhash::HashMap;
 use std::sync::{Arc, Mutex};
 
 pub struct ExtremeLegacyProcessor {

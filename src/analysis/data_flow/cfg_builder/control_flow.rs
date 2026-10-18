@@ -3,7 +3,7 @@
 //! This module handles if/while/return/match expressions and other
 //! control flow constructs during CFG construction.
 
-use std::collections::HashSet;
+use foldhash::HashSet;
 
 use syn::visit::Visit;
 use syn::{Expr, ExprAssign, ExprClosure, ExprIf, ExprMatch, ExprReturn, ExprWhile, Pat};

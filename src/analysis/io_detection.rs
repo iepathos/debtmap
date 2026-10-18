@@ -23,8 +23,8 @@
 //! }
 //! ```
 
+use foldhash::{HashMap, HashMapExt};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Unique identifier for a function
 pub type FunctionId = String;

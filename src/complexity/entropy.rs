@@ -1,5 +1,5 @@
+use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
 use syn::{Block, Expr, visit::Visit};
 

@@ -32,7 +32,7 @@
 //! let summary: AnalysisSummary = metrics.into();
 //! ```
 
-use std::collections::HashMap;
+use foldhash::HashMap;
 use std::path::PathBuf;
 use std::time::Instant;
 

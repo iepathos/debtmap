@@ -25,6 +25,7 @@
 //! // config is now validated - safe to use
 //! ```
 
+use foldhash::HashMapExt;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -316,13 +317,13 @@ impl AnalysisConfig {
 pub struct AnalysisConfigBuilder {
     config: AnalysisConfig,
     /// Track sources for each field
-    sources: std::collections::HashMap<String, ConfigSource>,
+    sources: foldhash::HashMap<String, ConfigSource>,
 }
 
 impl AnalysisConfigBuilder {
     /// Create a new builder with required project path.
     pub fn new(project_path: PathBuf) -> Self {
-        let mut sources = std::collections::HashMap::new();
+        let mut sources = foldhash::HashMap::new();
         sources.insert("project_path".to_string(), ConfigSource::Default);
 
         Self {
@@ -438,7 +439,7 @@ impl AnalysisConfigBuilder {
     }
 
     /// Get tracked sources for debugging.
-    pub fn sources(&self) -> &std::collections::HashMap<String, ConfigSource> {
+    pub fn sources(&self) -> &foldhash::HashMap<String, ConfigSource> {
         &self.sources
     }
 }

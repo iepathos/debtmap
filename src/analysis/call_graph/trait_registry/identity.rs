@@ -2,7 +2,7 @@
 
 use super::TraitRegistry;
 use crate::priority::call_graph::{CallGraph, FunctionId};
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use std::path::PathBuf;
 
 pub(crate) type Locations = HashMap<(PathBuf, usize), Vec<FunctionId>>;

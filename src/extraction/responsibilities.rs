@@ -5,7 +5,7 @@
 
 use crate::extraction::types::ExtractedFunctionData;
 use crate::organization::god_object::classifier::infer_responsibility_with_confidence;
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileResponsibilityGroups {

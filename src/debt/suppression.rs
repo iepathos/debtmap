@@ -1,8 +1,8 @@
 use crate::core::{DebtType, Language};
 use crate::debt::suppression_audit::{SuppressionDecision, SuppressionKind};
+use foldhash::{HashMap, HashMapExt};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
@@ -302,10 +302,21 @@ struct SuppressionPatterns {
     function_allow: Regex,
 }
 
-impl SuppressionPatterns {
-    fn new(language: Language) -> Self {
-        let comment_prefix = get_comment_prefix_pattern(language);
+static HASH_PATTERNS: Lazy<SuppressionPatterns> = Lazy::new(|| SuppressionPatterns::new("#"));
+static RUST_PATTERNS: Lazy<SuppressionPatterns> = Lazy::new(|| SuppressionPatterns::new(r"///?"));
+static SLASH_PATTERNS: Lazy<SuppressionPatterns> = Lazy::new(|| SuppressionPatterns::new("//"));
 
+impl SuppressionPatterns {
+    fn for_language(language: Language) -> &'static Self {
+        match language {
+            Language::Python => &HASH_PATTERNS,
+            // Match both // and /// (doc comments)
+            Language::Rust => &RUST_PATTERNS,
+            _ => &SLASH_PATTERNS,
+        }
+    }
+
+    fn new(comment_prefix: &str) -> Self {
         Self {
             block_start: Regex::new(&format!(
                 r"(?m)^\s*{comment_prefix}\s*debtmap:ignore-start(?:\s*\[([\w,*]+)\])?(?:\s*--\s*(.*))?$"
@@ -324,17 +335,6 @@ impl SuppressionPatterns {
                 r"(?m)^\s*{comment_prefix}\s*debtmap:ignore\s*\[([\w,*]+)\]\s*-{{1,2}}\s*(.+)$"
             )).unwrap(),
         }
-    }
-}
-
-/// Returns a regex pattern for matching comment prefixes.
-/// For Rust, matches both `//` and `///` (doc comments).
-fn get_comment_prefix_pattern(language: Language) -> &'static str {
-    match language {
-        Language::Python => "#",
-        // Match both // and /// (doc comments)
-        Language::Rust => r"///?",
-        _ => "//",
     }
 }
 
@@ -510,7 +510,7 @@ pub fn parse_suppression_comments(
     language: Language,
     file: &Path,
 ) -> SuppressionContext {
-    let patterns = SuppressionPatterns::new(language);
+    let patterns = SuppressionPatterns::for_language(language);
     let mut context = SuppressionContext::new();
     let mut open_blocks: Vec<(usize, Vec<DebtType>, Option<String>)> = Vec::new();
 
@@ -519,7 +519,7 @@ pub fn parse_suppression_comments(
         .enumerate()
         .map(|(idx, line)| (idx + 1, line))
     {
-        let result = parse_line(line, line_number, &patterns);
+        let result = parse_line(line, line_number, patterns);
         process_parsed_line(result, &mut context, &mut open_blocks);
     }
 

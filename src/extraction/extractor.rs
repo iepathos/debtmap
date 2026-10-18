@@ -1108,7 +1108,7 @@ impl Clone for Bar {
     #[test]
     fn test_extract_imports() {
         let code = r#"
-use std::collections::HashMap;
+use foldhash::{HashMap};
 use std::io::{Read, Write};
 use crate::module::*;
 use something as alias;
@@ -1118,7 +1118,7 @@ use something as alias;
 
         // Check specific imports
         let paths: Vec<_> = data.imports.iter().map(|i| &i.path).collect();
-        assert!(paths.contains(&&"std::collections::HashMap".to_string()));
+        assert!(paths.contains(&&"foldhash::HashMap".to_string()));
         assert!(paths.contains(&&"std::io::Read".to_string()));
         assert!(paths.contains(&&"std::io::Write".to_string()));
 

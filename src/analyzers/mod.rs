@@ -48,6 +48,7 @@ pub mod signature_extractor;
 pub mod solidity;
 pub mod state_field_detector;
 pub mod state_machine_pattern_detector;
+pub mod syntax_tree;
 pub mod test_detector;
 pub mod trait_implementation_tracker;
 pub mod trait_resolver;
@@ -331,3 +332,4 @@ mod tests {
 }
 
 pub(crate) mod rust_resolution;
+pub use rust_resolution::index::{DEFAULT_RESOLUTION_CACHE_MB, set_resolution_cache_mb};

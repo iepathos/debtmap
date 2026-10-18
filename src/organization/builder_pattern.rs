@@ -3,7 +3,7 @@
 /// Detects builder patterns where many fluent setter methods are intentionally
 /// present for configuration purposes. Prevents false positives where god object
 /// detection flags builders for having many methods.
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use syn::{File, ImplItem, Item, ItemImpl, ReturnType, Type, spanned::Spanned, visit::Visit};
 
 /// Information about a method signature

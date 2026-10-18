@@ -1,5 +1,5 @@
 use super::match_patterns::MatchExpressionRecognizer;
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 use syn::{
     Block, Expr, ExprAsync, ExprBlock, ExprClosure, ExprForLoop, ExprIf, ExprLoop, ExprMatch,
     ExprWhile, ImplItem, Item, Stmt, visit::Visit,

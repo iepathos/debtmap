@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 
 /// Represents different types of variables for classification
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

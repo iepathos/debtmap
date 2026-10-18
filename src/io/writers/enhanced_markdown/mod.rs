@@ -332,7 +332,7 @@ mod tests {
         TechnicalDebtReport,
     };
     use chrono::Utc;
-    use std::collections::HashMap;
+    use foldhash::{HashMap, HashMapExt};
     use std::io::Cursor;
     use std::path::PathBuf;
 
@@ -423,7 +423,7 @@ mod tests {
                 circular: vec![],
             },
             duplications: vec![],
-            file_contexts: std::collections::HashMap::new(),
+            file_contexts: foldhash::HashMap::new(),
         }
     }
 

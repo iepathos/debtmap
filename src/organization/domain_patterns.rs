@@ -12,8 +12,8 @@
 //! - `detect_observer_dispatch()` → Observer Pattern
 //! - `check_for_callback_patterns()` → Callback Pattern
 
+use foldhash::{HashMap, HashMapExt, HashSet};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
 
 /// Minimum confidence threshold for domain pattern match
 /// Note: Lowered from spec's 0.60 to 0.40 to be more inclusive with partial signal matches

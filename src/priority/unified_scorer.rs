@@ -17,8 +17,8 @@ use crate::priority::{
 };
 use crate::risk::evidence_calculator::EvidenceBasedRiskCalculator;
 use crate::risk::lcov::LcovData;
+use foldhash::HashSet;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 use std::path::PathBuf;
 
 /// Detailed breakdown of debt aggregator adjustments (spec 260).
@@ -241,7 +241,7 @@ impl UnifiedDebtItem {
                 .upstream_callers
                 .iter()
                 .chain(&self.downstream_callees)
-                .collect::<std::collections::HashSet<_>>()
+                .collect::<foldhash::HashSet<_>>()
                 .len();
             known
                 + self
@@ -958,7 +958,7 @@ pub fn is_dead_code_with_exclusions(
     func: &FunctionMetrics,
     call_graph: &CallGraph,
     func_id: &FunctionId,
-    framework_exclusions: &std::collections::HashSet<FunctionId>,
+    framework_exclusions: &foldhash::HashSet<FunctionId>,
     function_pointer_used_functions: Option<&HashSet<FunctionId>>,
 ) -> bool {
     // Check if dead code detection is enabled for this file's language

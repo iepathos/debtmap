@@ -4,7 +4,7 @@
 //! names are unique within their parent directory.
 
 use super::NameCandidate;
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet};
 use std::path::{Path, PathBuf};
 
 /// Validates and ensures uniqueness of module names
@@ -172,7 +172,7 @@ impl NameUniquenessValidator {
     /// // → Returns: "classification" (from "classify" verb)
     /// ```
     fn extract_distinctive_term(methods: &[String]) -> Option<String> {
-        use std::collections::HashMap;
+        use foldhash::HashMap;
 
         // Look for distinctive verbs
         let distinctive_verbs = [

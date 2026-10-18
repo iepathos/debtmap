@@ -3,7 +3,7 @@
 /// This module provides validation tools to detect structural issues,
 /// orphaned nodes, and suspicious patterns in the call graph.
 use crate::priority::call_graph::{CallGraph, FunctionId};
-use std::collections::{HashMap, HashSet};
+use foldhash::{HashMap, HashMapExt, HashSet};
 use std::path::PathBuf;
 
 /// Configuration for call graph validation

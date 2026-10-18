@@ -4,7 +4,8 @@ use debtmap::analyzers::rust_call_graph::extract_call_graph_multi_file;
 use debtmap::builders::parallel_call_graph::build_call_graph_from_extracted;
 use debtmap::extraction::UnifiedFileExtractor;
 use debtmap::priority::call_graph::CallGraph;
-use std::collections::{BTreeSet, HashMap};
+use foldhash::HashMap;
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 fn graphs(files: &[(&str, &str)]) -> [CallGraph; 2] {

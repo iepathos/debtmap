@@ -4,7 +4,7 @@ use crate::core::{FunctionMetrics, Language};
 use crate::priority::call_graph::{CallGraph, FunctionId};
 use crate::priority::semantic_classifier::{FunctionRole, classify_function_role};
 use crate::priority::{DebtType, FunctionVisibility, TransitiveCoverage};
-use std::collections::HashSet;
+use foldhash::{HashSet, HashSetExt};
 
 // Configuration for untested function thresholds (spec 122)
 const UNTESTED_COMPLEXITY_THRESHOLD: u32 = 15;
@@ -1600,7 +1600,7 @@ mod tests {
 
     #[test]
     fn test_production_path_uses_dampened_values() {
-        use std::collections::HashSet;
+        use foldhash::HashSet;
 
         // This test verifies the production path (classify_all_debt_types)
         // correctly uses dampened values via check_complexity_hotspot

@@ -2,7 +2,7 @@
 //!
 //! Provides pure functions for calculating cluster cohesion metrics.
 
-use std::collections::HashMap;
+use foldhash::{HashMap, HashMapExt};
 
 /// Calculate cohesion metrics for a cluster.
 ///
@@ -89,7 +89,7 @@ mod tests {
     #[test]
     fn test_cluster_with_internal_calls() {
         let methods = vec!["a".into(), "b".into()];
-        let adjacency = HashMap::from([(("a".into(), "b".into()), 3)]);
+        let adjacency = crate::collections::map_from([(("a".into(), "b".into()), 3)]);
         let method_to_cluster: HashMap<String, usize> =
             vec![("a".into(), 0), ("b".into(), 0)].into_iter().collect();
 
@@ -102,7 +102,7 @@ mod tests {
     #[test]
     fn test_cluster_with_external_calls() {
         let methods = vec!["a".into()];
-        let adjacency = HashMap::from([(("a".into(), "external".into()), 2)]);
+        let adjacency = crate::collections::map_from([(("a".into(), "external".into()), 2)]);
         let method_to_cluster: HashMap<String, usize> =
             vec![("a".into(), 0), ("external".into(), 1)]
                 .into_iter()

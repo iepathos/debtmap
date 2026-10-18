@@ -1,6 +1,6 @@
 //! Go module and import syntax used by cross-file call resolution.
 
-use std::collections::HashMap;
+use foldhash::HashMap;
 use std::path::{Path, PathBuf};
 
 pub(crate) fn package_import_path(directory: &Path) -> Option<String> {

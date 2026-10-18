@@ -24,8 +24,8 @@ pub mod traits;
 pub mod types;
 
 use chrono::{DateTime, Utc};
+use foldhash::HashMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::path::PathBuf;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
