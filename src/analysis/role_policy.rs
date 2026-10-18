@@ -174,9 +174,22 @@ fn js_framework_registration(source: &str, name: &str) -> Option<(String, String
 
 fn go_framework_registration(source: &str, name: &str) -> Option<(String, String)> {
     source.lines().find_map(|line| {
-        let is_handler = line.contains("HandleFunc(") || line.contains(".Handle(");
-        (is_handler && line.contains(name)).then(|| ("net/http".into(), "handler".into()))
+        (is_go_handler_line(line) && line.contains(name))
+            .then(|| ("net/http".into(), "handler".into()))
     })
+}
+
+fn is_go_handler_line(line: &str) -> bool {
+    line.contains("HandleFunc(") || line.contains(".Handle(")
+}
+
+/// Only the lines Go handler detection can match, for checking many functions per file.
+pub fn go_handler_lines(source: &str) -> String {
+    source
+        .lines()
+        .filter(|line| is_go_handler_line(line))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn solidity_framework_registration(source: &str, name: &str) -> Option<(String, String)> {

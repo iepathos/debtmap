@@ -2,6 +2,7 @@
 //!
 //! Maps tree-sitter node kinds to `TokenCategory` with appropriate weights.
 
+use crate::analyzers::syntax_tree::node_text;
 use crate::complexity::entropy_core::{EntropyToken, TokenCategory};
 use std::hash::{Hash, Hasher};
 use tree_sitter::Node;
@@ -311,13 +312,6 @@ fn get_call_name(node: &Node, source: &str) -> String {
         }
         _ => "call".to_string(),
     }
-}
-
-/// Extract text from a tree-sitter node
-fn node_text<'a>(node: &Node, source: &'a str) -> &'a str {
-    let start = node.start_byte();
-    let end = node.end_byte();
-    &source[start..end]
 }
 
 #[cfg(test)]

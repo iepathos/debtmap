@@ -100,7 +100,7 @@ pub struct UnifiedAnalysis {
     pub total_debt_score: f64,
     pub debt_density: f64,
     pub total_lines_of_code: usize,
-    pub call_graph: CallGraph,
+    pub call_graph: std::sync::Arc<CallGraph>,
     pub data_flow_graph: crate::data_flow::DataFlowGraph,
     pub overall_coverage: Option<f64>,
     #[serde(default)]
@@ -475,9 +475,10 @@ pub struct TieredDisplay {
 }
 
 impl UnifiedAnalysis {
-    pub fn new(call_graph: CallGraph) -> Self {
-        // Create DataFlowGraph from the CallGraph
-        let data_flow_graph = crate::data_flow::DataFlowGraph::from_call_graph(call_graph.clone());
+    pub fn new(call_graph: impl Into<std::sync::Arc<CallGraph>>) -> Self {
+        let call_graph = call_graph.into();
+        let data_flow_graph =
+            crate::data_flow::DataFlowGraph::from_call_graph(std::sync::Arc::clone(&call_graph));
 
         Self {
             items: Vector::new(),

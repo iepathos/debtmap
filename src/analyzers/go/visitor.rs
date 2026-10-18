@@ -1,7 +1,9 @@
-use crate::analyzers::go::advanced::detect_advanced_signals;
+use crate::analyzers::go::advanced::{GoAdvancedSignals, SignalVisitor};
 use crate::analyzers::go::parser::{node_line, node_text};
-use crate::analyzers::go::purity::analyze_purity;
+use crate::analyzers::go::purity::{GoPurity, PurityVisitor};
 use crate::analyzers::go::types::{GoAnalysis, GoFunction, GoFunctionKind};
+use crate::analyzers::go::walk::{Scope, Visitor, walk};
+use crate::analyzers::syntax_tree::{children, function_length};
 use crate::core::PurityLevel;
 use crate::core::ast::GoAst;
 use std::collections::{HashMap, HashSet};
@@ -85,32 +87,13 @@ fn build_function(
     kind: GoFunctionKind,
     context: FunctionContext<'_>,
 ) -> GoFunction {
-    let body = node.child_by_field_name("body");
-    let cyclomatic = body.map(cyclomatic_complexity).unwrap_or(1);
-    let cognitive = body.map(|node| cognitive_complexity(node, 0)).unwrap_or(0);
-    let nesting = body.map(|node| max_nesting(node, 0)).unwrap_or(0);
-    let purity = body.map(|node| analyze_purity(node, &ast.source));
     let is_test = is_test_file(&ast.path) || is_test_function(&name);
-    let advisory = body
-        .map(|node| {
-            detect_advanced_signals(
-                node,
-                &ast.source,
-                &name,
-                is_test,
-                &context.file.package_variables,
-            )
-        })
-        .unwrap_or_default();
-    let local_types = body
-        .map(|node| local_type_environment(node, ast, &context))
-        .unwrap_or_default();
-    let local_names = function_local_names(node, ast);
-    let call_context = CallContext {
-        local_types: &local_types,
-        function_names: &context.file.function_names,
-        local_names: &local_names,
-    };
+    let FunctionScan {
+        complexity,
+        purity,
+        advisory,
+        calls,
+    } = scan_function(node, ast, &name, is_test, &context);
 
     GoFunction {
         visibility: visibility_for(&name),
@@ -119,13 +102,11 @@ fn build_function(
         file: ast.path.clone(),
         line: node_line(&node),
         length: function_length(node),
-        cyclomatic,
-        cognitive,
-        nesting,
+        cyclomatic: 1 + complexity.branches,
+        cognitive: complexity.cognitive,
+        nesting: complexity.nesting,
         kind,
-        calls: body
-            .map(|node| collect_calls(node, ast, &call_context))
-            .unwrap_or_default(),
+        calls,
         purity_level: purity
             .as_ref()
             .map(|purity| purity.level)
@@ -138,6 +119,56 @@ fn build_function(
         advisory_patterns: advisory.patterns,
         error_swallowing_count: advisory.error_swallowing_count,
         error_swallowing_patterns: advisory.error_swallowing_patterns,
+    }
+}
+
+struct FunctionScan {
+    complexity: Complexity,
+    purity: Option<GoPurity>,
+    advisory: GoAdvancedSignals,
+    calls: Vec<String>,
+}
+
+fn scan_function(
+    node: Node,
+    ast: &GoAst,
+    name: &str,
+    is_test: bool,
+    context: &FunctionContext<'_>,
+) -> FunctionScan {
+    let body = node.child_by_field_name("body");
+    let source = &ast.source;
+    let mut complexity = Complexity::default();
+    let mut purity = PurityVisitor::new(source);
+    let mut signals = SignalVisitor::new(source, name, is_test, &context.file.package_variables);
+    let mut types = LocalTypes::new(ast, context);
+    let mut names = LocalNames {
+        ast,
+        names: HashSet::new(),
+    };
+    let mut calls = CallNodes::default();
+    walk(
+        node,
+        body,
+        &mut [
+            &mut complexity,
+            &mut purity,
+            &mut signals,
+            &mut types,
+            &mut names,
+            &mut calls,
+        ],
+    );
+    let call_context = CallContext {
+        local_types: &types.types,
+        function_names: &context.file.function_names,
+        local_names: &names.names,
+    };
+    FunctionScan {
+        complexity,
+        purity: body.map(|_| purity.finish()),
+        advisory: signals.finish(),
+        calls: calls.resolve(ast, &call_context),
     }
 }
 
@@ -239,26 +270,18 @@ fn function_names(root: Node, ast: &GoAst) -> HashSet<String> {
         .collect()
 }
 
-fn function_local_names(function: Node, ast: &GoAst) -> HashSet<String> {
-    children(function)
-        .into_iter()
-        .flat_map(|child| collect_local_names(child, ast))
-        .collect()
+/// Names bound by the function's parameters and body, outside nested literals.
+struct LocalNames<'a> {
+    ast: &'a GoAst,
+    names: HashSet<String>,
 }
 
-fn collect_local_names(node: Node, ast: &GoAst) -> Vec<String> {
-    if is_nested_callable(node) {
-        return Vec::new();
+impl<'t> Visitor<'t> for LocalNames<'_> {
+    fn enter(&mut self, node: Node<'t>, scope: Scope) {
+        if !scope.nested {
+            self.names.extend(binding_names(node, self.ast));
+        }
     }
-
-    binding_names(node, ast)
-        .into_iter()
-        .chain(
-            children(node)
-                .into_iter()
-                .flat_map(|child| collect_local_names(child, ast)),
-        )
-        .collect()
 }
 
 fn binding_names(node: Node, ast: &GoAst) -> Vec<String> {
@@ -345,13 +368,6 @@ fn first_child_text(node: Node, kind: &str, ast: &GoAst) -> Option<String> {
     None
 }
 
-fn function_length(node: Node) -> usize {
-    node.end_position()
-        .row
-        .saturating_sub(node.start_position().row)
-        + 1
-}
-
 fn visibility_for(name: &str) -> Option<String> {
     name.rsplit('.')
         .next()
@@ -380,51 +396,33 @@ fn is_test_function(name: &str) -> bool {
         .any(|prefix| short_name.starts_with(prefix))
 }
 
-fn cyclomatic_complexity(node: Node) -> u32 {
-    1 + branch_complexity(node)
+/// Branch count, cognitive cost and maximum nesting of the body.
+#[derive(Default)]
+struct Complexity {
+    branches: u32,
+    cognitive: u32,
+    nesting: u32,
+    depth: u32,
 }
 
-fn branch_complexity(node: Node) -> u32 {
-    if is_nested_callable(node) {
-        return 0;
+impl<'t> Visitor<'t> for Complexity {
+    fn enter(&mut self, node: Node<'t>, scope: Scope) {
+        if !scope.own_body() {
+            return;
+        }
+        let operators = boolean_operator_count(node);
+        let branch = u32::from(is_branch_node(node));
+        self.branches += branch + operators;
+        self.cognitive += branch * (1 + self.depth) + operators;
+        self.depth += u32::from(is_nesting_node(node));
+        self.nesting = self.nesting.max(self.depth);
     }
 
-    let current = u32::from(is_branch_node(node)) + boolean_operator_count(node);
-    current + child_sum(node, branch_complexity)
-}
-
-fn cognitive_complexity(node: Node, depth: u32) -> u32 {
-    if is_nested_callable(node) {
-        return 0;
+    fn exit(&mut self, node: Node<'t>, scope: Scope) {
+        if scope.own_body() {
+            self.depth -= u32::from(is_nesting_node(node));
+        }
     }
-
-    let branch_cost = if is_branch_node(node) { 1 + depth } else { 0 };
-    let next_depth = if is_nesting_node(node) {
-        depth + 1
-    } else {
-        depth
-    };
-
-    branch_cost + boolean_operator_count(node) + child_sum_with_depth(node, next_depth)
-}
-
-fn max_nesting(node: Node, depth: u32) -> u32 {
-    if is_nested_callable(node) {
-        return depth;
-    }
-
-    let next_depth = if is_nesting_node(node) {
-        depth + 1
-    } else {
-        depth
-    };
-    let child_max = children(node)
-        .into_iter()
-        .map(|child| max_nesting(child, next_depth))
-        .max()
-        .unwrap_or(next_depth);
-
-    next_depth.max(child_max)
 }
 
 fn is_branch_node(node: Node) -> bool {
@@ -451,13 +449,6 @@ fn is_nesting_node(node: Node) -> bool {
     )
 }
 
-fn is_nested_callable(node: Node) -> bool {
-    matches!(
-        node.kind(),
-        "func_literal" | "function_declaration" | "method_declaration"
-    )
-}
-
 fn boolean_operator_count(node: Node) -> u32 {
     if node.kind() != "binary_expression" {
         return 0;
@@ -469,39 +460,32 @@ fn boolean_operator_count(node: Node) -> u32 {
         .count() as u32
 }
 
-fn child_sum(node: Node, f: fn(Node) -> u32) -> u32 {
-    children(node).into_iter().map(f).sum()
+/// Call sites in the body, resolved after the walk once local names are known.
+#[derive(Default)]
+struct CallNodes<'t> {
+    nodes: Vec<Node<'t>>,
 }
 
-fn child_sum_with_depth(node: Node, depth: u32) -> u32 {
-    children(node)
-        .into_iter()
-        .map(|child| cognitive_complexity(child, depth))
-        .sum()
-}
-
-fn children(node: Node) -> Vec<Node> {
-    let mut cursor = node.walk();
-    node.children(&mut cursor).collect()
-}
-
-fn collect_calls(node: Node, ast: &GoAst, context: &CallContext<'_>) -> Vec<String> {
-    if is_nested_callable(node) {
-        return Vec::new();
+impl CallNodes<'_> {
+    fn resolve(self, ast: &GoAst, context: &CallContext<'_>) -> Vec<String> {
+        self.nodes
+            .into_iter()
+            .filter_map(|node| extracted_call_name(node, ast, context))
+            .collect()
     }
+}
 
-    let current = extracted_call_name(node, ast, context)
-        .into_iter()
-        .collect::<Vec<_>>();
-
-    current
-        .into_iter()
-        .chain(
-            children(node)
-                .into_iter()
-                .flat_map(|child| collect_calls(child, ast, context)),
-        )
-        .collect()
+impl<'t> Visitor<'t> for CallNodes<'t> {
+    fn enter(&mut self, node: Node<'t>, scope: Scope) {
+        if scope.own_body()
+            && matches!(
+                node.kind(),
+                "call_expression" | "type_conversion_expression"
+            )
+        {
+            self.nodes.push(node);
+        }
+    }
 }
 
 fn extracted_call_name(node: Node, ast: &GoAst, context: &CallContext<'_>) -> Option<String> {
@@ -565,19 +549,37 @@ fn generic_candidate(name: &str, raw: &str, context: &CallContext<'_>) -> Option
     })
 }
 
-fn local_type_environment(
-    body: Node,
-    ast: &GoAst,
-    context: &FunctionContext<'_>,
-) -> HashMap<String, String> {
-    let initial = context
-        .receiver
-        .as_ref()
-        .and_then(receiver_binding)
-        .into_iter()
-        .collect();
+/// Variable types declared anywhere in the body, seeded with the receiver.
+struct LocalTypes<'a> {
+    ast: &'a GoAst,
+    return_types: &'a HashMap<String, String>,
+    types: HashMap<String, String>,
+}
 
-    collect_local_types(body, ast, &context.file.return_types, initial)
+impl<'a> LocalTypes<'a> {
+    fn new(ast: &'a GoAst, context: &'a FunctionContext<'_>) -> Self {
+        Self {
+            ast,
+            return_types: &context.file.return_types,
+            types: context
+                .receiver
+                .as_ref()
+                .and_then(receiver_binding)
+                .into_iter()
+                .collect(),
+        }
+    }
+}
+
+impl<'t> Visitor<'t> for LocalTypes<'_> {
+    fn enter(&mut self, node: Node<'t>, scope: Scope) {
+        if !scope.in_body {
+            return;
+        }
+        if let Some((name, type_name)) = local_type_binding(node, self.ast, self.return_types) {
+            self.types.insert(name, type_name);
+        }
+    }
 }
 
 fn receiver_binding(receiver: &ReceiverInfo) -> Option<(String, String)> {
@@ -585,21 +587,6 @@ fn receiver_binding(receiver: &ReceiverInfo) -> Option<(String, String)> {
         .name
         .as_ref()
         .map(|name| (name.clone(), receiver.type_name.clone()))
-}
-
-fn collect_local_types(
-    node: Node,
-    ast: &GoAst,
-    return_types: &HashMap<String, String>,
-    mut types: HashMap<String, String>,
-) -> HashMap<String, String> {
-    if let Some((name, type_name)) = local_type_binding(node, ast, return_types) {
-        types.insert(name, type_name);
-    }
-
-    children(node).into_iter().fold(types, |types, child| {
-        collect_local_types(child, ast, return_types, types)
-    })
 }
 
 fn local_type_binding(

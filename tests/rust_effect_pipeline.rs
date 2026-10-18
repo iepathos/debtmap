@@ -33,7 +33,7 @@ fn actual_call_resolver_has_no_fabricated_external_effects_or_discount() {
         &HashMap::from([(file, extracted)]),
     );
     let metrics = run_purity_propagation(&metrics, &graph);
-    let data_flow = build_data_flow_graph(&metrics, &graph, None);
+    let data_flow = build_data_flow_graph(&metrics, &graph.clone().into(), None);
     for name in [
         "CallResolver::resolve_call_outcome",
         "CallResolver::select_best_candidate",

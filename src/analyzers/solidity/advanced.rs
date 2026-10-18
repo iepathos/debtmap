@@ -1,4 +1,5 @@
 use crate::analyzers::solidity::parser::node_text;
+use crate::analyzers::syntax_tree::walk_nodes;
 use crate::config::SolidityLanguageConfig;
 use tree_sitter::Node;
 
@@ -250,14 +251,6 @@ fn is_dynamic_type_text(text: &str) -> bool {
     text.contains("string")
         || (text.contains("bytes") && !text.contains("bytes32"))
         || text.contains("[]")
-}
-
-fn walk_nodes(node: Node, f: &mut impl FnMut(Node)) {
-    f(node);
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        walk_nodes(child, f);
-    }
 }
 
 #[cfg(test)]

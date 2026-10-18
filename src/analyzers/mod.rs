@@ -48,6 +48,7 @@ pub mod signature_extractor;
 pub mod solidity;
 pub mod state_field_detector;
 pub mod state_machine_pattern_detector;
+pub mod syntax_tree;
 pub mod test_detector;
 pub mod trait_implementation_tracker;
 pub mod trait_resolver;

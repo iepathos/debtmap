@@ -3,7 +3,8 @@
 use crate::core::{FunctionMetrics, Language};
 use crate::priority::CallGraph;
 use crate::priority::call_graph::{CallEdgeProvenance, CallType, FunctionId, ResolutionOutcome};
-use std::collections::HashMap;
+use rayon::prelude::*;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 type PackageSymbol = (PathBuf, String);
@@ -16,47 +17,89 @@ struct SymbolIndex {
 }
 
 pub(super) fn add_resolved_calls(graph: &mut CallGraph, metrics: &[FunctionMetrics]) {
-    add_framework_evidence(graph, metrics);
-    let index = symbol_index(metrics);
-    let mut callers: Vec<_> = metrics
+    let go: Vec<_> = metrics
         .iter()
+        .filter(|metric| Language::from_path(&metric.file) == Language::Go)
+        .collect();
+    let sources = read_sources(&go);
+    add_framework_evidence(graph, &go, &sources);
+    let mut callers: Vec<_> = go
+        .into_iter()
         .filter(|metric| is_production_go(metric))
         .collect();
     callers.sort_by_key(|metric| function_id(metric));
+    let index = symbol_index(&callers, &sources);
 
-    for caller in callers {
-        add_caller_edges(graph, caller, &index);
+    let resolutions: Vec<_> = callers
+        .par_iter()
+        .map(|caller| caller_resolutions(caller, &index))
+        .collect();
+    for (caller, outcome) in resolutions.into_iter().flatten() {
+        graph.add_resolution(caller, CallType::Direct, outcome);
     }
 }
 
-fn add_framework_evidence(graph: &mut CallGraph, metrics: &[FunctionMetrics]) {
-    let mut sources = HashMap::new();
-    for metric in metrics
-        .iter()
-        .filter(|metric| Language::from_path(&metric.file) == Language::Go)
-    {
-        let source = sources
-            .entry(metric.file.clone())
-            .or_insert_with(|| std::fs::read_to_string(&metric.file).unwrap_or_default());
-        let evidence = crate::analysis::role_policy::framework_evidence_for_source(
-            Language::Go,
-            source,
-            &metric.name,
-        );
+fn read_sources(metrics: &[&FunctionMetrics]) -> HashMap<PathBuf, String> {
+    let files: HashSet<_> = metrics.iter().map(|metric| &metric.file).collect();
+    files
+        .into_par_iter()
+        .map(|file| {
+            let source = std::fs::read_to_string(file).unwrap_or_default();
+            (file.clone(), source)
+        })
+        .collect()
+}
+
+fn add_framework_evidence(
+    graph: &mut CallGraph,
+    metrics: &[&FunctionMetrics],
+    sources: &HashMap<PathBuf, String>,
+) {
+    let handlers: HashMap<_, _> = sources
+        .par_iter()
+        .map(|(path, source)| (path, crate::analysis::role_policy::go_handler_lines(source)))
+        .collect();
+    let evidence: Vec<_> = metrics
+        .par_iter()
+        .map(|metric| {
+            crate::analysis::role_policy::framework_evidence_for_source(
+                Language::Go,
+                handlers
+                    .get(&metric.file)
+                    .map(String::as_str)
+                    .unwrap_or_default(),
+                &metric.name,
+            )
+        })
+        .collect();
+    for (metric, evidence) in metrics.iter().zip(evidence) {
         graph.add_role_evidence(&function_id(metric), evidence);
     }
 }
 
-fn symbol_index(metrics: &[FunctionMetrics]) -> SymbolIndex {
-    metrics
+fn symbol_index(callers: &[&FunctionMetrics], sources: &HashMap<PathBuf, String>) -> SymbolIndex {
+    let directories: HashSet<_> = callers
         .iter()
-        .filter(|metric| is_production_go(metric))
+        .filter_map(|metric| metric.file.parent())
+        .collect();
+    let import_paths: HashMap<_, _> = directories
+        .into_par_iter()
+        .filter_map(|directory| {
+            crate::analyzers::go::imports::package_import_path(directory)
+                .map(|path| (directory, path))
+        })
+        .collect();
+    callers
+        .iter()
         .fold(SymbolIndex::default(), |mut index, metric| {
             index
                 .imports_by_file
                 .entry(metric.file.clone())
                 .or_insert_with(|| {
-                    crate::analyzers::go::imports::import_aliases_for_file(&metric.file)
+                    sources
+                        .get(&metric.file)
+                        .map(|source| crate::analyzers::go::imports::import_aliases(source))
+                        .unwrap_or_default()
                 });
             let candidates = index
                 .by_package
@@ -65,37 +108,31 @@ fn symbol_index(metrics: &[FunctionMetrics]) -> SymbolIndex {
             candidates.push(function_id(metric));
             candidates.sort();
             candidates.dedup();
-            if !metric.name.contains('.') {
-                index_importable_symbol(&mut index, metric);
+            let import_path = metric.file.parent().and_then(|dir| import_paths.get(dir));
+            if let Some(import_path) = import_path.filter(|_| !metric.name.contains('.')) {
+                let candidates = index
+                    .by_import_path
+                    .entry((import_path.clone(), metric.name.clone()))
+                    .or_default();
+                candidates.push(function_id(metric));
+                candidates.sort();
+                candidates.dedup();
             }
             index
         })
 }
 
-fn index_importable_symbol(index: &mut SymbolIndex, metric: &FunctionMetrics) {
-    let Some(directory) = metric.file.parent() else {
-        return;
-    };
-    let Some(import_path) = crate::analyzers::go::imports::package_import_path(directory) else {
-        return;
-    };
-    let candidates = index
-        .by_import_path
-        .entry((import_path, metric.name.clone()))
-        .or_default();
-    candidates.push(function_id(metric));
-    candidates.sort();
-    candidates.dedup();
-}
-
-fn add_caller_edges(graph: &mut CallGraph, caller: &FunctionMetrics, index: &SymbolIndex) {
+fn caller_resolutions(
+    caller: &FunctionMetrics,
+    index: &SymbolIndex,
+) -> Vec<(FunctionId, ResolutionOutcome)> {
     let mut calls = caller.call_dependencies.clone().unwrap_or_default();
     calls.sort();
     calls.dedup();
-    for call in calls {
-        let outcome = resolve_call(caller, &call, index);
-        graph.add_resolution(function_id(caller), CallType::Direct, outcome);
-    }
+    calls
+        .iter()
+        .map(|call| (function_id(caller), resolve_call(caller, call, index)))
+        .collect()
 }
 
 fn resolve_call(caller: &FunctionMetrics, call: &str, index: &SymbolIndex) -> ResolutionOutcome {
